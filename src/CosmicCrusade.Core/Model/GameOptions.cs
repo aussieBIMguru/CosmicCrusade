@@ -1,0 +1,92 @@
+using System.Text.Json;
+
+namespace CosmicCrusade.Core.Model;
+
+/// <summary>Pre-game options (spec §10, game-modes.json).</summary>
+public sealed class GameOptions
+{
+    public int RoundsToWin { get; set; } = 3;
+    public EmptyDeckRule EmptyDeck { get; set; } = EmptyDeckRule.Reshuffle;
+    public bool Warzones { get; set; }
+    public bool Leaders { get; set; } = true;
+    public DeckMode DeckMode { get; set; } = DeckMode.Standard;
+
+    /// <summary>RNG seed. Same seed + same decisions = identical game.</summary>
+    public int Seed { get; set; } = Environment.TickCount;
+
+    /// <summary>Copy counts per card id (base section, plus warzones section when enabled). Editable in setup.</summary>
+    public Dictionary<string, int> CopyCounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Card ids removed in No Leaders mode (besides Leader-class units).</summary>
+    public HashSet<string> LeaderRelatedCards { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public int HandUnitTarget { get; set; } = 5;
+    public int HandOrderTarget { get; set; } = 3;
+
+    public GameOptions Clone()
+    {
+        var c = (GameOptions)MemberwiseClone();
+        c.CopyCounts = new Dictionary<string, int>(CopyCounts, StringComparer.OrdinalIgnoreCase);
+        c.LeaderRelatedCards = new HashSet<string>(LeaderRelatedCards, StringComparer.OrdinalIgnoreCase);
+        return c;
+    }
+
+    /// <summary>
+    /// Loads defaults from game-modes.json and the pool file it references (paths relative to <paramref name="dataDir"/>).
+    /// </summary>
+    public static GameOptions LoadDefaults(string dataDir)
+    {
+        var options = new GameOptions();
+        var modesPath = Path.Combine(dataDir, "game-modes.json");
+        string poolRel = "pools/standard.json";
+
+        if (File.Exists(modesPath))
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(modesPath));
+            var root = doc.RootElement;
+            if (root.TryGetProperty("defaults", out var d))
+            {
+                if (d.TryGetProperty("pool", out var p)) poolRel = p.GetString() ?? poolRel;
+                if (d.TryGetProperty("roundsToWin", out var r)) options.RoundsToWin = r.GetInt32();
+                if (d.TryGetProperty("emptyDeck", out var e)) options.EmptyDeck = CardDatabase.ParseEnum<EmptyDeckRule>(e.GetString()!);
+                if (d.TryGetProperty("warzones", out var w)) options.Warzones = w.GetBoolean();
+                if (d.TryGetProperty("leaders", out var l)) options.Leaders = l.GetBoolean();
+                if (d.TryGetProperty("deckMode", out var m)) options.DeckMode = CardDatabase.ParseEnum<DeckMode>(m.GetString()!);
+            }
+            if (root.TryGetProperty("leaderRelatedCards", out var lr))
+                foreach (var id in lr.EnumerateArray()) options.LeaderRelatedCards.Add(id.GetString()!);
+        }
+
+        var pool = PoolDefinition.Load(Path.Combine(dataDir, poolRel));
+        options.CopyCounts = pool.MergedCounts(includeWarzones: true);
+        return options;
+    }
+}
+
+/// <summary>A copy-count pool file (pools/standard.json).</summary>
+public sealed class PoolDefinition
+{
+    public string Name { get; init; } = "";
+    public Dictionary<string, int> Base { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> Warzones { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public Dictionary<string, int> MergedCounts(bool includeWarzones)
+    {
+        var all = new Dictionary<string, int>(Base, StringComparer.OrdinalIgnoreCase);
+        if (includeWarzones)
+            foreach (var kv in Warzones) all[kv.Key] = kv.Value;
+        return all;
+    }
+
+    public static PoolDefinition Load(string path)
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
+        var root = doc.RootElement;
+        var pool = new PoolDefinition { Name = root.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "" };
+        if (root.TryGetProperty("base", out var b))
+            foreach (var p in b.EnumerateObject()) pool.Base[p.Name] = p.Value.GetInt32();
+        if (root.TryGetProperty("warzones", out var w))
+            foreach (var p in w.EnumerateObject()) pool.Warzones[p.Name] = p.Value.GetInt32();
+        return pool;
+    }
+}

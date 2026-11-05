@@ -1,0 +1,101 @@
+<UserControl x:Class="CosmicCrusade.App.Views.SetupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:CosmicCrusade.App.Controls">
+    <Grid>
+        <controls:Starfield />
+
+        <Grid Margin="40,30">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="380" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="280" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Title + options -->
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="COSMIC" FontFamily="{StaticResource DisplayFont}" FontSize="96" Foreground="White" Margin="0,-10,0,-30">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="#7C3AED" BlurRadius="30" ShadowDepth="0" />
+                    </TextBlock.Effect>
+                </TextBlock>
+                <TextBlock Text="CRUSADE" FontFamily="{StaticResource DisplayFont}" FontSize="96" Foreground="{StaticResource GoldBrush}">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="#F59E0B" BlurRadius="30" ShadowDepth="0" />
+                    </TextBlock.Effect>
+                </TextBlock>
+
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1"
+                        CornerRadius="14" Padding="18" Margin="0,16,0,0">
+                    <StackPanel>
+                        <TextBlock Text="GAME SETUP" Style="{StaticResource Heading}" Margin="0,0,0,8" />
+
+                        <TextBlock Text="Rounds to win" Style="{StaticResource Muted}" />
+                        <DockPanel Margin="0,2,0,10">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding RoundsToWin}" Width="28" TextAlignment="Right" FontSize="16" />
+                            <Slider Minimum="1" Maximum="9" IsSnapToTickEnabled="True" TickFrequency="1" Value="{Binding RoundsToWin}" />
+                        </DockPanel>
+
+                        <TextBlock Text="Deck mode" Style="{StaticResource Muted}" />
+                        <ComboBox ItemsSource="{Binding DeckModes}" SelectedItem="{Binding DeckMode}" Margin="0,2,0,10" />
+
+                        <TextBlock Text="When a deck runs out" Style="{StaticResource Muted}" />
+                        <ComboBox ItemsSource="{Binding EmptyDeckRules}" SelectedItem="{Binding EmptyDeck}" Margin="0,2,0,10" />
+
+                        <CheckBox Content="Leaders (untick for No Leaders mode)" IsChecked="{Binding Leaders}" />
+                        <CheckBox Content="Warzones expansion orders" IsChecked="{Binding Warzones}"
+                                  ToolTip="Adds the Warzone deck (one Warzone revealed each round) and the Warzones Orders." />
+
+                        <TextBlock Text="Seed (blank = random)" Style="{StaticResource Muted}" Margin="0,8,0,0" />
+                        <TextBox Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8" />
+
+                        <TextBlock Text="{Binding Totals}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Margin="0,6,0,14" />
+
+                        <Button Content="START GAME" Style="{StaticResource GlowButton}" FontSize="32" Click="Start_Click" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="2,12,0,0"
+                           Text="Milestone 3.1: units with their When-you-play abilities (36 of 38), Lock and Unlock, Orders on a priority stack (17 Actions and 5 Reacts live), Assemble, scoring and an AI opponent. Static and Warzone effects come next." />
+            </StackPanel>
+
+            <!-- Card pool -->
+            <Border Grid.Column="1" Margin="24,0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource PanelBorderBrush}"
+                    BorderThickness="1" CornerRadius="14" Padding="14">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Button DockPanel.Dock="Right" Content="RESET COUNTS" Style="{StaticResource SmallButton}" Command="{Binding ResetCountsCommand}" />
+                        <TextBlock Text="CARD POOL" Style="{StaticResource Heading}" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Filter" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBox Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" />
+                    </DockPanel>
+                    <DataGrid ItemsSource="{Binding CardsView}" SelectedItem="{Binding SelectedCard}" AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Id" Binding="{Binding Id}" IsReadOnly="True" Width="56" />
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" IsReadOnly="True" Width="*" />
+                            <DataGridTextColumn Header="Race" Binding="{Binding Race}" IsReadOnly="True" Width="120" />
+                            <DataGridTextColumn Header="Type" Binding="{Binding Type}" IsReadOnly="True" Width="130" />
+                            <DataGridTextColumn Header="Set" Binding="{Binding SetName}" IsReadOnly="True" Width="74" />
+                            <DataGridTextColumn Header="Copies" Binding="{Binding Copies, UpdateSourceTrigger=PropertyChanged}" Width="64">
+                                <DataGridTextColumn.EditingElementStyle>
+                                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                        <Setter Property="Padding" Value="4,0" />
+                                    </Style>
+                                </DataGridTextColumn.EditingElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+
+            <!-- Preview -->
+            <StackPanel Grid.Column="2">
+                <Border x:Name="PreviewHost" Height="370" />
+                <TextBlock Text="{Binding SelectedCard.Definition.Text}" TextWrapping="Wrap" Margin="0,10,0,0" Style="{StaticResource Muted}" FontSize="13" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

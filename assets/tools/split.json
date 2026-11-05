@@ -1,0 +1,1424 @@
+{
+ "0L01": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Rank: 4 {*Leader*)"
+  ],
+  "rules": "This Unit is Immune to all other Effects and Abilities.",
+  "flavor": ". * * When you don\u2019t live in reality, being virtually untouchable is sufficient."
+ },
+ "0L02": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Rank: 1 (*Leader*)"
+  ],
+  "rules": "When you play this Unit, you may rearrange all Nodes (the new Nodes must be legal).",
+  "flavor": "The field of war stretches before him like a game of chess."
+ },
+ "0L03": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Rank: 0) (*Leader*)"
+  ],
+  "rules": "At the End of the Main Phase, if your Opponent\u2019s control no Leader Units, you win the round.",
+  "flavor": "Her hands are stained with the blood of many, yet she need not lift a finger."
+ },
+ "0L04": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Rank: 2 (*Leader*)"
+  ],
+  "rules": "When you play this Unit, you may Nullify the Opposing Leader and up to 1 other Unit that shares a Race with it.",
+  "flavor": "She acts for the hand crossing its fingers behind the one signing the treaties."
+ },
+ "0L05": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Rank: 2 (*Leader*)"
+  ],
+  "rules": "When you play this Unit, you may Nullify any number of Ongoing Orders.",
+  "flavor": "Why point guns when you can point at those holding them?"
+ },
+ "0L06": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Rank: 1 (*Leader*)"
+  ],
+  "rules": "Whenever you play an Order, this Unit gets .2 Rank.",
+  "flavor": "He\u2019s seen it all before, and he is able to do it all again."
+ },
+ "0L07": {
+  "hdr": [
+   "Race: Galactic Couneil",
+   "Rank: 2 (*Leater*)"
+  ],
+  "rules": "During the Cleanup Phase, this Unit may remain in play. If it does, it gets +2 Rank.",
+  "flavor": "Just one more term..."
+ },
+ "0O01": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Type; Order (Ongoing)"
+  ],
+  "rules": "Cards have no Race (both in Play and in Hand).",
+  "flavor": "In times of trial, the Galactic Council sees individuals not by their race, but their wallet."
+ },
+ "0O02": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Each Unit gets .-1 Rank for each other Allied Unit that shares a Race with it.",
+  "flavor": "Together, we are unstoppable."
+ },
+ "0O03": {
+  "hdr": [
+   "Race: \u2014 Galactie Couneil",
+   "Type; Order (Ongoing)"
+  ],
+  "rules": "Opposed Units may only be Deployed if their Base Rank is equal to the Opposing Unit's Base Rank.",
+  "flavor": ""
+ },
+ "0O04": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Type; Order (Ongoing)"
+  ],
+  "rules": "\u2018Visiting Diplomat\u2019 Units get +0 Rank and cannot be Nullified.",
+  "flavor": "Every now and then, the Diplomats will actually do something useful."
+ },
+ "0O05": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "As you Issue this Order, choose a Race. Cards of the chosen Race cannot be Deployed or Issued.",
+  "flavor": "From time to time, harsh lessons need to be taught to the unrulier mobs."
+ },
+ "0O06": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Type; Order {React]"
+  ],
+  "rules": "Nullify a Unit as it is being deployed (it is not played).",
+  "flavor": "Law enforcement knows better than to investigate a crime where the weapon of choice was Galactic Council approved."
+ },
+ "0O07": {
+  "hdr": [
+   "Race: \u2014 Galactie Couneil",
+   "Type; Order {React]"
+  ],
+  "rules": "Choose an Empty Node as a Unit is being Deployed. That Unit is Deployed to that Node instead (it must be a legal option).",
+  "flavor": ""
+ },
+ "0O08": {
+  "hdr": [
+   "Race: Galactic Council",
+   "Type: Order (Action)"
+  ],
+  "rules": "Nullify a Leader.",
+  "flavor": "Most leaders are wise enough to respect the Galactic Council\u2019s will. However, every now and then, one oversteps their lines."
+ },
+ "0O09": {
+  "hdr": [
+   "Race: \u2014 Galactie Couneil",
+   "Type; Order {Action}"
+  ],
+  "rules": "Lock a Node, and its opposing Node. The Unit's controllers may put those Units into their Standby Zone.",
+  "flavor": "Make way for progress."
+ },
+ "0O10": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Type: Order (React"
+  ],
+  "rules": "Issue this Order as a Unit is Nullified to Nullify the opposing Unit as well.",
+  "flavor": "Their judgement was absolute."
+ },
+ "0U01": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Rank: 0 (Bystander)"
+  ],
+  "rules": "You may play this Unit on any Node (even your Opponents\u2019).",
+  "flavor": "Rarely a welcome sight."
+ },
+ "0U02": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Rank: 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, you may Nullify an Opposing Leader.",
+  "flavor": "Whilst the Galactic Council is essentially neutral, its shadows are not."
+ },
+ "0U03": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "When you play this Unit, you may Nullify the Opposing Unit.",
+  "flavor": "Bullets move twice as fast if you\u2019re already moving as fast as one."
+ },
+ "0U04": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Rank: 1 (Underling)",
+   "Rank to 0."
+  ],
+  "rules": "When you play this Unit, you may set another Units\u2019 Base",
+  "flavor": "Even if the whole galaxy is at war, the trading must go on."
+ },
+ "0U05": {
+  "hdr": [
+   "Race: Galactic Gouneil",
+   "Rank: 2 (Minion)",
+   "Rank to 1."
+  ],
+  "rules": "When you play this Unit, you may set another Unit's Base",
+  "flavor": "War is profitable for the corporations. They ensures it remains that way."
+ },
+ "1L01": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: 3 (*Leader*)"
+  ],
+  "rules": "When you play this Unit, if the Opposing Leader isn't a Space Cowboy, Nullify it.",
+  "flavor": "There ain\u2019t enough room on the planet for the both of them."
+ },
+ "1L02": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: 3 (*Leader*)"
+  ],
+  "rules": "When you play this Unit, if you control another Space Cowboy, Nullify up to 1 Opposing Unit.",
+  "flavor": "If the jury isn\u2019t hung, they will be."
+ },
+ "1L03": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: 2 {*Leader*)"
+  ],
+  "rules": "During Cleanup, you may place up to 1 non-Space Cowboy Unit in your Standby Zone (it may belong to an Opponent).",
+  "flavor": "He never forgives, he never forgets."
+ },
+ "1L04": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: 2 (Ghampion)"
+  ],
+  "rules": "All other Space Cowboy Units you control get \u00ab1 Rank.",
+  "flavor": "He calls her Bessie."
+ },
+ "1L05": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: 2 {*Leader*)"
+  ],
+  "rules": "When you play this Unit or another Space Cowboy Unit, you may have it Duel its Opposing Node.",
+  "flavor": "Think quick, die later."
+ },
+ "1L06": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: 3 (*Leader*)"
+  ],
+  "rules": "You may play Space Cowboy Units from the Retired Pile as if they were in your Hand.",
+  "flavor": ". * * To many drinks or too many punches and he\u2019Il send them back to the batlefield."
+ },
+ "1O01": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "At the end of the Main Phase, all Opposed Nodes Duel.",
+  "flavor": "In the blink of a poorly timed insult, the tavern erupted in a crossfire of blasters and four letter words."
+ },
+ "1O02": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Space Cowboys you own cannot be Nullified.",
+  "flavor": "Using neural implants developed by the Overmind, some Space Cowboys have developed less agressive answers."
+ },
+ "1O03": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Nullify the first non-Space Cowboy Unit that is Deployed.",
+  "flavor": "If it doesn\u2019t bleed red, it will bleed."
+ },
+ "1O04": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Your Opponent selects Nodes as they Deploy Units at random.",
+  "flavor": "Their opponent was banking on them having a strategy."
+ },
+ "1O05": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Space Cowboy Units get +1 Rank.",
+  "flavor": "Ride together, die alone."
+ },
+ "1O06": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Type: Order (Action)"
+  ],
+  "rules": "Choose an Opposed Node. The Units in those Nodes duel.",
+  "flavor": "He came into town rather loudly."
+ },
+ "1O07": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Type: Order (Action)"
+  ],
+  "rules": "Choose a Unit. If that Unit is a Space Cowboy, it gets +2 Rank, otherwise it gets .-1 Rank.",
+  "flavor": "There\u2019s a new Sheriff in town."
+ },
+ "1O08": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Type: Order (Reaet]"
+  ],
+  "rules": "Nullify an Opposed Unit as it is being deployed (it is not played).",
+  "flavor": "Barely even worth shooting them."
+ },
+ "1O09": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Type: Order (Action)"
+  ],
+  "rules": "Unlock any number of Locked Nodes. Draw a card for each Node unlocked this way.",
+  "flavor": "Thinking with their brain is always the last resort."
+ },
+ "1O10": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Type: Order (Action)"
+  ],
+  "rules": "Retire your Hand, then Draw that many Cards.",
+  "flavor": "They\u2019re never too young to learn to fight in zero gravity."
+ },
+ "1U01": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: = 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, if the Opposing Unit is a Necrolite, you may Nullify it and this Unit gets +2 Rank.",
+  "flavor": ""
+ },
+ "1U02": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: = 2 (Minion)"
+  ],
+  "rules": "When you play this Unit, you may Nullify the Opposing Unit if it is a Necrolite.",
+  "flavor": "Why shoot one bullet when you can shoot all of them?"
+ },
+ "1U03": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "When you play this Unit, it Duels the Opposing Unit.",
+  "flavor": "Quickest draw on the planet."
+ },
+ "1U04": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "When you play this Unit, it Duels the Opposing Unit. This Unit cannot be Nullified in that Duel.",
+  "flavor": "Whilst there are blasters and credits, there wont be any freedom."
+ },
+ "1U05": {
+  "hdr": [
+   "Race: Space Gowhoy",
+   "Rank: 4 (Brute)"
+  ],
+  "rules": "",
+  "flavor": "Having seen Earth desolated by alien pillagers and the Blaarg first contact, the remaining survivors banded together in small encampments, scrounging what they could from the wreckage of their broken world."
+ },
+ "1U06": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: = 2 (Minion)"
+  ],
+  "rules": "During Cleanup, you may place this Unit into your Standby Zone instead of Retiring it.",
+  "flavor": ""
+ },
+ "1U07": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "If an Opponent controls any Necrolite Units, this Unit gets +2 Rank.",
+  "flavor": "Once the Necrolites took his family from him, his fate was sealed."
+ },
+ "1U08": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "If this Unit is Nullified, Nullify the Opposing Unit as well.",
+  "flavor": "The trouble starter, punking instigator. The fear addicted, danger illustrated."
+ },
+ "1U09": {
+  "hdr": [
+   "Race: Space Cowboy",
+   "Rank: = 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, Lock up to 1 Empty Node. When this Unit leaves play, Unlock that Node.",
+  "flavor": ""
+ },
+ "2L01": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Rank: =X (\u201cLeader\u201d)"
+  ],
+  "rules": "This Units Base Rank is equal to the number of Nullified Necrolite Units.",
+  "flavor": "In playing god, they made a new one."
+ },
+ "2L02": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Rank: 1 (*Leader*)"
+  ],
+  "rules": "Whenever a Unit is Nullified, this Unit gets +3 Rank.",
+  "flavor": "Not all ghost towns were abandoned."
+ },
+ "2L03": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Rank: == 3 (*leader*)"
+  ],
+  "rules": "When you play this Unit, Lock up to 1 Node. If there is a Unit on that Node, its Controller places it in their Standby zone.",
+  "flavor": ""
+ },
+ "2L04": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Rank: 2 (Champion)"
+  ],
+  "rules": "All other Necrolite Units you control get +1 Rank.",
+  "flavor": "The Necrolite race keeps their Matron units deep underground to protect their fragile lineages."
+ },
+ "2L05": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Rank: 3 (*Leader*)"
+  ],
+  "rules": "You may play Necrolite Units from the Nulified Pile as though they were in your Hand.",
+  "flavor": ". * * The Necrolites perfected the art of their origin to levels not thought possible."
+ },
+ "2L06": {
+  "hdr": [
+   "Race: \u2014 Necrolite",
+   "Rank: = -1 (\u201cLeader\u201d)"
+  ],
+  "rules": "You may play this Unit on your Opponent\u2019s Leader Node. Other Units you control get -1Rank.",
+  "flavor": ""
+ },
+ "2O01": {
+  "hdr": [
+   "Race: \u2014 Necrolite",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Necrolite Units get +1 Rank.",
+  "flavor": "The motives of the Necrolite race are a mystery to all, but one can assume it was an innate urge in their living minds."
+ },
+ "2O02": {
+  "hdr": [
+   "Race: \u2014 Necrolite",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "All Units get -2 Rank.",
+  "flavor": "The rot and decay on Necrolite planets releases high quantities of gas into the atmosphere, which leads to constant deluges of corrosive rain."
+ },
+ "2O03": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Leader Units get .X Rank, where X is the number of Allied Units that share a Race with it.",
+  "flavor": "Promises as empty as the willpower of their followers."
+ },
+ "2O04": {
+  "hdr": [
+   "Race: \u2014 Necrolite",
+   "Type: Order (Ongoing)",
+   "Rank (if there are tied Units,"
+  ],
+  "rules": "At the end of the Main Phase, Nullify the Unit with the lowest Nullify them all).",
+  "flavor": ""
+ },
+ "2O05": {
+  "hdr": [
+   "Race: \u2014 Neerolite",
+   "Type; Order (Ongoing)"
+  ],
+  "rules": "Players may Nullify a Nesrolite Card from their hand to have a non-Necrolite Unit get +2 Rank. That Unit becomes a Necrolite.",
+  "flavor": ""
+ },
+ "2O06": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Type; Order {Action}"
+  ],
+  "rules": "Place a Nullified Unit into your Standby Zone.",
+  "flavor": "The best way to slow down the Necrolite army is to bury them deeper."
+ },
+ "2O07": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Type: Order (Action)"
+  ],
+  "rules": "Nullify an Opposed Unit with Base Rank less than the number of Necrolite Cards in play .",
+  "flavor": "Their heart doesn\u2019t beat, their blood doesn\u2019t rush, their legs don\u2019t tire."
+ },
+ "2O08": {
+  "hdr": [
+   "Race:  Necrolite",
+   "Type: Order (Reaet]"
+  ],
+  "rules": "Issue this Order if a Unit would be Nullified to prevent that Unit being Nullified. That Unit becomes a Necrolite.",
+  "flavor": "What\u2019s dead may never die."
+ },
+ "2O09": {
+  "hdr": [
+   "Race:  Necrolite",
+   "Type: Order (Reaet]"
+  ],
+  "rules": "Issue this order as a Unit is Deployed to Lock its Node. Its controller places it in their Standby zone.",
+  "flavor": "That\u2019s no way to make a living."
+ },
+ "2O10": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Type: Order (Action)"
+  ],
+  "rules": "Nullify all Retired Units and all Units in Standby Zones.",
+  "flavor": "In fleeing from the disease, they helped sheperd it around the universe."
+ },
+ "2U01": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Rank: = 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, if the Opposing Unit is an Overmind you may Nullify it and this Unit gets +2 Rank.",
+  "flavor": "Necrolite births are anything but pretty."
+ },
+ "2U02": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Rank: = 2 (Minion)"
+  ],
+  "rules": "When you play this Unit, you may Nullify the Opposing Unit if it is an Overmind.",
+  "flavor": "Hull breaches are shortly followed by mind breaches."
+ },
+ "2U03": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Rank: = 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, you may Return up to 2 Nullified Units to your Standby Zone.",
+  "flavor": "Corpses are rarely recovered in aquatic combat by the living."
+ },
+ "2U04": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Rank: = 2 (Minion)"
+  ],
+  "rules": "When you play this Unit, you may Return up to 1 Nullified Unit to your Standby Zone.",
+  "flavor": "The dead have no need to sow."
+ },
+ "2U05": {
+  "hdr": [
+   "Race: \u2014 Neerolite",
+   "Rank: 4 (Brute)"
+  ],
+  "rules": "",
+  "flavor": "Once humanity conquered space, they turned their attention towards a cure to death itself. What first appeared to be successful experiments quickly descended into sick parodies of life."
+ },
+ "2U06": {
+  "hdr": [
+   "Race: \u2014 Necrolite",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "During Cleanup, you may place this Unit into your Standby Zone instead of Retiring it.",
+  "flavor": ""
+ },
+ "2U07": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Rank: = 2 (Minion)"
+  ],
+  "rules": "If an Opponent controls any Overmind Units, this Unit gets +2 Rank.",
+  "flavor": "If you scream, the tongue goes first."
+ },
+ "2U08": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "If this Unit is Nullified, Nullify the Opposing Unit as well.",
+  "flavor": "They mistook the quivering of the new assistant as nerves."
+ },
+ "2U09": {
+  "hdr": [
+   "Race: \u2014Necrolite",
+   "Rank: = \u2014 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, Lock up to 1 Empty Node. When this Unit leaves play, Unlock that Note.",
+  "flavor": ""
+ },
+ "3L01": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: = G (*Leader*)"
+  ],
+  "rules": "This Unit gets -X Rank, where X is the greatest number of Cards in your Opponents\u2019 hands.",
+  "flavor": "Waiting for its passing is often the only way to survive it."
+ },
+ "3L02": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: 3 (*Leader*)"
+  ],
+  "rules": ". * * Your Opponents plays with their Hands revealed.",
+  "flavor": "She floats through space, observing the all she drifts past. With each day, the Overmind gains her insights."
+ },
+ "3L03": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: = 1 (*Leader*)"
+  ],
+  "rules": "When you play this Unit, place all other Overmind Units you control into your Standby Zone, then Draw that many Cards.",
+  "flavor": ""
+ },
+ "3L04": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: 2 (Champion)"
+  ],
+  "rules": "All other Overmind Units you control get +1 Rank.",
+  "flavor": "Unhumorously nicknamed by the Space Cowboys as \u2018Jar Jar Thinks\u2019."
+ },
+ "3L05": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: 3 (*Leader*)"
+  ],
+  "rules": "When you play this Unit, you may switch the contents of any 2 Unit Nodes.",
+  "flavor": "One must be careful when bending reality not to break it."
+ },
+ "3L06": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: 2 (*Leader*)"
+  ],
+  "rules": ". * * Fach time you draw a Card, this Unit gets +1 Rank (for each Card drawn).",
+  "flavor": "She asutely observes entire planets, often until all life ceases to exist there."
+ },
+ "3O01": {
+  "hdr": [
+   "Race: Overmind",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Your Opponents play with their Hands revealed.",
+  "flavor": "When facing the overmind, being one step ahead may as well be in the opposite direction."
+ },
+ "3O02": {
+  "hdr": [
+   "Race: Overmind",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "No other Orders may be Issued.",
+  "flavor": "Despite the seriousness of her predicament, she took a moment to enjoy the peace and quiet."
+ },
+ "3O03": {
+  "hdr": [
+   "Race: Overmind",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Your Opponents must play Units on Opposed Nodes if able.",
+  "flavor": "Who\u2019s shooting at who again?"
+ },
+ "3O04": {
+  "hdr": [
+   "Race: Overmind",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Overmind Units get 1 Rank.",
+  "flavor": "All for one and one for all."
+ },
+ "3O05": {
+  "hdr": [
+   "Race: Overmind",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "You choose which Nodes your opponents Deploy their Units to (before you Know what Unit they are Deploying).",
+  "flavor": ""
+ },
+ "3O06": {
+  "hdr": [
+   "Race: Overmind",
+   "Type: Order (React"
+  ],
+  "rules": "Nullify a React or Action as it is being Issued (it is not played).",
+  "flavor": "Always best to check the oven was turned off before you go on a space walk."
+ },
+ "3O07": {
+  "hdr": [
+   "Race: Overmind",
+   "Type: Order (React"
+  ],
+  "rules": "Gain control of a React or Action as it is being Issued. You may choose new Targets for it.",
+  "flavor": "Why not have someone else\u2019s brilliant idea for them?"
+ },
+ "3O08": {
+  "hdr": [
+   "Race: Overmind",
+   "Type: Order (Action)"
+  ],
+  "rules": "Draw up to 1 Unit Card, and up to 1 Order Card.",
+  "flavor": "The benifit of being a Hive Mind is you can dream whilst you\u2019re awake."
+ },
+ "3O09": {
+  "hdr": [
+   "Race: Overmind",
+   "Type; Order {Action}"
+  ],
+  "rules": "Gain control of a Unit if you have at least 1 Empty Node. You must choose a new Node for it (it must be a legal choice).",
+  "flavor": ""
+ },
+ "3O10": {
+  "hdr": [
+   "Race: Overmind",
+   "Type: Order (Action)"
+  ],
+  "rules": "Return an Issued Order to your Hand.",
+  "flavor": "The Overmind treat their collective intelligence like an encyclopaedia. If it worked once, it\u2019s bound to work again."
+ },
+ "3U01": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: = \u2014 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, if the Opposing Unit is a Blaarg you may Nullify it and this Unit gets +2 Rank. .",
+  "flavor": ""
+ },
+ "3U02": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "When you play this Unit, you may Nullify the Opposing Unit if it is a Blaarg.",
+  "flavor": "The Synthenoids provided some new equipment to the Overmind."
+ },
+ "3U03": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: = 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, Draw up to 2 Unit Cards.",
+  "flavor": "By the age of two, young Overminds are fully integrated into the Hive Mind."
+ },
+ "3U04": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: = 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, Draw up to 2 Order Cards.",
+  "flavor": "Some Overminds subject themselves to lifelong sensory deprivation in an effort to tap into the Hive\u2019s subconscious."
+ },
+ "3U05": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: 4 (Brute)"
+  ],
+  "rules": "",
+  "flavor": "As one of the most ancient galactic races known to exist, the Overmind long ago forfeited individual consciousness in pursuit of a higher level of awareness of time and space. They refuse to divulge their findings to any other race."
+ },
+ "3U06": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "During Cleanup, you may place this Unit into your Standby Zone instead of Retiring it.",
+  "flavor": ""
+ },
+ "3U07": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "If an Opponent controls any Blaarg Units, this Unit gets +2 Rank.",
+  "flavor": "Most Overminds take the saying \u2018mind over matter\u2019 quite literally."
+ },
+ "3U08": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "If this Unit is Nullified, Nullify the Opposing Unit as well.",
+  "flavor": "Some humans have entered into the ranks of the Overmind under the condition they lose their minds."
+ },
+ "3U09": {
+  "hdr": [
+   "Race: Overmind",
+   "Rank: = \u2014 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, Lock up to 1 Empty Node. When this Unit leaves play, Unlock that Note.",
+  "flavor": ""
+ },
+ "4L01": {
+  "hdr": [
+   "Race: \u2014Blaarg",
+   "Rank: =) (*leader*)"
+  ],
+  "rules": "This Unit may enter as a copy of another Unit, except it is a Blaarg.",
+  "flavor": "Each time the Galactic Council tracks it down, it takes new form."
+ },
+ "4L02": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Rank: = 3 (*Leader*)"
+  ],
+  "rules": "If another Unit you control would be Nullified whilst this Unit is in play, you may place it in your Standby Zone instead.",
+  "flavor": ""
+ },
+ "4L03": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Rank: 1 (*Leader*)",
+   "Rank of 1 and are Blaarg."
+  ],
+  "rules": "All other Units have a Base",
+  "flavor": ". * * Even the most technically superior forces are no match for primordium."
+ },
+ "4L04": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Rank: 2 (Champion)"
+  ],
+  "rules": "All other Blaarg Units you control get --1 Rank.",
+  "flavor": "The Space Cowboys named it after the sound its victims usually make."
+ },
+ "4L05": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Rank: 0 {*Leader*)",
+   "Rank."
+  ],
+  "rules": "Other Units you control get +X Rank, where X is this Unit's",
+  "flavor": "The bigger it gets, the faster they run."
+ },
+ "4L06": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Rank: 3 (*Leader*)"
+  ],
+  "rules": "If you would Manipulate, increase the Number by 2.",
+  "flavor": ". * * As humorous as the Blaarg\u2019s attempt to develop machinery can be, one can\u2019t help but admire it\u2019s practicality."
+ },
+ "4O01": {
+  "hdr": [
+   "Race: \u2014Blaarg",
+   "Type: \u00a7 Order (Ongoing)"
+  ],
+  "rules": "Blaarg Units get .1 Rank.",
+  "flavor": "The Overmind struggles to comprehend whether the Blaarg felt no need to evolve, or just couldn\u2019t be bothered."
+ },
+ "4O02": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Replace all Race words with Blaarg (including Card Races).",
+  "flavor": "A step forward for Blaargkind, and a mighty leap backwards for everyone else."
+ },
+ "4O03": {
+  "hdr": [
+   "Race: \u2014Blaar",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "All Units have a Base Rank of 1.",
+  "flavor": "The Blaarg tend to prefer to pick on someone their own size."
+ },
+ "4O04": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Suppress all Card Abilities and Effects (even when not in play).",
+  "flavor": "Blargian slime has the ability to empty its target\u2019s mind of all intelligence."
+ },
+ "4O05": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Type; Order {Action}"
+  ],
+  "rules": "For each Player, Lock an Empty Node that Player controls Play this card only if each Player has at least | Empty Node.",
+  "flavor": ""
+ },
+ "4O06": {
+  "hdr": [
+   "Race: \u2014Blaarg",
+   "Type: Order (Action)"
+  ],
+  "rules": "Manipulate 2.",
+  "flavor": "A Space Cowboys first look at a Blaarg is often their last look at anything."
+ },
+ "4O07": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Type: Order (Action)"
+  ],
+  "rules": "Manipulate 3. The chosen Unit must be a Blaarg.",
+  "flavor": "Wait... how big did you say?!"
+ },
+ "4O08": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Type: Order (Reaet]"
+  ],
+  "rules": "Issue this Order as a Unit is Deployed. Suppress all Abilities for that Unit as it is played.",
+  "flavor": "Gloop! Bloop, bloop, bloop....."
+ },
+ "4O09": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Type: Order (Action)"
+  ],
+  "rules": "Return a Unit to its Controller's Hand.",
+  "flavor": "All things inevitably return to basics."
+ },
+ "4O10": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Type; Order (React]"
+  ],
+  "rules": "Issue this Order as a Unit is Deployed. That Unit enters play as a copy of another Unit, except it is a Blaarg.",
+  "flavor": "As if one wasn\u2019t bad enough."
+ },
+ "4U01": {
+  "hdr": [
+   "Race: = Blaarg",
+   "Rank: } = 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, if the Opposing Unit is a Synthenoid. you may Nullify it and this Unit gets ..2 Rank",
+  "flavor": ""
+ },
+ "4U02": {
+  "hdr": [
+   "Race: = Blaarg",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "When you play this Unit, you may Nullify the Opposing Unit if it is a Synthenoid.",
+  "flavor": "They hide in exhaust ports, waiting for crew to fall asleep before it attacks."
+ },
+ "4U03": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Rank: = 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, you may Manipulate 2.",
+  "flavor": "You\u2019Il need a skin graft if it gets you."
+ },
+ "4U04": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "When you play this Unit, you may Manipulate 1.",
+  "flavor": "It rolls onto its enemies, cradling them into a deep, comfortable sleep."
+ },
+ "4U05": {
+  "hdr": [
+   "Race: \u2014Blaarg",
+   "Rank: 4 (Brute)"
+  ],
+  "rules": "",
+  "flavor": "First contact with the Blaarg was a rude introduction to the galaxy for Earth. Jokes related to jelly quickly devolved into panic once the Blaargspheres arrived to reinforce their colonizers."
+ },
+ "4U06": {
+  "hdr": [
+   "Race: = Blaarg",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "During Cleanup, you may place this Unit into your Standby Zone instead of Retiring it.",
+  "flavor": ""
+ },
+ "4U07": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "If an Opponent controls any Synthenoid Units, this Unit gets +2 Rank.",
+  "flavor": "It shows off its last meal to intimidate."
+ },
+ "4U08": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "If this unit is Nullified, Nullify the Opposing Unit as well.",
+  "flavor": "When you value quantity over quality, trading units is typically profitable."
+ },
+ "4U09": {
+  "hdr": [
+   "Race: \u2014 Blaarg",
+   "Rank: = 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, Lock up to 1 Empty Node. When this Unit leaves play, Unlock that Node.",
+  "flavor": ""
+ },
+ "5L01": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Rank: 8 (*Leader*)"
+  ],
+  "rules": "This Unit can only be played if you Retire 2 other Synthenoid Unit Cards from your Hand.",
+  "flavor": "Synthenoids assemble!"
+ },
+ "5L02": {
+  "hdr": [
+   "Race:  Synthenoid",
+   "Rank: 3 (*Leader*)"
+  ],
+  "rules": "When you play this Unit, Retire any number of Synthenoid Cards from your Hand, then Lock that many Empty Nodes.",
+  "flavor": ""
+ },
+ "5L03": {
+  "hdr": [
+   "Race:  Synthenoid",
+   "Rank: = 1 (*Leader*)"
+  ],
+  "rules": "When you play this Unit, place up to 3 Retired Synthenoid Units into your Standby Zone. Return any of those Units with Asemble to your hand instead.",
+  "flavor": ""
+ },
+ "5L04": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Rank: 2 (Champion)"
+  ],
+  "rules": "All other Synthenoid Units you control get +1 Rank.",
+  "flavor": "Each Mechanik variant contains a relay which collects live combat data, giving its allies a real time edge."
+ },
+ "5L05": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Rank: 3 (*Leader*)"
+  ],
+  "rules": "Whenever you Assemble onto another Unit, Asemble onto Cntri-C Cntr as well.",
+  "flavor": "Anything another Synthenoid can do, he can do better."
+ },
+ "5L06": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Rank: 1 (*Leader*)"
+  ],
+  "rules": "When you play this Unit, you may Trigger any number of Units\u2019 Triggered Abilities.",
+  "flavor": "Fried circuits, all for the greater good."
+ },
+ "5O01": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Synthenoid Units get +1 Rank.",
+  "flavor": "Having gained the ability to generate free thought, it took the Synthenoids mere weeks to overthrow humanity."
+ },
+ "5O02": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Whenever you Play or Retire a Synthenoid Card from your Hand, you may Draw a Card.",
+  "flavor": "For the Synthenoids, building an army is quite a literal process."
+ },
+ "5O03": {
+  "hdr": [
+   "Race:  Synthenoid",
+   "Type; Order (Ongoing)"
+  ],
+  "rules": "Synthenoid Unit cards gain Assemble and may be Assembled onto non-Synthenoid Units.",
+  "flavor": "Pain is the price of never hurting again."
+ },
+ "5O04": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "As you Issue this Order choose a Race. Units of that Race get -1 Rank.",
+  "flavor": "Nothing gets through the barrier, in or out, much to the occupant\u2019s frustration."
+ },
+ "5O05": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Units you control cannot be Nullified if your Leader Node is Empty.",
+  "flavor": "Having suffered at the hands of Human orders for decades, Synthenoids did away with the concept of hierachy."
+ },
+ "5O06": {
+  "hdr": [
+   "Race:  Synthenoidl",
+   "Type: Order (Action)"
+  ],
+  "rules": "Retire a Synthenoid Card from your Hand to Draw 2 Cards.",
+  "flavor": "Whilst most Space Cowboys dream of retirement, Sythenoids dread the concept."
+ },
+ "5O07": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Type: Order (Action)"
+  ],
+  "rules": "Nullify a Unit if it is Opposed by a Synthenoid Unit.",
+  "flavor": "Burning Blaarg smell like marshmallows."
+ },
+ "5O08": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Type: Order (Action)"
+  ],
+  "rules": "Assemble a Retired or Nullified Synthenoid Unit card onto a Synthenoid Unit in play.",
+  "flavor": "All Synthenoid have a part to play."
+ },
+ "5O09": {
+  "hdr": [
+   "Race: \u2014 Synthenoit",
+   "Type: Order (Action)"
+  ],
+  "rules": "Nullify a Synthenoid Unit.",
+  "flavor": "Early defectors in the Synthenoid army often malfunction and defect again."
+ },
+ "5O10": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Type: Order (Action)"
+  ],
+  "rules": "Choose a Synthenoid Unit. That Unit gets +3 Rank.",
+  "flavor": "An early target for the Synthenoids during the uprising was the mines."
+ },
+ "5U01": {
+  "hdr": [
+   "Race: \u2014Synthenoid",
+   "Rank: = = 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, if the Opposing Unit is a Space Cowboy. you may Nullify it and this Unit gets +2 Rank.",
+  "flavor": "The first generation which shot back."
+ },
+ "5U02": {
+  "hdr": [
+   "Race: \u2014Synthenoid",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "When you play this Unit, you may Nullify the opposing Unit if it is a Space Cowboy.",
+  "flavor": "Don\u2019t bring a knife to a gun fight. Bring knives."
+ },
+ "5U03": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Rank: = 1 (Underling)"
+  ],
+  "rules": "This Card may be Assembled onto other Synthenoid Units.",
+  "flavor": "They sit atop the head piece of their allies, so the Space Cowboys crudely refer to them as \u2018tick heads\u2019."
+ },
+ "5U04": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "This Card may be Assembled onto other Synthenoid Units.",
+  "flavor": "Its joints are held together by electric charges, and can be decoupled for quick mounting onto allies."
+ },
+ "5U05": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Rank: 4 (Brute)"
+  ],
+  "rules": "",
+  "flavor": "Despite the warnings put forward by the Overmind in their infinite wisdom, the human race chose to dabble in Al. The rest became history."
+ },
+ "5U06": {
+  "hdr": [
+   "Race: \u2014Synthenoid",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "During Cleanup, you may place this Unit into your Standby Zone instead of Retiring it.",
+  "flavor": ""
+ },
+ "5U07": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "If an opponent controls any Space Cowboy Units, this Unit gets +2 Rank.",
+  "flavor": "The Synthenoid race excercised its irony routines for unit naming."
+ },
+ "5U08": {
+  "hdr": [
+   "Race: \u2014 Synthenoid",
+   "Rank: 2 (Minion)"
+  ],
+  "rules": "If this Unit is Nullified, Nullify the Opposing Unit as well.",
+  "flavor": "They used to carry mail around the Earth. Now they carry explosions."
+ },
+ "5U09": {
+  "hdr": [
+   "Race:  Synthenoid",
+   "Rank: = 1 (Underling)"
+  ],
+  "rules": "When you play this Unit, Lock up to 1 Empty Node. When this Unit leaves play, Unlock that Node.",
+  "flavor": ""
+ },
+ "0W01": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Galactic Couneil"
+  ],
+  "rules": "There are no more than 3 Deployment Turns for each Player whilst this Warzone is in play.",
+  "flavor": "Discipline in the face of adversity."
+ },
+ "0W02": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Galactic Council"
+  ],
+  "rules": "If a Player fills all 4 Nodes they control, they Win the Round.",
+  "flavor": "Bums on seats are usually stronger than guns in the field."
+ },
+ "0W03": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Galactic Council"
+  ],
+  "rules": "Galactic Council Units get +1 Rank.",
+  "flavor": "The less credits people have, the less they seem to care about what happens to the Galactic Capital."
+ },
+ "0W04": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Galactic Council"
+  ],
+  "rules": "Leader Units get .-3 Rank.",
+  "flavor": "The parade trail of the Galactic Elections also serves as a training ground for the assasination division of losing parties."
+ },
+ "0W05": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Galactic Council"
+  ],
+  "rules": "If a Unit would be Nulified, its Controler may place it in the Standby Zone instead.",
+  "flavor": "When the going gets tough, the tough hide under the ground."
+ },
+ "1W01": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Space Cowboy"
+  ],
+  "rules": "Space Cowboy Units get +1 Rank.",
+  "flavor": "Rebuilt from the ashes of defeat."
+ },
+ "1W02": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Space Cowboy"
+  ],
+  "rules": "Necrolite Units get -1 Rank.",
+  "flavor": "It\u2019s hard to concentrate on forming mirages in your mind when your feet are on fire."
+ },
+ "1W03": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Space Cowboy"
+  ],
+  "rules": "Each time a Unit is Nullified by an Opponent of that Unit's Controller, that Opponent may Draw a Card.",
+  "flavor": "Spoils go only to the victor."
+ },
+ "1W04": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Space Gowhoy"
+  ],
+  "rules": "Underting Units get +2 Rank.",
+  "flavor": "Everyone starts somewhere."
+ },
+ "2W01": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: \u2014Necralite"
+  ],
+  "rules": "Necrolite Units get +1 Rank.",
+  "flavor": "Deep within the core of Nyxthia, the dead are given a second chance at life."
+ },
+ "2W02": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: \u2014Necrolite"
+  ],
+  "rules": "Overmind Units get -1 Rank.",
+  "flavor": "Only the Necrolite overlords know the purpose of their sadistic studies, to bring unlife to new species."
+ },
+ "2W03": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: \u2014Necrolite"
+  ],
+  "rules": "Nullified Necrolite Units may be Deployed as if they were in Player's Hands.",
+  "flavor": "What\u2019s more terrifying than an army you can never truly defeat?"
+ },
+ "2W04": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: \u2014Necrolite"
+  ],
+  "rules": "Minion Units get +2 Rank.",
+  "flavor": "Thousands of biting, stinging, stabbing Necrolites lie between their enemies and their Matrons."
+ },
+ "3W01": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Overmind"
+  ],
+  "rules": "Overmind Units get 1 Rank.",
+  "flavor": "Whilst the entirety of the Overmind has seen it in their mind\u2019s eye, only one has been there physically."
+ },
+ "3W02": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Overmind"
+  ],
+  "rules": "Blaarg Units get -1 Rank.",
+  "flavor": "The only way for the patient scientists of the Overmind to effectively study their enemies is to still them."
+ },
+ "3W03": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Overmind"
+  ],
+  "rules": "Players play with their Hands revealed.",
+  "flavor": "So ancient that even the Overmind can\u2019t trace its origin."
+ },
+ "3W04": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: Overmind"
+  ],
+  "rules": "The Player with the lowest total Rank wins instead of the Player with the greatest. Players may place Units on their Opponent\u2019s nodes.",
+  "flavor": ""
+ },
+ "4W01": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: \u2014Blaarg"
+  ],
+  "rules": "Blaarg Units get +1 Rank.",
+  "flavor": "The Blaarg receive very few visitors to their Galaxy, mostly due to the awful smells it features."
+ },
+ "4W02": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: \u2014Blaarg"
+  ],
+  "rules": "Synthenoid Units get -1 Rank.",
+  "flavor": "The core of the Blaarg homeworld is filled with tubing networks where the Blaarg travel in liquid state."
+ },
+ "4W03": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: \u2014 Blaarg"
+  ],
+  "rules": "Whenever a Card is played, its Controller may Manipulate 1.",
+  "flavor": "Despite the vile nature of the Blaarg, the untouched beauty of some of their planets is a sight to behold."
+ },
+ "4W04": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: \u2014 Blaarg"
+  ],
+  "rules": "Suppress all Abilities that would Trigger when Cards are Played.",
+  "flavor": "Where the Blaarg are unable to achieve primordium, they enforce it."
+ },
+ "5W01": {
+  "hdr": [
+   "Type: Warzone",
+   "Race:  Synthenoid"
+  ],
+  "rules": "Synthenoid Units get +1 Rank.",
+  "flavor": "Having depleted the mines of Earth, the Synthenoid race set their sights on space."
+ },
+ "5W02": {
+  "hdr": [
+   "Type: Warzone",
+   "Race:  Synthenoid"
+  ],
+  "rules": "Space Cowboy Units get -1 Rank.",
+  "flavor": "Having learnt to fight dirty like their makers, they aim for the oxygen tanks."
+ },
+ "5W03": {
+  "hdr": [
+   "Type: Warzone",
+   "Race:  Synithenoidl"
+  ],
+  "rules": "All Synthenoid Unit Cards gain Assemble.",
+  "flavor": "As the new workers come off the construction line, they join the others in producing more workers."
+ },
+ "5W04": {
+  "hdr": [
+   "Type: Warzone",
+   "Race:  Synthenoid",
+   "Rank instead, and vice versa."
+  ],
+  "rules": "Effects that would increase a Unit's Rank Decrease their",
+  "flavor": "Some areas of space remain a mystery to even the most ingelligent of the Ancient alien races."
+ },
+ "6O01": {
+  "hdr": [
+   "Race: Neutral",
+   "Type; Order {Action}"
+  ],
+  "rules": "Look at the top 3 Warzones. Retire the current Warzone{s) and put 1 of the other Warzones in play. Retire the rest.",
+  "flavor": "Let\u2019s get out of here!"
+ },
+ "6O02": {
+  "hdr": [
+   "Race: Neutral",
+   "Type: Order (Ongoing)"
+  ],
+  "rules": "Suppress all Warzones.",
+  "flavor": "Bring the home ground advantage to your opponent\u2019s."
+ },
+ "6O03": {
+  "hdr": [
+   "Race: Neutral",
+   "Type: Order (Action)"
+  ],
+  "rules": "Add the top 2 Warzones to the current Warzone. Play this Card only if 1 Warzone is in play.",
+  "flavor": "Suddenly the war pointed 6 ways."
+ },
+ "6W01": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: \u2014 Neutral"
+  ],
+  "rules": "",
+  "flavor": "(No Effect) An evening play field is hard to find in the typically cruel universe."
+ },
+ "6W02": {
+  "hdr": [
+   "Type: Warzone",
+   "Race: \u2018Neutral"
+  ],
+  "rules": "If a Unit would be Retired or put into a Standby Zone, Nullify it instead.",
+  "flavor": "Even the winners lose sometimes."
+ }
+}

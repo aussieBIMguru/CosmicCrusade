@@ -1,0 +1,232 @@
+<UserControl x:Class="CosmicCrusade.App.Views.GameView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:CosmicCrusade.App.Controls"
+             Focusable="True">
+    <Grid x:Name="Root" Background="#03040E">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="340" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ===================== PLAY AREA ===================== -->
+        <Grid x:Name="PlayArea" Grid.Column="0" ClipToBounds="True"
+              MouseWheel="PlayArea_MouseWheel" MouseRightButtonDown="PlayArea_MouseRightButtonDown">
+
+            <controls:Starfield />
+
+            <!-- The board: a 2D canvas mapped onto a tilted 3D plane. It stays fully interactive. -->
+            <Viewport3D x:Name="Viewport" ClipToBounds="False">
+                <Viewport3D.Camera>
+                    <PerspectiveCamera x:Name="Camera" FieldOfView="50" NearPlaneDistance="0.1" FarPlaneDistance="200" />
+                </Viewport3D.Camera>
+                <ModelVisual3D>
+                    <ModelVisual3D.Content>
+                        <AmbientLight Color="White" />
+                    </ModelVisual3D.Content>
+                </ModelVisual3D>
+                <Viewport2DVisual3D x:Name="BoardVisual3D">
+                    <Viewport2DVisual3D.Geometry>
+                        <MeshGeometry3D Positions="-8,-5,0 8,-5,0 8,5,0 -8,5,0"
+                                        TextureCoordinates="0,1 1,1 1,0 0,0"
+                                        TriangleIndices="0 1 2 0 2 3" />
+                    </Viewport2DVisual3D.Geometry>
+                    <Viewport2DVisual3D.Material>
+                        <DiffuseMaterial Viewport2DVisual3D.IsVisualHostMaterial="True" Brush="White" />
+                    </Viewport2DVisual3D.Material>
+                    <Viewport2DVisual3D.Visual>
+                        <Canvas x:Name="BoardCanvas" Width="1600" Height="1000" />
+                    </Viewport2DVisual3D.Visual>
+                </Viewport2DVisual3D>
+            </Viewport3D>
+
+            <!-- Hands (2D overlay, partly off-screen like a real hand) -->
+            <Canvas x:Name="OpponentHandCanvas" VerticalAlignment="Top" Height="70" />
+            <Canvas x:Name="HandCanvas" VerticalAlignment="Bottom" Height="150" />
+
+            <!-- The priority stack (top first). Shown only while something is on it. -->
+            <Border x:Name="StackHost" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0,0,0"
+                    Visibility="Collapsed" Padding="8" CornerRadius="12" Background="#D007091C"
+                    BorderBrush="#88C084FC" BorderThickness="1.5" MaxWidth="250">
+                <Border.Effect>
+                    <DropShadowEffect Color="#C084FC" BlurRadius="24" ShadowDepth="0" Opacity="0.6" />
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock Text="STACK" FontFamily="{StaticResource DisplayFont}" FontSize="22" Foreground="#FFD8B4FE"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="top resolves first" Style="{StaticResource Muted}" FontSize="11"
+                               HorizontalAlignment="Center" Margin="0,0,0,6" />
+                    <StackPanel x:Name="StackList" />
+                </StackPanel>
+            </Border>
+
+            <!-- Flying cards, shockwaves, banners -->
+            <Canvas x:Name="FxCanvas" IsHitTestVisible="False" />
+
+            <!-- Hover magnifier for hand cards (never takes the mouse, so the hand underneath keeps working) -->
+            <Canvas x:Name="MagnifyCanvas" IsHitTestVisible="False" />
+
+            <Border x:Name="Banner" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0"
+                    IsHitTestVisible="False" Padding="48,18" CornerRadius="18" Background="#CC07091C"
+                    BorderBrush="#AA4FD1FF" BorderThickness="2" RenderTransformOrigin="0.5,0.5">
+                <Border.RenderTransform>
+                    <ScaleTransform x:Name="BannerScale" ScaleX="1" ScaleY="1" />
+                </Border.RenderTransform>
+                <Border.Effect>
+                    <DropShadowEffect x:Name="BannerGlow" Color="#4FD1FF" BlurRadius="40" ShadowDepth="0" />
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock x:Name="BannerTitle" FontFamily="{StaticResource DisplayFont}" FontSize="76"
+                               HorizontalAlignment="Center" Foreground="White" />
+                    <TextBlock x:Name="BannerSubtitle" FontSize="20" HorizontalAlignment="Center"
+                               Foreground="#FFB9C6F0" Margin="0,2,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- Ability choices (targets, nodes, yes/no...). Board cards and nodes can be clicked too. -->
+            <Border x:Name="ChoicePanel" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Top"
+                    Margin="0,64,0,0" MaxWidth="760" Padding="16,12" CornerRadius="16" Background="#EE0A0D24"
+                    BorderBrush="#CCFFC94A" BorderThickness="2">
+                <Border.Effect>
+                    <DropShadowEffect Color="#FFC94A" BlurRadius="30" ShadowDepth="0" Opacity="0.7" />
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock x:Name="ChoiceTitle" FontFamily="{StaticResource DisplayFont}" FontSize="26"
+                               Foreground="{StaticResource GoldBrush}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+                    <TextBlock x:Name="ChoiceCardText" Style="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap"
+                               TextAlignment="Center" HorizontalAlignment="Center" Margin="0,2,0,8" />
+                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <WrapPanel x:Name="ChoiceOptions" HorizontalAlignment="Center" />
+                    </ScrollViewer>
+                    <Grid Margin="0,8,0,0">
+                        <TextBlock x:Name="ChoiceCount" Style="{StaticResource Muted}" VerticalAlignment="Center" />
+                        <Button x:Name="ChoiceConfirm" Content="CONFIRM" Style="{StaticResource SmallButton}"
+                                HorizontalAlignment="Right" Click="ChoiceConfirm_Click" ToolTip="Confirm (Enter)" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Right-click inspect: one big crisp card; any click or Esc closes it -->
+            <Grid x:Name="InspectOverlay" Visibility="Collapsed" Background="#C8020310" Cursor="Hand"
+                  MouseDown="InspectOverlay_MouseDown">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Border x:Name="InspectHost" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="1" Text="Click, right-click or Esc to close" Style="{StaticResource Muted}"
+                           HorizontalAlignment="Center" Margin="0,0,0,10" />
+            </Grid>
+
+            <!-- Game over overlay -->
+            <Border x:Name="GameOverPanel" Visibility="Collapsed" Background="#B0000000">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock x:Name="GameOverTitle" FontFamily="{StaticResource DisplayFont}" FontSize="110"
+                               HorizontalAlignment="Center" Foreground="{StaticResource GoldBrush}">
+                        <TextBlock.Effect>
+                            <DropShadowEffect Color="#FFC94A" BlurRadius="40" ShadowDepth="0" />
+                        </TextBlock.Effect>
+                    </TextBlock>
+                    <TextBlock x:Name="GameOverSubtitle" FontSize="22" HorizontalAlignment="Center" Margin="0,0,0,24" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="PLAY AGAIN" Style="{StaticResource GlowButton}" Click="PlayAgain_Click" Margin="8" />
+                        <Button Content="MENU" Style="{StaticResource GlowButton}" Click="Menu_Click" Margin="8" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ===================== SIDE PANEL ===================== -->
+        <Border Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="1,0,0,0">
+            <Grid Margin="14,10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Zoomed card -->
+                <Border x:Name="ZoomHost" Grid.Row="0" Height="330" HorizontalAlignment="Center" Margin="0,0,0,8">
+                    <TextBlock x:Name="ZoomHint" Text="Hover a card to inspect it&#x0a;Right-click a card to enlarge it" TextAlignment="Center" Style="{StaticResource Muted}"
+                               VerticalAlignment="Center" HorizontalAlignment="Center" />
+                </Border>
+
+                <!-- Round + score -->
+                <StackPanel Grid.Row="1">
+                    <TextBlock Text="{Binding RoundText}" Style="{StaticResource Heading}" HorizontalAlignment="Center" />
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding PlayerName}" Foreground="{StaticResource PlayerBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="MyTotalText" Text="{Binding MyTotal}" FontFamily="{StaticResource DisplayFont}" FontSize="58" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding MyPips}" Foreground="{StaticResource GoldBrush}" FontSize="18" HorizontalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="vs" VerticalAlignment="Center" Style="{StaticResource Muted}" FontSize="16" />
+                        <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding AiName}" Foreground="{StaticResource OpponentBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="AiTotalText" Text="{Binding AiTotal}" FontFamily="{StaticResource DisplayFont}" FontSize="58" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding AiPips}" Foreground="{StaticResource GoldBrush}" FontSize="18" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Turn status + pass -->
+                <StackPanel Grid.Row="2" Margin="0,8,0,0">
+                    <TextBlock Text="{Binding Status}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+                    <TextBlock Text="{Binding Hint}" Style="{StaticResource Muted}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,2,0,6" />
+                    <Button x:Name="PassButton" Content="{Binding PassText}" Style="{StaticResource GlowButton}" Click="Pass_Click"
+                            IsEnabled="{Binding CanPass}" HorizontalAlignment="Stretch" ToolTip="Pass / no response (Space)" />
+                </StackPanel>
+
+                <!-- View controls -->
+                <Grid Grid.Row="3" Margin="0,10,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition />
+                        <RowDefinition />
+                        <RowDefinition />
+                        <RowDefinition />
+                        <RowDefinition />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Tilt" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <Slider x:Name="TiltSlider" Grid.Column="1" Minimum="0" Maximum="58" Value="38" ValueChanged="Camera_Changed" />
+                    <TextBlock Grid.Row="1" Text="Zoom" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <Slider x:Name="ZoomSlider" Grid.Row="1" Grid.Column="1" Minimum="0.7" Maximum="1.4" Value="1" IsDirectionReversed="True" ValueChanged="Camera_Changed" ToolTip="1.0 (default) = the whole board fits" />
+                    <TextBlock Grid.Row="2" Text="Speed" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <Slider x:Name="SpeedSlider" Grid.Row="2" Grid.Column="1" Minimum="0.2" Maximum="2" Value="1" IsDirectionReversed="True" ValueChanged="Speed_Changed" ToolTip="Animation speed" />
+                    <CheckBox x:Name="MagnifyCheck" Grid.Row="3" Grid.ColumnSpan="2" IsChecked="True"
+                              Content="Magnify hand cards on hover" Checked="MagnifyCheck_Changed" Unchecked="MagnifyCheck_Changed"
+                              ToolTip="Shows a large, readable copy of the hand card under the mouse. Right-click any card for a full-size view." />
+                    <CheckBox x:Name="PauseReactsCheck" Grid.Row="4" Grid.ColumnSpan="2" IsChecked="True"
+                              Content="Pause when I can React" Checked="PauseReacts_Changed" Unchecked="PauseReacts_Changed"
+                              ToolTip="On: the game stops and asks whenever one of your Reacts can answer what just happened. Off: you never respond (auto-allow everything)." />
+                </Grid>
+
+                <!-- Log -->
+                <Border Grid.Row="4" Background="#30000000" CornerRadius="10" Padding="4">
+                <ListBox ItemsSource="{Binding Log}" FontSize="12">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="#FFC8D2F0" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                </Border>
+
+                <Button Grid.Row="5" Content="MENU" Style="{StaticResource SmallButton}" Click="Menu_Click"
+                        HorizontalAlignment="Right" Margin="0,8,0,0" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
