@@ -9,12 +9,39 @@ public sealed class CardInstance
     public CardInstance(int instanceId, CardDefinition definition)
     {
         InstanceId = instanceId;
+        PrintedDefinition = definition;
         Definition = definition;
         Races = new HashSet<Race>(definition.Races);
     }
 
     public int InstanceId { get; }
-    public CardDefinition Definition { get; }
+
+    /// <summary>
+    /// What the card is right now. Normally the printed card; while a Unit is in play as a copy of another Unit
+    /// (Mr Morph, Forced Mitosis) it is the copied card's definition, so its Rank, class and abilities are the copy's.
+    /// Leaving play turns it back into <see cref="PrintedDefinition"/>.
+    /// </summary>
+    public CardDefinition Definition { get; private set; }
+
+    /// <summary>The card as printed (never changes).</summary>
+    public CardDefinition PrintedDefinition { get; }
+
+    /// <summary>True while the Unit is in play as a copy of another Unit.</summary>
+    public bool IsCopy => !ReferenceEquals(Definition, PrintedDefinition);
+
+    /// <summary>
+    /// "Enters play as a copy of another Unit, except it is a Blaarg": takes the copied card's printed values (Rank,
+    /// class, abilities) and the given races. Rank changes, memory and suppression from before are cleared.
+    /// </summary>
+    public void BecomeCopy(CardDefinition copied, IEnumerable<Race> races)
+    {
+        Definition = copied;
+        Races.Clear();
+        foreach (var r in races) Races.Add(r);
+        BaseRankOverride = null;
+        PersistentModifiers.Clear();
+        Memory.Clear();
+    }
 
     /// <summary>Current races (mutable: Stagnation, The Voidslime, "becomes a Necrolite"...).</summary>
     public HashSet<Race> Races { get; }
@@ -34,11 +61,13 @@ public sealed class CardInstance
     /// <summary>Where the card is right now. Maintained by <see cref="GameState"/> move helpers.</summary>
     public CardLocation Location { get; internal set; } = CardLocation.None;
 
-    public string Name => Definition.Name;
+    /// <summary>The display name. A copy reads "Mr Morph (as Fast Eddie)".</summary>
+    public string Name => IsCopy ? $"{PrintedDefinition.Name} (as {Definition.Name})" : Definition.Name;
 
-    /// <summary>Resets everything that only lasts while a unit stays in play.</summary>
+    /// <summary>Resets everything that only lasts while a unit stays in play (a copy turns back into itself).</summary>
     public void ResetInPlayState()
     {
+        Definition = PrintedDefinition;
         Races.Clear();
         foreach (var r in Definition.Races) Races.Add(r);
         BaseRankOverride = null;

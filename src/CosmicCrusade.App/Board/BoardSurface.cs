@@ -62,7 +62,7 @@ public sealed class NodeSlot : Grid
         _lock = new TextBlock
         {
             Text = "\U0001F512",
-            FontSize = 48,
+            FontSize = 40,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Visibility = Visibility.Collapsed,
@@ -93,7 +93,98 @@ public sealed class NodeSlot : Grid
         }
     }
 
-    public void Refresh() => _lock.Visibility = Node.IsLocked ? Visibility.Visible : Visibility.Collapsed;
+    private Canvas? _lockBars;
+
+    /// <summary>
+    /// Shows whether the node is Locked. While it is, the slot keeps a chained look: crossed chains, three
+    /// humming energy bars across the slot and a small padlock (the bars pulse unless effects are reduced).
+    /// </summary>
+    public void Refresh()
+    {
+        bool locked = Node.IsLocked;
+        _lock.Visibility = locked ? Visibility.Visible : Visibility.Collapsed;
+        if (locked == (_lockBars is not null)) return;
+        if (!locked)
+        {
+            Children.Remove(_lockBars);
+            _lockBars = null;
+            return;
+        }
+        _lockBars = BuildLockBars(Width, Height);
+        Children.Insert(Children.IndexOf(_lock), _lockBars);
+    }
+
+    private static Canvas BuildLockBars(double w, double h)
+    {
+        var steel = Color.FromRgb(226, 232, 240);
+        var energy = Color.FromRgb(125, 211, 252);
+        var layer = new Canvas
+        {
+            Width = w,
+            Height = h,
+            IsHitTestVisible = false,
+            Clip = new RectangleGeometry(new Rect(0, 0, w, h), 14, 14),
+        };
+        layer.Children.Add(new Rectangle { Width = w, Height = h, Fill = new SolidColorBrush(Color.FromArgb(70, 10, 14, 30)) });
+
+        // Two chains corner to corner: rows of oval links, alternating flat and edge-on.
+        foreach (var (x0, y0, x1, y1) in new[] { (8.0, 10.0, w - 8, h - 10), (w - 8, 10.0, 8.0, h - 10) })
+        {
+            double len = Math.Sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
+            double angle = Math.Atan2(y1 - y0, x1 - x0) * 180 / Math.PI;
+            const double link = 22;
+            int n = (int)(len / (link * 0.72));
+            for (int i = 0; i < n; i++)
+            {
+                double f = (i + 0.5) / n;
+                double cx = x0 + (x1 - x0) * f, cy = y0 + (y1 - y0) * f;
+                bool edgeOn = i % 2 == 1;
+                var ring = new Ellipse
+                {
+                    Width = link,
+                    Height = edgeOn ? 5 : 12,
+                    Stroke = new SolidColorBrush(Color.FromArgb(edgeOn ? (byte)230 : (byte)190, steel.R, steel.G, steel.B)),
+                    StrokeThickness = edgeOn ? 3 : 2.6,
+                    RenderTransform = new RotateTransform(angle, link / 2, (edgeOn ? 5 : 12) / 2.0),
+                };
+                Canvas.SetLeft(ring, cx - link / 2);
+                Canvas.SetTop(ring, cy - (edgeOn ? 5 : 12) / 2.0);
+                layer.Children.Add(ring);
+            }
+        }
+
+        // Energy bars.
+        for (int i = 0; i < 3; i++)
+        {
+            var bar = new Rectangle
+            {
+                Width = w - 10,
+                Height = 7,
+                RadiusX = 3.5,
+                RadiusY = 3.5,
+                Fill = new LinearGradientBrush(new GradientStopCollection
+                {
+                    new(Color.FromArgb(60, energy.R, energy.G, energy.B), 0),
+                    new(Color.FromArgb(230, 255, 255, 255), 0.5),
+                    new(Color.FromArgb(60, energy.R, energy.G, energy.B), 1),
+                }, 0),
+                Effect = new DropShadowEffect { Color = energy, BlurRadius = 14, ShadowDepth = 0 },
+            };
+            Canvas.SetLeft(bar, 5);
+            Canvas.SetTop(bar, h * (0.28 + i * 0.22) - 3.5);
+            layer.Children.Add(bar);
+            if (!FxSettings.ReduceEffects)
+                bar.BeginAnimation(OpacityProperty, new DoubleAnimation(0.45, 1, TimeSpan.FromSeconds(0.9 + i * 0.17))
+                {
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    EasingFunction = new SineEase(),
+                });
+        }
+        layer.Opacity = 0;
+        layer.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(300)));
+        return layer;
+    }
 }
 
 /// <summary>A deck or pile: a stack of cards with a count.</summary>

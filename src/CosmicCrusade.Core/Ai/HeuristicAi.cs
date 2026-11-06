@@ -58,6 +58,9 @@ public sealed class HeuristicAi : IPlayerController
                 return r;
         }
 
+        // M3.3: Commandeer, Forced Mitosis, Recolonize.
+        if (StackReact(ctx, state, me, opp) is { } special) return special;
+
         foreach (var r in ctx.Legal.OfType<ReactAction>())
         {
             if (!ReactCounters.IsCounter(r.Card.Definition)) continue;
@@ -80,10 +83,49 @@ public sealed class HeuristicAi : IPlayerController
         return null;
     }
 
+    /// <summary>
+    /// M3.3 Reacts:
+    ///   • Commandeer: take an opponent's Action as it is being Issued (its choices become ours as it resolves).
+    ///     Their Reacts are left alone – they usually aim at our own play and would still hit it.
+    ///   • Forced Mitosis: make the opponent's big Deploy a copy of a small Unit, or our small Deploy a copy of a big one.
+    ///   • Recolonize: only when the opponent's Deploy can be sent to our side of the board.
+    /// </summary>
+    private static GameAction? StackReact(DecisionContext ctx, GameState state, int me, int opp)
+    {
+        foreach (var r in ctx.Legal.OfType<ReactAction>())
+        {
+            var victim = r.RespondingTo;
+            string raw = r.Card.Definition.Effects.GetRawText();
+
+            if (raw.Contains("\"GainControl\"") && victim.Kind == StackItemKind.IssueOrder && !victim.IsReact
+                && victim.Controller == opp)
+                return r;
+
+            if (victim.Kind != StackItemKind.DeployUnit || victim.TargetNode is null) continue;
+            int rank = victim.Card.Definition.BaseRank ?? 0;
+            var ranks = state.AllUnitsInPlay.Select(u => u.Definition.BaseRank ?? 0).ToList();
+
+            if (raw.Contains("\"EnterAsCopy\"") && ranks.Count > 0)
+            {
+                bool theirs = victim.TargetNode.Side == opp;
+                if (theirs && rank >= 3 && ranks.Min() <= rank - 2) return r;
+                if (!theirs && ranks.Max() >= rank + 3) return r;
+            }
+
+            if (raw.Contains("\"RedirectDeploy\"") && victim.Controller == opp && victim.TargetNode.Side == opp
+                && state.Players[me].ScoringNodes.Any(n => Placement.CanRedirectTo(state, victim.Controller, victim.Card, n)))
+                return r;
+        }
+        return null;
+    }
+
     // ------------------------------------------------------------------ turns
 
     private GameAction Choose(DecisionContext ctx)
     {
+        // M3.3: One of Us / Terraform when they swing the round clearly.
+        if (BigAction(ctx) is { } big) return big;
+
         var action = ChooseCore(ctx);
         if (action is not PassAction) return action;
 
@@ -100,6 +142,43 @@ public sealed class HeuristicAi : IPlayerController
         if (!ctx.OpponentJustPassed && _rng.NextDouble() < FillerOrderChance)
             return orders[_rng.Next(orders.Count)];
         return action;
+    }
+
+    /// <summary>
+    /// Actions worth a turn on their own: One of Us on a Unit of Rank 2+ (it leaves their total and joins ours),
+    /// Terraform when the pair it clears costs them at least 3 more than it costs us.
+    /// </summary>
+    private static GameAction? BigAction(DecisionContext ctx)
+    {
+        var state = ctx.State;
+        int me = ctx.Player;
+        int opp = GameState.Other(me);
+        foreach (var o in ctx.Legal.OfType<IssueOrderAction>().Where(o => o.OrderNode is null))
+        {
+            string raw = o.Card.Definition.Effects.GetRawText();
+            if (raw.Contains("\"GainControl\"") && raw.Contains("\"moveTo\""))
+            {
+                var free = state.Players[me].ScoringNodes.ToList();
+                bool worth = state.Players[opp].UnitsInPlay.Any(u => !StaticLayer.IsImmune(state, u)
+                    && RankCalculator.GetRank(state, u) >= 2 && free.Any(n => Placement.CanMoveInPlayTo(u, n)));
+                if (worth) return o;
+            }
+            if (raw.Contains("\"Terraform\""))
+            {
+                var nodes = state.AllNodes.Where(n => n.IsScoring && state.OpposingNode(n) is not null).ToList();
+                if (nodes.Count > 0 && nodes.Max(n => TerraformGain(state, n, me)) >= 3) return o;
+            }
+        }
+        return null;
+    }
+
+    private static double TerraformGain(GameState s, Node node, int me)
+    {
+        double v = 0;
+        foreach (var n in new[] { node, s.OpposingNode(node)! })
+            if (n.Card is { } c && !StaticLayer.IsImmune(s, c))
+                v += n.Side == me ? -RankCalculator.GetRank(s, c) : RankCalculator.GetRank(s, c);
+        return v;
     }
 
     private GameAction ChooseCore(DecisionContext ctx)

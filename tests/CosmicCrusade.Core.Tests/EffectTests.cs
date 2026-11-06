@@ -52,7 +52,7 @@ public class EffectTests
         var onPlay = TestData.Db.All.Where(c => HasTrigger(c, "OnPlay")).ToList();
         var notLive = onPlay.Where(c => !EffectSupport.IsLive(c, "OnPlay")).Select(c => c.Name).OrderBy(n => n).ToList();
         Assert.Equal(38, onPlay.Count);
-        Assert.Equal(new[] { "Ace, Council Tactician", "TR-1993.r" }, notLive); // scripted handlers, later
+        Assert.Empty(notLive); // M3.3: Ace and TR-1993.r are scripted handlers now
     }
 
     [Fact]
@@ -67,11 +67,15 @@ public class EffectTests
     {
         var actions = TestData.Db.All.Where(c => HasTrigger(c, "OnResolve")).ToList();
         var inert = actions.Where(c => !EffectSupport.IsLive(c, "OnResolve")).Select(c => c.Name).OrderBy(n => n).ToList();
-        Assert.Equal(new[] { "One of Us", "Terraform" }, inert); // scripted / control change: M3.3
+        Assert.Empty(inert); // M3.3: One of Us and Terraform are live
 
         var liveReacts = TestData.Db.All.Where(c => c.OrderType == OrderType.React && EffectSupport.IsLive(c, "React"))
             .Select(c => c.Name).OrderBy(n => n).ToList();
-        Assert.Equal(new[] { "Already Dead", "Gloop!", "Respond in Kind", "Second Thought", "Shadow Strike", "Spreading Sickness", "Target Practice" }, liveReacts);
+        Assert.Equal(new[]
+        {
+            "Already Dead", "Commandeer", "Forced Mitosis", "Gloop!", "Recolonize", "Respond in Kind", "Second Thought",
+            "Shadow Strike", "Spreading Sickness", "Target Practice",
+        }, liveReacts);
     }
 
     private static bool HasTrigger(CardDefinition c, string trigger) =>
@@ -330,12 +334,12 @@ public class EffectTests
     }
 
     [Fact]
-    public async Task Inert_orders_still_resolve_without_effect()
+    public async Task Terraform_on_an_empty_pair_just_locks_both_nodes()
     {
         var s = TestData.EmptyGame();
         var terraform = Give(s, 0, "Terraform");
         var sink = await Run(s, Issues(terraform), ScriptedController.PassForever());
-        Assert.Contains(sink.Events, e => e is OrderResolvedEvent { EffectApplied: false } r && r.Card == terraform);
-        Assert.Contains(sink.Events, e => e is LogEvent || e is OrderResolvedEvent);
+        Assert.Contains(sink.Events, e => e is OrderResolvedEvent { EffectApplied: true } r && r.Card == terraform);
+        Assert.Equal(2, sink.Events.OfType<NodeLockChangedEvent>().Count(e => e.Locked));
     }
 }

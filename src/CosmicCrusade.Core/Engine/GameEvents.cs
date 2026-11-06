@@ -11,7 +11,8 @@ public abstract record GameEvent;
 
 public sealed record GameStartedEvent(int RoundsToWin) : GameEvent;
 public sealed record RoundStartedEvent(int Round, int FirstPlayer) : GameEvent;
-public sealed record CardDrawnEvent(int Player, CardInstance Card, PileKind FromDeck) : GameEvent;
+/// <param name="Source">The card whose effect made the player draw; null for Start-up draws.</param>
+public sealed record CardDrawnEvent(int Player, CardInstance Card, PileKind FromDeck, CardInstance? Source = null) : GameEvent;
 public sealed record DeckReshuffledEvent(PileKind Deck, int CardCount) : GameEvent;
 public sealed record TurnStartedEvent(int Player) : GameEvent;
 public sealed record PassedEvent(int Player) : GameEvent;
@@ -76,7 +77,14 @@ public sealed record CardNullifiedEvent(CardInstance Card, Node? FromNode, PileK
 public sealed record NodeLockChangedEvent(Node Node, bool Locked, CardInstance? Source) : GameEvent;
 
 /// <summary>A Unit's Rank changed (ModifyRank, SetBaseRank, Manipulate). <paramref name="Description"/> e.g. "+2", "Base Rank 0".</summary>
-public sealed record RankChangedEvent(CardInstance Card, string Description, CardInstance? Source) : GameEvent;
+public sealed record RankChangedEvent(CardInstance Card, string Description, CardInstance? Source,
+    RankChangeKind Kind = RankChangeKind.Modify) : GameEvent;
+
+/// <summary>What kind of Rank change a <see cref="RankChangedEvent"/> is (the UI picks its effect from it).</summary>
+public enum RankChangeKind { Modify, BaseRank, Manipulate, Assembled }
+
+/// <summary>A Unit in play has new races ("That Unit becomes a Necrolite"; Voidslime-style "has no Race").</summary>
+public sealed record RacesChangedEvent(CardInstance Card, IReadOnlyList<Race> Races, CardInstance? Source) : GameEvent;
 
 /// <summary>A Unit went to a Standby node: from a node (leaving play), a pile, or the stack (its deploy cancelled).</summary>
 public sealed record CardMovedToStandbyEvent(CardInstance Card, Node? FromNode, PileKind? FromPile, bool FromStack, Node To) : GameEvent;
@@ -97,7 +105,10 @@ public sealed record DuelEvent(CardInstance A, CardInstance B, IReadOnlyList<Car
     public CardInstance? Loser => Losers.Count == 1 ? Losers[0] : null;
 }
 
-/// <summary>The contents of two nodes were switched (Arganium). Control follows the side.</summary>
+/// <summary>
+/// The contents of two nodes were switched (Arganium; Ace, Council Tactician also between a player's Unit, Leader and
+/// Standby nodes). Control follows the side.
+/// </summary>
 public sealed record NodesSwappedEvent(Node A, Node B, CardInstance? CardNowOnA, CardInstance? CardNowOnB) : GameEvent;
 
 /// <summary>
@@ -111,6 +122,30 @@ public sealed record NullifyPreventedEvent(CardInstance Card, CardInstance? Sour
 
 /// <summary>A card's abilities were Suppressed (Gloop!).</summary>
 public sealed record AbilitiesSuppressedEvent(CardInstance Card, CardInstance? Source) : GameEvent;
+
+// ------------------------------------------------------------------ M3.3
+
+/// <summary>
+/// A Unit entered play as a copy of another card (Mr Morph, Forced Mitosis). <see cref="CardInstance.Definition"/>
+/// is already the copied card when this is published.
+/// </summary>
+public sealed record CardCopiedEvent(CardInstance Card, CardDefinition CopiedFrom, CardInstance? Source) : GameEvent;
+
+/// <summary>Recolonize: a Unit being Deployed now goes to <paramref name="To"/> instead of <paramref name="From"/>.</summary>
+public sealed record DeployRedirectedEvent(StackItem Item, Node From, Node To, CardInstance? Source) : GameEvent;
+
+/// <summary>Commandeer: a player took control of an Order on the stack (and maybe pointed a React at a new target).</summary>
+public sealed record StackItemControlChangedEvent(StackItem Item, int OldController, int NewController, CardInstance? Source) : GameEvent;
+
+/// <summary>
+/// One of Us: a Unit in play moved across the control line to a new node and changed controller. It stays in play
+/// (it is not Played again).
+/// </summary>
+public sealed record UnitControlGainedEvent(CardInstance Card, Node From, Node To, int NewController, CardInstance? Source) : GameEvent;
+
+/// <summary>Shoot First, Think Second: the engine picked <paramref name="Chosen"/> at random from <paramref name="Candidates"/>.</summary>
+public sealed record RandomDeployNodeChosenEvent(int Player, CardInstance Card, IReadOnlyList<Node> Candidates, Node Chosen,
+    CardInstance? Source) : GameEvent;
 
 public sealed record RoundScoredEvent(RoundResult Result) : GameEvent;
 public sealed record CardMovedToPileEvent(CardInstance Card, Node? From, PileKind Pile) : GameEvent;

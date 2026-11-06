@@ -20,6 +20,9 @@ public enum StackItemKind
     UnitNullifying,
 }
 
+/// <summary>"Enters play as a copy of <paramref name="Of"/>, except it is <paramref name="Races"/>" (Forced Mitosis).</summary>
+public sealed record CopyInstruction(CardDefinition Of, IReadOnlyList<Race> Races, CardInstance? Source);
+
 /// <summary>
 /// Something waiting on the priority stack (spec §7.2). Reacts read its public properties to decide whether
 /// their condition is met ("as a Unit is being Deployed", "as a React or Action is being Issued").
@@ -42,7 +45,7 @@ public sealed class StackItem
     /// <summary>Unique per item (UI bookkeeping).</summary>
     public int Id { get; }
 
-    /// <summary>Who controls the item. Mutable for Commandeer (M3).</summary>
+    /// <summary>Who controls the item. Commandeer changes it.</summary>
     public int Controller { get; internal set; }
 
     public StackItemKind Kind { get; }
@@ -50,10 +53,13 @@ public sealed class StackItem
     /// <summary>The card on the stack: the Unit being deployed / assembled, or the Order being issued.</summary>
     public CardInstance Card { get; }
 
-    public string Description { get; }
+    public string Description { get; internal set; }
 
-    /// <summary>DeployUnit: the node the Unit is going to.</summary>
-    public Node? TargetNode { get; init; }
+    /// <summary>DeployUnit: the node the Unit is going to. Recolonize can redirect it while it waits.</summary>
+    public Node? TargetNode { get; internal set; }
+
+    /// <summary>DeployUnit: Forced Mitosis – the Unit enters play as a copy. Null when it enters as itself.</summary>
+    public CopyInstruction? EntersAsCopy { get; internal set; }
 
     /// <summary>DeployUnit from a pile (Barkeep Bill, Galactomancer, Hills of Decay): the pile it came from.</summary>
     public PileKind? FromPile { get; init; }
@@ -73,8 +79,8 @@ public sealed class StackItem
     /// <summary>UnitNullifying: true once the window has been shown on the stack (someone responded to it).</summary>
     public bool Shown { get; internal set; }
 
-    /// <summary>React: the stack item it responds to.</summary>
-    public StackItem? RespondingTo { get; init; }
+    /// <summary>React: the stack item it responds to. Commandeer may point it at a new target.</summary>
+    public StackItem? RespondingTo { get; internal set; }
 
     public bool IsReact => Kind == StackItemKind.IssueOrder && Card.Definition.OrderType == OrderType.React;
 

@@ -106,10 +106,21 @@ public sealed class PacedController : IPlayerController
         _thinkMs = thinkMs;
     }
 
+    /// <summary>True while the AI is "thinking" about a turn or a choice (the UI's holographic eye pulses).</summary>
+    public event Action<bool>? ThinkingChanged;
+
     public async Task<GameAction> ChooseActionAsync(DecisionContext context, CancellationToken ct)
     {
-        await Task.Delay(TimeSpan.FromMilliseconds(_thinkMs * Anim.SpeedFactor), ct);
-        return await _inner.ChooseActionAsync(context, ct);
+        ThinkingChanged?.Invoke(true);
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(_thinkMs * Anim.SpeedFactor), ct);
+            return await _inner.ChooseActionAsync(context, ct);
+        }
+        finally
+        {
+            ThinkingChanged?.Invoke(false);
+        }
     }
 
     public Task<GameAction?> ChooseResponseAsync(DecisionContext context, CancellationToken ct) =>
@@ -117,7 +128,15 @@ public sealed class PacedController : IPlayerController
 
     public async Task<IReadOnlyList<int>> ChooseAsync(ChoiceRequest request, GameState state, CancellationToken ct)
     {
-        await Task.Delay(TimeSpan.FromMilliseconds(_thinkMs * 0.6 * Anim.SpeedFactor), ct);
-        return await _inner.ChooseAsync(request, state, ct);
+        ThinkingChanged?.Invoke(true);
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(_thinkMs * 0.6 * Anim.SpeedFactor), ct);
+            return await _inner.ChooseAsync(request, state, ct);
+        }
+        finally
+        {
+            ThinkingChanged?.Invoke(false);
+        }
     }
 }

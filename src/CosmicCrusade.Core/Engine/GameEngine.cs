@@ -111,7 +111,7 @@ public sealed partial class GameEngine
     }
 
     /// <summary>Draws one card from a deck, applying the empty-deck rule. Null when nothing can be drawn.</summary>
-    public async Task<CardInstance?> DrawAsync(int player, PileKind deckKind, CancellationToken ct)
+    public async Task<CardInstance?> DrawAsync(int player, PileKind deckKind, CancellationToken ct, CardInstance? source = null)
     {
         CardInstance card;
         if (State.Options.DeckMode == DeckMode.RandomDraw)
@@ -129,8 +129,8 @@ public sealed partial class GameEngine
                 switch (State.Options.EmptyDeck)
                 {
                     case EmptyDeckRule.Reshuffle:
-                        var source = deckKind == PileKind.UnitDeck ? PileKind.RetiredUnits : PileKind.IssuedOrders;
-                        var pile = State.GetPile(source);
+                        var refillFrom = deckKind == PileKind.UnitDeck ? PileKind.RetiredUnits : PileKind.IssuedOrders;
+                        var pile = State.GetPile(refillFrom);
                         if (pile.Count == 0) return null;
                         foreach (var c in pile.ToList()) State.MoveToPile(c, deckKind);
                         State.Shuffle(deck);
@@ -147,7 +147,7 @@ public sealed partial class GameEngine
             State.MoveToHand(card, player);
         }
 
-        await EmitAsync(new CardDrawnEvent(player, card, deckKind), ct);
+        await EmitAsync(new CardDrawnEvent(player, card, deckKind, source), ct);
         await RaiseAsync(new TriggerEvent("CardDrawn", player, card), ct);
         return card;
     }
@@ -295,6 +295,9 @@ public sealed partial class GameEngine
         State.MoveToNode(card, target);
         await EmitAsync(new UnitPlayedEvent(item.Controller, card, target), ct);
 
+        // M3.3: "Played as the chosen Unit" – Forced Mitosis' copy, or Mr Morph's own, before "When you play".
+        await ApplyEntryAsync(item, card, target, ct);
+
         // "When you play this Unit": the controller is the side it landed on (ruling #15).
         if (StaticLayer.IsTriggerSuppressed(State, card, "OnPlay"))
         {
@@ -354,7 +357,9 @@ public sealed partial class GameEngine
     private async Task<Node> RandomDeployNodeAsync(int player, CardInstance card, IReadOnlyList<Node> nodes, CancellationToken ct)
     {
         var node = nodes[State.Rng.Next(nodes.Count)];
-        string source = StaticLayer.DeployNodeOverride(State, player)?.Source.Name ?? "Random";
+        var sourceCard = StaticLayer.DeployNodeOverride(State, player)?.Source;
+        string source = sourceCard?.Name ?? "Random";
+        await EmitAsync(new RandomDeployNodeChosenEvent(player, card, nodes, node, sourceCard), ct);
         await EmitAsync(new LogEvent($"{source}: {card.Name} goes to {State.Players[node.Side].Name}'s {node.Label} at random."), ct);
         return node;
     }

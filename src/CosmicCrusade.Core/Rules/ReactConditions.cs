@@ -10,7 +10,7 @@ namespace CosmicCrusade.Core.Rules;
 ///   { "event": "UnitDeploying" }                                   Shadow Strike, Recolonize, Spreading Sickness, Gloop!, Forced Mitosis
 ///   { "event": "UnitDeploying", "targetNodeOpposed": true }        Target Practice
 ///   { "event": "OrderIssuing", "orderType": ["React", "Action"] }   Second Thought, Commandeer
-///   { "event": "UnitNullifying" }                                  Respond in Kind, Already Dead (window opens in M3)
+///   { "event": "UnitNullifying" }                                  Respond in Kind, Already Dead
 /// </code>
 /// Either player may React to anything whose condition is met, including their own cards (spec §7.2).
 /// </summary>
@@ -18,8 +18,11 @@ public static class ReactConditions
 {
     /// <param name="MovesUnitToStandby">The React puts the deploying Unit into Standby (Spreading Sickness): it can't
     /// answer a Leader's deploy (ruling #36).</param>
+    /// <param name="NeedsRedirectNode">Recolonize: there must be another legal node to send the Unit to.</param>
+    /// <param name="NeedsCopySource">Forced Mitosis: there must be a Unit in play to copy.</param>
     public sealed record Condition(string Event, bool TargetNodeOpposed, IReadOnlyList<OrderType>? OrderTypes,
-        bool MovesUnitToStandby = false, bool NeedsOpposingUnit = false);
+        bool MovesUnitToStandby = false, bool NeedsOpposingUnit = false, bool NeedsRedirectNode = false,
+        bool NeedsCopySource = false);
 
     private static readonly Dictionary<string, Condition?> _cache = new();
 
@@ -56,7 +59,11 @@ public static class ReactConditions
             case "UnitDeploying":
                 if (item.Kind != StackItemKind.DeployUnit || item.TargetNode is null) return false;
                 if (c.TargetNodeOpposed && state.OpposingNode(item.TargetNode)?.Card is null) return false;
-                if (c.MovesUnitToStandby && !Placement.CanEnterStandby(item.Card.Definition)) return false;
+                if (c.MovesUnitToStandby && !Placement.CanEnterStandby(item.Card)) return false;
+                if (c.NeedsCopySource && !state.AllUnitsInPlay.Any()) return false;
+                if (c.NeedsRedirectNode && !state.AllNodes.Any(n => !ReferenceEquals(n, item.TargetNode)
+                                                                   && Placement.CanRedirectTo(state, item.Controller, item.Card, n)))
+                    return false;
                 return true;
 
             case "OrderIssuing":
@@ -94,7 +101,10 @@ public static class ReactConditions
             bool needsOpposing = ops.ValueKind == JsonValueKind.Array
                 && ops.EnumerateArray().Any(op => op.TryGetProperty("targets", out var tg) && tg.ValueKind == JsonValueKind.String
                                                   && tg.GetString() == "Event.Unit.OpposingUnit");
-            return new Condition(ev, opposed, types, toStandby, needsOpposing);
+            bool redirect = ops.ValueKind == JsonValueKind.Array
+                && ops.EnumerateArray().Any(op => op.TryGetProperty("op", out var n) && n.GetString() == "RedirectDeploy");
+            bool copy = effect.TryGetProperty("script", out var sc) && sc.GetString() == "EnterAsCopy";
+            return new Condition(ev, opposed, types, toStandby, needsOpposing, redirect, copy);
         }
         return null;
     }

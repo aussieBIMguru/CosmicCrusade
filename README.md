@@ -52,7 +52,31 @@ Card faces are drawn in code from `card-layout.json` (`Rendering/CardFaceFactory
 
 **M1.2:** hover magnifier for hand cards and right-click inspect (`Views/GameView.Inspect.cs`).
 
-**M3.2b (this drop): the Nullify React window, phase and "whenever" triggers, costs, deploying from piles**
+**Effects pass 2 (this drop): card-specific effects, ambience and music** (`Views/GameView.Fx2.cs`)
+- **Ambient layer** (follows whatever is active, `SyncAmbient`): Black Hole vortex, Uncharted Space nebulae, Atmosphere Generator dome with heat shimmer, Acid Rain drizzle, Stagnation fog (and a "ALL BECOME BLAARG" wash), Polarity Storm lightning (and flipping Rank badges); any other Warzone glows round its slot in its race colour.
+- **Warzone moments:** Black Hole sucks Nullified Units into the vortex; Wormhole opens a portal while you choose; Dimensional Rift tears the board open.
+- **Combat:** Shadow Strike slash and shatter, Target Practice crosshairs and shot, Second Thought rewind, High Noon sunset and tumbleweed, Xeno Laser charge-and-beam, Respond in Kind mirror flash.
+- **Protection and control:** a breathing hex shield on Units that can't be Nullified or are Immune, green goo on Suppressed Units, Commandeer's grappling claw, tractor beams for One of Us and Arganium, Psychic Coercion tendrils, Shoot First's roulette, Recolonize's thruster burst.
+- **Races and moments:** race-themed landings (dust, cracks and bones, psychic rings, goo, sparks and steam, a holo beam), Leader arrivals (horns, heavier shake, camera push-in), liquid-chrome copies, Ace's tactical grid, a gavel for The Empress / Senate Chambers, a Clean-up sweep, and a heartbeat with pulsing scores in close rounds.
+- **Sound:** sounds for all of the above, hover and pick-up sounds in your hand, and a generated music bed whose pulse layer rises in close rounds (*Music* toggle).
+
+**Effects pass: animation and sound**
+- Assemble: two meshing cogs spin up over the Unit with sparks. Manipulate: a green slime splat with droplets and drips.
+- Duels: blaster bolts fly back and forth (blue = yours, red = the AI's), then the loser(s) are smoked out.
+- Draws from a card's ability: a violet psionic pulse from that card, and the drawn cards glow.
+- Nullify: the Unit flashes, burns, crumbles to ash and embers, and a skull rises.
+- Necrolites: becoming one (Already Dead, Abominations) or rising from the Nullified pile (Shallow Grave, Grim Angler, Reaper of Rot, Galactomancer, Hills of Decay) shows a flickering rot with wisps and drips.
+- Also: a hex shield when a Nullify is prevented, fireworks when you win a round or the game, and a foil shimmer on every Leader.
+- **Sound:** procedural effects (no asset files; written once to `%TEMP%\CosmicCrusadeSfx`). *Sound* toggle and volume slider in the side panel. `Controls/Sfx.cs`, effects in `Views/GameView.Fx.cs`.
+- The setup screen's card list now includes the Warzones (their counts apply when the expansion is on).
+
+**M3.3: every card is implemented**
+- **Scripts** (`Engine/GameEngine.Scripts.cs`): Ace, Council Tactician (switch nodes one pair at a time, NONE to stop; rules in `Rules/Rearrange.cs`), Terraform (each controller may save their Unit in Standby, otherwise it is Nullified; then both nodes Lock), Mr Morph and Forced Mitosis (the Unit enters as a Blaarg copy of a Unit in play: `CardInstance.BecomeCopy`, undone when it leaves play), TR-1993.r (re-run chosen Units' "When you play" abilities, each as its controller).
+- **Stack control:** Recolonize (`RedirectDeploy`), Commandeer (`GainControl` of the Order being Issued; a commandeered React may be pointed at another item), One of Us (the Unit moves to your side and stays in play).
+- **AI:** greedy rearranging with Ace, sensible copy picks, Commandeer on your Actions, Forced Mitosis on big deploys, One of Us / Terraform when they swing the round.
+- Every card face is now unmarked (no "not implemented" boxes). `M33Tests` covers the new cards.
+
+**M3.2b: the Nullify React window, phase and "whenever" triggers, costs, deploying from piles**
 - **Rulings:** #36 Leaders can never go into Standby (Sisters of Blight can't pick a node holding a Leader, Spreading Sickness can't answer a Leader's deploy, Y'nosh / Shallow Grave & co. can't choose one; if it would happen anyway nothing happens). #37 a Duel with matched Ranks and no deciding weakness Nullifies both Units (`Duel.Losers`; Crimson Redeemer still protects itself).
 - **Nullify window (spec §7.2):** every Nullify of a Unit in play opens a `UnitNullifying` stack item with nested priority (`RunPriorityAsync` now only resolves down to its own starting depth). Already Dead (PreventEvent + becomes a Necrolite) and Respond in Kind are live. The window only shows on the stack once someone responds, so it reveals nothing. Replacements: Glorpaglorp and Fallout Shelter (Standby instead; Nullified if full), Black Hole (Retire / Standby → Nullify instead; if that Nullify is prevented the original move happens).
 - **Phase triggers** (`Engine/GameEngine.Triggers.cs`): End of Main – The Empress, High Noon (all opposed pairs incl. Leaders, simultaneous), Weed out the Weak; Clean-up – Y'nosh first, Preferred Candidate (remains in play, +2), Lone Wolf / Mindless Mass / Grey Matter Master / Regeneratrix / Repair Drone. Order: `priority: First`, then the first player's, then the second player's, then `AfterRankModifiers` (High Noon). `WinRound` sets `RoundResult.WonBy`.
@@ -90,8 +114,7 @@ Card faces are drawn in code from `card-layout.json` (`Rendering/CardFaceFactory
 - **Not yet:** `UnitNullifying` React windows (Respond in Kind, Already Dead) need Nullify events from the interpreter. Neither do PlayCost cards (Mechatron, Scrapped Metal), Commandeer's control change, or Order targets.
 
 **Next:**
-- **M3.2c:** the last statics (RevealHands with a face-up AI hand, Shoot First / Psychic Coercion in the deploy pipeline, Abominations' granted action, Stagnation's race-word rewrite).
-- **M3.3:** The 6 scripted handlers (Ace, Terraform, Mr Morph, Forced Mitosis, TR-1993.r, Wormhole), Commandeer, Recolonize, One of Us.
+- **Presentation pass:** more animation and sound.
 - **M4:** AI upgrade to determinized MCTS.
 - **Visuals:** Particle trails on flying cards, nullify disintegration, race-themed node effects, sound.
 

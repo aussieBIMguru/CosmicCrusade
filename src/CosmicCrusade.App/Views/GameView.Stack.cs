@@ -79,20 +79,9 @@ public partial class GameView
         mini.MouseEnter += (_, _) => ShowZoom(item.Card);
         mini.MouseRightButtonDown += Card_MouseRightButtonDown;
 
-        string who = item.Controller == 0 ? "You" : "AI";
-        string what = item.Kind switch
-        {
-            StackItemKind.DeployUnit => $"deploy{(item.Controller == 0 ? "" : "s")} {item.Card.Name} → {NodeText(item.TargetNode!, item.Controller)}",
-            StackItemKind.Assemble => $"assemble{(item.Controller == 0 ? "" : "s")} {item.Card.Name} onto {item.AssembleTarget!.Name}",
-            StackItemKind.UnitNullifying => $"Nullify {item.Card.Name}{(item.NullifySource is { } src ? $" ({src.Name})" : "")}",
-            _ when item.IsReact => $"React: {item.Card.Name} → {item.RespondingTo?.Card.Name}",
-            _ => item.OrderNode is null
-                ? $"issue{(item.Controller == 0 ? "" : "s")} {item.Card.Name}"
-                : $"issue{(item.Controller == 0 ? "" : "s")} {item.Card.Name} → {item.OrderNode.Label}",
-        };
         var caption = new TextBlock
         {
-            Text = $"{who} {what}",
+            Text = StackCaption(item),
             TextWrapping = TextWrapping.Wrap,
             FontSize = 12,
             Foreground = new SolidColorBrush(item.Controller == 0 ? Color.FromRgb(191, 219, 254) : Color.FromRgb(254, 202, 202)),
@@ -119,6 +108,37 @@ public partial class GameView
             BorderBrush = new SolidColorBrush(Color.FromArgb(120, side.R, side.G, side.B)),
         };
         return new StackEntry { Item = item, Root = root, Mini = mini, Caption = caption };
+    }
+
+    private static string StackCaption(StackItem item)
+    {
+        string who = item.Controller == 0 ? "You" : "AI";
+        string what = item.Kind switch
+        {
+            StackItemKind.DeployUnit => $"deploy{(item.Controller == 0 ? "" : "s")} {item.Card.Name} → {NodeText(item.TargetNode!, item.Controller)}",
+            StackItemKind.Assemble => $"assemble{(item.Controller == 0 ? "" : "s")} {item.Card.Name} onto {item.AssembleTarget!.Name}",
+            StackItemKind.UnitNullifying => $"Nullify {item.Card.Name}{(item.NullifySource is { } src ? $" ({src.Name})" : "")}",
+            _ when item.IsReact => $"React: {item.Card.Name} → {item.RespondingTo?.Card.Name}",
+            _ => item.OrderNode is null
+                ? $"issue{(item.Controller == 0 ? "" : "s")} {item.Card.Name}"
+                : $"issue{(item.Controller == 0 ? "" : "s")} {item.Card.Name} → {item.OrderNode.Label}",
+        };
+        return $"{who} {what}";
+    }
+
+    /// <summary>Rebuilds an item's entry in place (Commandeer changed its controller or target, Recolonize its node).</summary>
+    private void RebuildStackEntry(StackItem item)
+    {
+        if (!_stackEntries.TryGetValue(item.Id, out var old)) return;
+        int index = StackList.Children.IndexOf(old.Root);
+        var entry = CreateStackEntry(item);
+        _stackEntries[item.Id] = entry;
+        if (index >= 0)
+        {
+            StackList.Children.RemoveAt(index);
+            StackList.Children.Insert(index, entry.Root);
+        }
+        RefreshStackHighlight();
     }
 
     /// <summary>The top entry glows; the rest are dimmed a little.</summary>
@@ -174,21 +194,23 @@ public partial class GameView
     {
         _hud.AddLog($"  {e.By.Name} Nullifies {e.Card.Name} – it is not played!");
 
+        // Keep the card on screen until the React's own effect has hit it.
         Rect start;
+        Action vanish = () => { };
         if (_flying is not null && _flying.Card == e.Card)
         {
             // The deploying unit hovering over its node.
             var f = _flying;
             _flying = null;
             start = FxBounds(f);
-            FxCanvas.Children.Remove(f);
+            vanish = () => FxCanvas.Children.Remove(f);
         }
         else if (_boardCards.TryGetValue(e.Card.InstanceId, out var boardView))
         {
             // A Standby advance: the card had slid onto its target node.
             _boardCards.Remove(e.Card.InstanceId);
-            BoardCanvas.Children.Remove(boardView);
             start = ProjectRect(BoardLayout.CardRectAt(BoardLayout.Center(e.Item.TargetNode ?? e.Item.FromNode!)));
+            vanish = () => BoardCanvas.Children.Remove(boardView);
         }
         else
         {
@@ -204,8 +226,31 @@ public partial class GameView
             victimEntry.Mini.Opacity = 0;
         }
 
-        _ = FloatTextAtAsync("NULLIFIED!", new Point(start.X + start.Width / 2, start.Y + start.Height / 2), Red);
-        await FlyAsync(e.Card, start, PileCardRect(e.To), false, false, 480, Red);
+        switch (e.By.Definition.Name)
+        {
+            case "Shadow Strike":
+                await SlashAsync(start);
+                vanish();
+                _ = FloatTextAtAsync("NULLIFIED!", Mid(start), Red);
+                await ShatterAsync(start, Purple);
+                break;
+            case "Target Practice":
+                await CrosshairAsync(start);
+                vanish();
+                _ = FloatTextAtAsync("NULLIFIED!", Mid(start), Red);
+                await ShatterAsync(start, Red);
+                break;
+            case "Second Thought":
+                await RewindAsync(start);
+                vanish();
+                await FlyAsync(e.Card, start, PileCardRect(e.To), false, false, 420, Cyan);
+                break;
+            default:
+                vanish();
+                _ = FloatTextAtAsync("NULLIFIED!", Mid(start), Red);
+                await FlyAsync(e.Card, start, PileCardRect(e.To), false, false, 480, Red);
+                break;
+        }
         UpdatePiles();
         _piles[e.To].Pulse();
     }
@@ -238,6 +283,7 @@ public partial class GameView
             await FlyAsync(e.Card, start, small, false, false, 420, Green, fadeOut: true);
             Shockwave(BoardLayout.Center(hostNode), Green);
             targetView.SetGlow(Green);
+            await CogSpinAsync(BoardLayout.Center(hostNode)); // the part is fitted
             _ = Task.Delay(900).ContinueWith(_ => targetView.SetGlow(null), TaskScheduler.FromCurrentSynchronizationContext());
             RefreshScores();
             _hud.AddLog($"  {e.Target.Name} gains +{e.Amount} Rank (now {RankCalculator.GetRank(State, e.Target)}). Score {_hud.MyTotal}–{_hud.AiTotal}.");
@@ -315,6 +361,7 @@ public partial class GameView
         flyer.Scale.ScaleX = from.Width / flyer.Width;
         flyer.Scale.ScaleY = from.Height / flyer.Height;
         FxCanvas.Children.Add(flyer);
+        Trail(flyer, RaceColor(card)); // effects pass 3
 
         var tasks = new List<Task>
         {

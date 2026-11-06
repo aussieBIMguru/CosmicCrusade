@@ -43,7 +43,7 @@ internal sealed class EffectRunner
 
         if (Str(effect, "script") is { } script)
         {
-            await _engine.RunScriptAsync(script, ctx, ct);
+            await _engine.RunScriptAsync(script, effect, ctx, ct);
             return;
         }
 
@@ -53,7 +53,7 @@ internal sealed class EffectRunner
             // Sisters of Blight: the Unit on the chosen node goes to Standby, so a node holding a Leader is not a
             // legal choice (ruling #36).
             Func<Node, bool>? nodeOk = MovesChosenUnitToStandby(effect, chosenName)
-                ? n => n.Card is null || Placement.CanEnterStandby(n.Card.Definition)
+                ? n => n.Card is null || Placement.CanEnterStandby(n.Card)
                 : null;
             ctx.Chosen[chosenName] = await SelectAsync(choose, ctx, "Lock", ct, nodeOk);
         }
@@ -104,7 +104,7 @@ internal sealed class EffectRunner
                 foreach (var card in targets.OfType<CardInstance>().Where(InPlay))
                 {
                     card.BaseRankOverride = value;
-                    await _engine.EmitAsync(new RankChangedEvent(card, $"Base Rank {value}", ctx.Source), ct);
+                    await _engine.EmitAsync(new RankChangedEvent(card, $"Base Rank {value}", ctx.Source, RankChangeKind.BaseRank), ct);
                 }
                 break;
             }
@@ -179,7 +179,7 @@ internal sealed class EffectRunner
                     1, 1, "ManipulateSign"), ct);
                 int delta = sign.Count > 0 && sign[0] == 1 ? -n : n;
                 target.PersistentModifiers.Add(new RankModifier("Manipulate", delta));
-                await _engine.EmitAsync(new RankChangedEvent(target, $"{delta:+0;-0;0} Rank (Manipulate)", ctx.Source), ct);
+                await _engine.EmitAsync(new RankChangedEvent(target, $"{delta:+0;-0;0} Rank (Manipulate)", ctx.Source, RankChangeKind.Manipulate), ct);
                 break;
             }
 
@@ -270,6 +270,7 @@ internal sealed class EffectRunner
                     foreach (var race in races) card.Races.Add(race);
                     string what = races.Count == 0 ? "has no Race" : "becomes " + string.Join("/", races.Select(RaceName));
                     await _engine.EmitAsync(new LogEvent($"  {card.Name} {what}."), ct);
+                    await _engine.EmitAsync(new RacesChangedEvent(card, races, ctx.Source), ct);
                 }
                 break;
             }
@@ -300,7 +301,7 @@ internal sealed class EffectRunner
                 foreach (var card in targets.OfType<CardInstance>().Where(InPlay))
                 {
                     card.PersistentModifiers.Add(new RankModifier($"Assemble: {ctx.Event?.Card?.Name}", amount));
-                    await _engine.EmitAsync(new RankChangedEvent(card, $"{amount:+0;-0;0} Rank (Assembled as well)", ctx.Source), ct);
+                    await _engine.EmitAsync(new RankChangedEvent(card, $"{amount:+0;-0;0} Rank (Assembled as well)", ctx.Source, RankChangeKind.Assembled), ct);
                 }
                 break;
             }
@@ -321,11 +322,88 @@ internal sealed class EffectRunner
                 break;
             }
 
+            // ------------------------------------------------------------ M3.3
+
+            case "RedirectDeploy":
+            {
+                // Recolonize: "Choose an Empty Node as a Unit is being Deployed. That Unit is Deployed there instead."
+                if (DeployingItem(ctx) is not { } item)
+                {
+                    await _engine.EmitAsync(new LogEvent($"  {ctx.Source.Name}: the Unit is no longer being Deployed."), ct);
+                    break;
+                }
+                var node = (await SelectAsync(op.GetProperty("node"), ctx, $"Redirect:{item.Controller}", ct)).OfType<Node>().FirstOrDefault();
+                if (node is null)
+                {
+                    await _engine.EmitAsync(new LogEvent($"  {ctx.Source.Name}: there is no other legal node for {item.Card.Name}."), ct);
+                    break;
+                }
+                await _engine.RedirectDeployAsync(item, node, ctx.Source, ct);
+                break;
+            }
+
+            case "GainControl":
+            {
+                if (Str(op, "targets") == "Event.Order")
+                {
+                    // Commandeer: the Order being Issued now belongs to us.
+                    if (IssuingItem(ctx) is { } order) await _engine.GainControlOfStackItemAsync(order, ctx.Controller, ctx.Source, ct);
+                    else await _engine.EmitAsync(new LogEvent($"  {ctx.Source.Name}: the Order is no longer being Issued."), ct);
+                    break;
+                }
+
+                // One of Us: a Unit in play with somewhere legal to go on our side; it moves and stays in play.
+                var moveTo = op.GetProperty("moveTo");
+                var unit = (await SelectAsync(op.GetProperty("targets"), ctx, "GainControl", ct,
+                        cardOk: c => InPlay(c) && Destinations(moveTo, c, ctx).Count > 0))
+                    .OfType<CardInstance>().FirstOrDefault();
+                if (unit is null)
+                {
+                    await _engine.EmitAsync(new LogEvent($"  {ctx.Source.Name}: there is no Unit you can take control of."), ct);
+                    break;
+                }
+                var nodes = Destinations(moveTo, unit, ctx);
+                var to = (await AskNodesAsync(ctx, nodes, 1, 1, "GainControlNode", ct)).FirstOrDefault() ?? nodes[0];
+                await _engine.GainControlOfUnitAsync(unit, to, ctx.Controller, ctx.Source, ct);
+                break;
+            }
+
+            case "Retarget":
+                if (IssuingItem(ctx) is { } retarget) await _engine.RetargetAsync(retarget, ctx.Controller, ctx.Source, ct);
+                break;
+
             default:
                 await _engine.EmitAsync(new LogEvent($"  {ctx.Source.Name}: '{name}' is not implemented yet."), ct);
                 break;
         }
     }
+
+    /// <summary>The Deploy a React answers, while it is still under way.</summary>
+    private static StackItem? DeployingItem(EffectContext ctx) =>
+        ctx.EventItem is { Kind: StackItemKind.DeployUnit, Cancelled: false, TargetNode: not null } item
+        && item.Card.Location.Kind == LocationKind.Stack ? item : null;
+
+    /// <summary>The Order a React answers, while it is still being Issued.</summary>
+    private static StackItem? IssuingItem(EffectContext ctx) =>
+        ctx.EventItem is { Kind: StackItemKind.IssueOrder, Cancelled: false } item
+        && item.Card.Location.Kind == LocationKind.Stack ? item : null;
+
+    /// <summary>The nodes a <c>moveTo</c> selector offers for <paramref name="unit"/> ("legalFor": "Target").</summary>
+    private List<Node> Destinations(JsonElement moveTo, CardInstance unit, EffectContext ctx)
+    {
+        moveTo.TryGetProperty("filter", out var filter);
+        ctx.Bound[TargetKey] = new List<object> { unit };
+        try
+        {
+            return Nodes(filter, ctx);
+        }
+        finally
+        {
+            ctx.Bound.Remove(TargetKey);
+        }
+    }
+
+    private const string TargetKey = "$Target";
 
     private async Task DrawAsync(JsonElement op, EffectContext ctx, CancellationToken ct)
     {
@@ -346,7 +424,7 @@ internal sealed class EffectRunner
                 n = pick.Count > 0 ? options[pick[0]].Value : max;
             }
             for (int i = 0; i < n; i++)
-                if (await _engine.DrawAsync(player, deck, ct) is null) break;
+                if (await _engine.DrawAsync(player, deck, ct, ctx.Source) is null) break;
             return;
         }
 
@@ -372,9 +450,9 @@ internal sealed class EffectRunner
         }
 
         for (int i = 0; i < units; i++)
-            if (await _engine.DrawAsync(player, PileKind.UnitDeck, ct) is null) break;
+            if (await _engine.DrawAsync(player, PileKind.UnitDeck, ct, ctx.Source) is null) break;
         for (int i = 0; i < count - units; i++)
-            if (await _engine.DrawAsync(player, PileKind.OrderDeck, ct) is null) break;
+            if (await _engine.DrawAsync(player, PileKind.OrderDeck, ct, ctx.Source) is null) break;
     }
 
     private async Task DuelAsync(JsonElement op, EffectContext ctx, CancellationToken ct)
@@ -524,7 +602,7 @@ internal sealed class EffectRunner
         }
 
         var cards = Cards(filter, ctx, unitOnly: kind == "Unit");
-        if (purpose == "MoveToStandby") cards = cards.Where(c => Placement.CanEnterStandby(c.Definition)).ToList(); // ruling #36
+        if (purpose == "MoveToStandby") cards = cards.Where(c => Placement.CanEnterStandby(c)).ToList(); // ruling #36
         if (cardOk is not null) cards = cards.Where(cardOk).ToList();
         return (await AskCardsAsync(ctx, cards, min, max, purpose, PromptFor(ctx, purpose, kind, min, max), ct))
             .Cast<object>().ToList();
@@ -778,9 +856,31 @@ internal sealed class EffectRunner
                     bool opposed = node.Card is not null && State.OpposingNode(node)?.Card is not null;
                     if (opposed != (v.ValueKind == JsonValueKind.True)) return false;
                     break;
+                case "legalFor":
+                    if (!LegalFor(node, v.GetString(), ctx)) return false;
+                    break;
             }
         }
         return true;
+    }
+
+    /// <summary>
+    /// "legalFor": "Event.Unit" – another node the Unit being Deployed could legally go to (Recolonize);
+    /// "Target" – a node the Unit chosen by this op may move to while staying in play (One of Us).
+    /// </summary>
+    private bool LegalFor(Node node, string? who, EffectContext ctx)
+    {
+        switch (who)
+        {
+            case "Event.Unit":
+                return DeployingItem(ctx) is { } item && !ReferenceEquals(node, item.TargetNode)
+                       && Placement.CanRedirectTo(State, item.Controller, item.Card, node);
+            case "Target":
+                return ctx.Bound.TryGetValue(TargetKey, out var t) && t.FirstOrDefault() is CardInstance unit
+                       && !ReferenceEquals(unit.Location.Node, node) && Placement.CanMoveInPlayTo(unit, node);
+            default:
+                return false;
+        }
     }
 
     // ================================================================== conditions and values

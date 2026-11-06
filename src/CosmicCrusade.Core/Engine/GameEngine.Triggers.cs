@@ -65,17 +65,32 @@ public sealed partial class GameEngine
         else await EmitAsync(new LogEvent($"  {source.Name}: the Warzone deck is empty."), ct);
     }
 
-    // ================================================================== scripted handlers (M3.3, started)
+    // ================================================================== scripted handlers (M3.3)
 
     /// <summary>Card abilities written in C# rather than as data (<c>"script"</c> in cards.json).</summary>
-    internal static readonly HashSet<string> Scripts = new() { "Wormhole" };
+    internal static readonly HashSet<string> Scripts = new()
+    {
+        "Wormhole", "RearrangeAllNodes", "Terraform", "EnterAsCopy", "RetriggerAbilities",
+    };
 
-    internal async Task RunScriptAsync(string name, EffectContext ctx, CancellationToken ct)
+    internal async Task RunScriptAsync(string name, JsonElement effect, EffectContext ctx, CancellationToken ct)
     {
         switch (name)
         {
             case "Wormhole":
                 await WormholeAsync(ctx.Controller, ctx.Source, ct);
+                break;
+            case "RearrangeAllNodes":
+                await RearrangeAllNodesAsync(ctx, ct);
+                break;
+            case "Terraform":
+                await TerraformAsync(ctx, ct);
+                break;
+            case "EnterAsCopy":
+                await EnterAsCopyAsync(effect, ctx, ct);
+                break;
+            case "RetriggerAbilities":
+                await RetriggerAbilitiesAsync(ctx, ct);
                 break;
             default:
                 await EmitAsync(new LogEvent($"  {ctx.Source.Name}: this ability isn't implemented yet."), ct);

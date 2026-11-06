@@ -82,7 +82,9 @@ public partial class GameView
         ChoicePanel.Visibility = Visibility.Visible;
         Fixed(ChoicePanel, OpacityProperty, 0, 1, 140);
         _hud.Status = "Choose";
-        _hud.Hint = single ? "Click an option (here or on the board)." : "Select options, then CONFIRM (Enter).";
+        _hud.Hint = single ? "Click an option (here or on the board)."
+            : r.Min == 0 && r.Max == 1 ? "Click an option (here or on the board), or NONE."
+            : "Select options, then CONFIRM (Enter).";
         _hud.CanPass = false;
     }
 
@@ -112,7 +114,8 @@ public partial class GameView
         var r = ActiveChoice;
         if (r is null || index < 0 || index >= r.Options.Count) return;
 
-        if (SinglePick(r))
+        // One pick or none (Ace's "next node, or NONE"): a click submits it; NONE stays on the CONFIRM button.
+        if (SinglePick(r) || (r.Min == 0 && r.Max == 1))
         {
             _human.SubmitChoice(new[] { index });
             return;

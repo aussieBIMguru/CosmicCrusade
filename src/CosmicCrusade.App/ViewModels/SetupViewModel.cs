@@ -71,7 +71,8 @@ public sealed class SetupViewModel : ObservableObject
         _leaders = _defaults.Leaders;
         _warzones = _defaults.Warzones;
 
-        foreach (var def in AppPaths.Database.All.Where(d => d.Kind != CardKind.Warzone).OrderBy(d => d.Id, StringComparer.Ordinal))
+        // Every card, Warzones included (their counts only matter while the Warzones expansion is on).
+        foreach (var def in AppPaths.Database.All.OrderBy(d => d.Id, StringComparer.Ordinal))
         {
             _defaults.CopyCounts.TryGetValue(def.Id, out int n);
             Cards.Add(new CardCountRow(def, n, UpdateTotals));
@@ -144,9 +145,11 @@ public sealed class SetupViewModel : ObservableObject
         var o = BuildOptions();
         int units = Cards.Where(r => r.Definition.IsUnit).Sum(r => DeckBuilder.CopiesOf(r.Definition, o));
         int orders = Cards.Where(r => r.Definition.IsOrder).Sum(r => DeckBuilder.CopiesOf(r.Definition, o));
-        Totals = DeckMode == DeckMode.RandomDraw
+        int warzones = Cards.Where(r => r.Definition.Kind == CardKind.Warzone).Sum(r => DeckBuilder.CopiesOf(r.Definition, o));
+        string wz = Warzones ? $" · Warzone deck {warzones}" : " · Warzones off";
+        Totals = (DeckMode == DeckMode.RandomDraw
             ? $"Random Draw: {Cards.Count(r => r.Definition.IsUnit && DeckBuilder.CopiesOf(r.Definition, o) > 0)} distinct units, " +
               $"{Cards.Count(r => r.Definition.IsOrder && DeckBuilder.CopiesOf(r.Definition, o) > 0)} distinct orders (decks never run out)"
-            : $"Unit deck {units} · Order deck {orders}";
+            : $"Unit deck {units} · Order deck {orders}") + wz;
     }
 }

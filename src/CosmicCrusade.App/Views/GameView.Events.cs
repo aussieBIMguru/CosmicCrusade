@@ -36,9 +36,15 @@ public partial class GameView
                 break;
 
             case RoundStartedEvent e:
+                _roundLive = true;
+                _someonePassed = false;
+                _cleaningUp = false;
+                _sweepShown = false;
+                EndSunset();
                 _hud.RoundText = $"ROUND {e.Round}";
                 _hud.AddLog($"— Round {e.Round} — {(e.FirstPlayer == 0 ? "you go" : "the AI goes")} first.");
                 await ShowBannerAsync($"ROUND {e.Round}", e.FirstPlayer == 0 ? "You go first" : "AI goes first", Cyan, 900);
+                await DealFanAsync(); // effects pass 3: the decks fan out, then the Start-up draws twirl in
                 break;
 
             case CardDrawnEvent e:
@@ -48,10 +54,13 @@ public partial class GameView
             case DeckReshuffledEvent e:
                 _hud.AddLog($"{BoardLayout.PileLabel(e.Deck)} reshuffled ({e.CardCount} cards).");
                 UpdatePiles();
+                await RiffleAsync(e.Deck);
                 _piles[e.Deck].Pulse();
                 break;
 
             case TurnStartedEvent e:
+                _dealing = false;
+                HideTacticalGrid();
                 if (e.Player == 1)
                 {
                     _hud.Status = "AI is thinking…";
@@ -60,9 +69,12 @@ public partial class GameView
                 break;
 
             case PassedEvent e:
+                _someonePassed = true;
+                HideTacticalGrid();
                 _hud.AddLog(e.Player == 0 ? "You passed." : "AI passed.");
                 if (e.Player == 1) _hud.Status = "AI passed";
                 await FloatTextAsync(e.Player == 0 ? "PASS" : "AI PASSES", e.Player);
+                if (e.Player == 0) MaybeTaunt(PassTaunts, 0.35);
                 break;
 
             case UnitDeployAnnouncedEvent e:
@@ -166,7 +178,16 @@ public partial class GameView
                 break;
 
             case RoundScoredEvent e:
+                _roundLive = false;
+                _cleaningUp = true;
+                EndSunset();
+                HideTacticalGrid();
+                UpdateTension();
                 await OnRoundScoredAsync(e.Result);
+                break;
+
+            case RandomDeployNodeChosenEvent e:
+                await RouletteAsync(e.Candidates, e.Chosen);
                 break;
 
             case CardMovedToPileEvent e:
@@ -183,9 +204,14 @@ public partial class GameView
             case WarzonesAddedEvent e:
             {
                 // Dimensional Rift / Wormhole: every new Warzone flies in together, then one banner names them all.
+                string? via = e.Source?.Definition.Name;
+                if (via == "Wormhole") OpenPortal();
+                if (via == "Dimensional Rift") OpenRift();
                 await Task.WhenAll(e.Warzones.Select(w =>
                     FlyBetweenPilesAsync(w, PileKind.WarzoneDeck, PileKind.ActiveWarzone, startFaceDown: true, endFaceDown: false)));
                 UpdatePiles();
+                await ClosePortalAsync();
+                await CloseRiftAsync();
                 foreach (var w in e.Warzones) _hud.AddLog($"Warzone: {w.Name}. {w.Definition.Text}");
                 string names = string.Join(" + ", e.Warzones.Select(w => w.Name.ToUpperInvariant()));
                 string sub = e.Warzones.Count == 1
@@ -201,6 +227,9 @@ public partial class GameView
                 break;
 
             case RoundEndedEvent:
+                _cleaningUp = false;
+                await ClosePortalAsync();
+                await CloseRiftAsync();
                 await Anim.Delay(350);
                 UpdatePiles();
                 RefreshScores();
@@ -217,17 +246,40 @@ public partial class GameView
             case CardNullifiedFromHandEvent e:
                 await OnCardNullifiedFromHandAsync(e);
                 break;
+
+            // M3.3
+            case CardCopiedEvent e:
+                await OnCardCopiedAsync(e);
+                break;
+
+            case DeployRedirectedEvent e:
+                await OnDeployRedirectedAsync(e);
+                break;
+
+            case StackItemControlChangedEvent e:
+                await OnStackItemControlChangedAsync(e);
+                break;
+
+            case UnitControlGainedEvent e:
+                await OnUnitControlGainedAsync(e);
+                break;
+
+            // Effects pass
+            case RacesChangedEvent e:
+                await OnRacesChangedAsync(e);
+                break;
         }
 
         // The All-knowing / Transparency / Oracle's Arch: show the AI's hand face up while it is revealed.
         SyncRevealedHands();
+        SyncAmbient();
 
         // Static effects (anthems, Acid Rain, Indominus...) change Ranks of Units that weren't involved in the
         // event, so refresh every badge and the totals after anything that can switch a static on or off.
         if (gameEvent is OrderResolvedEvent or CardNullifiedEvent or CardMovedToPileEvent or CardMovedToStandbyEvent
             or CardReturnedToHandEvent or CardRetiredFromHandEvent or CardDrawnEvent or WarzoneRevealedEvent or WarzonesAddedEvent
             or WarzoneReturnedEvent or AbilitiesSuppressedEvent or ChoiceMadeEvent or NullifyPreventedEvent
-            or NodesSwappedEvent or RankChangedEvent or CardNullifiedFromHandEvent)
+            or NodesSwappedEvent or RankChangedEvent or CardNullifiedFromHandEvent or CardCopiedEvent or UnitControlGainedEvent or RacesChangedEvent)
             RefreshScores();
     }
 
@@ -237,6 +289,15 @@ public partial class GameView
     {
         UpdatePiles();
         var deckCenter = ProjectToFx(BoardLayout.PileCenter(e.FromDeck));
+        Sfx.Play(SfxKind.Draw, 0.5, minGapMs: 70);
+
+        // A draw from a card effect: an Overmind-style psionic pulse from the card (or the deck if it isn't on the board).
+        bool psionic = e.Source is not null;
+        if (e.Source is { } src)
+        {
+            var at = _boardCards.TryGetValue(src.InstanceId, out var sv) ? BoardCenterOf(sv) : BoardLayout.PileCenter(e.FromDeck);
+            PsionicAura(at, src.InstanceId);
+        }
 
         if (e.Player == 0)
         {
@@ -247,7 +308,14 @@ public partial class GameView
             v.Translate.X = start.X - v.Width / 2;
             v.Translate.Y = start.Y - v.Height / 2;
             v.Scale.ScaleX = v.Scale.ScaleY = 0.45;
+            if (_dealing && e.Source is null)
+            {
+                // The fanned deal: each card twirls into its place in the hand.
+                v.Rotate.Angle = Rand(-40, 40);
+                Sfx.Play(SfxKind.Deal, 0.5, minGapMs: 50);
+            }
             LayoutHand();
+            if (psionic) GlowBriefly(v, PsiViolet, 900);
         }
         else
         {
@@ -258,6 +326,7 @@ public partial class GameView
             v.Translate.X = start.X - v.Width / 2;
             v.Translate.Y = start.Y - v.Height / 2;
             LayoutOpponentHand();
+            if (psionic) GlowBriefly(v, PsiViolet, 900);
         }
         await Anim.Delay(90);
     }
@@ -267,6 +336,7 @@ public partial class GameView
     private async Task OnDeployAnnouncedAsync(UnitDeployAnnouncedEvent e)
     {
         var targetRect = ProjectRect(BoardLayout.CardRectAt(BoardLayout.Center(e.Target)));
+        if (e.FromPile == PileKind.NullifiedUnits) _reanimating.Add(e.Card.InstanceId); // Galactomancer, Hills of Decay
         string side = e.Target.Side == e.Player ? "" : (e.Target.Side == 0 ? "your " : "the AI's ");
         _hud.AddLog($"{(e.Player == 0 ? "You" : "AI")} deploy{(e.Player == 0 ? "" : "s")} {e.Card.Name} → {side}{e.Target.Label}");
 
@@ -296,6 +366,7 @@ public partial class GameView
         flyer.SetGlow(CardLayout.Instance.Accent(e.Card.Definition));
         FxCanvas.Children.Add(flyer);
         _flying = flyer;
+        Trail(flyer, CardLayout.Instance.Accent(e.Card.Definition)); // effects pass 3
 
         double ms = 420;
         double tx = targetRect.X + targetRect.Width / 2 - flyer.Width / 2;
@@ -344,6 +415,7 @@ public partial class GameView
         flyer.Scale.ScaleX = a.Width / flyer.Width;
         flyer.Scale.ScaleY = a.Height / flyer.Height;
         FxCanvas.Children.Add(flyer);
+        Trail(flyer, Purple);
 
         const double ms = 520;
         var tasks = new List<Task>
@@ -404,12 +476,26 @@ public partial class GameView
         _ = Anim.To(view.Scale, ScaleTransform.ScaleXProperty, 1, 260, Anim.Back, from: 1.18);
         _ = Anim.To(view.Scale, ScaleTransform.ScaleYProperty, 1, 260, Anim.Back, from: 1.18);
         Shake();
+        Sfx.Play(SfxKind.Land);
+        RaceLanding(e.Card, BoardLayout.Center(e.Node));
+        if (e.Card.Definition.IsLeader) LeaderArrival(BoardLayout.Center(e.Node));
+        LookAt(BoardLayout.Center(e.Node));
 
         RefreshScores();
         int rank = RankCalculator.GetRank(State, e.Card);
         string where = e.Node.Side == e.Player ? e.Node.Label : $"{(e.Node.Side == 0 ? "your" : "the AI's")} {e.Node.Label}";
         _hud.AddLog($"  {e.Card.Name} lands on {where} (Rank {rank}). Score {_hud.MyTotal}–{_hud.AiTotal}.");
         await Anim.Delay(220);
+        if (_reanimating.Remove(e.Card.InstanceId)) await DecayAsync(view, "RISEN");
+    }
+
+    /// <summary>Units being Deployed out of the Nullified pile: they rise with the decay effect when they land.</summary>
+    private readonly HashSet<int> _reanimating = new();
+
+    private void GlowBriefly(CardView v, Color color, double ms)
+    {
+        v.SetGlow(color, pulse: true);
+        _ = Anim.Delay(ms).ContinueWith(_ => v.SetGlow(null), TaskScheduler.FromCurrentSynchronizationContext());
     }
 
     private CardView AddBoardCard(CardInstance card, Node node)
@@ -440,6 +526,7 @@ public partial class GameView
         _hud.AiTotal = RankCalculator.TotalRank(State, 1);
         foreach (var v in _boardCards.Values) v.ShowRankIfInPlay(State);
         foreach (var s in _slots.Values) s.Refresh();
+        UpdateBoardReadout(); // effects pass 3: pair chevrons, rolling totals, tug-of-war, lighting
     }
 
     // =================================================================== scoring and clean-up
@@ -473,6 +560,10 @@ public partial class GameView
         _hud.AddLog($"Round {r.Round}: {title.ToLowerInvariant()} {sub}.");
         _hud.Status = title;
         var color = r.Winner switch { 0 => BoardSurface.PlayerColor, 1 => BoardSurface.OpponentColor, _ => Colors.Gray };
+        if (r.WonBy is { } wonBy) await GavelAsync(wonBy); // The Empress, Senate Chambers
+        if (r.Winner == 0) Fireworks(4, color); // you took the round
+        if (r.Winner == 1) MaybeTaunt(RoundTaunts, 0.5);
+        await FinaleAsync(r); // effects pass 3: victory lift-off / defeat crack on the game's last round
         await ShowBannerAsync(title, sub, color, 1500);
     }
 
@@ -486,6 +577,12 @@ public partial class GameView
         _boardCards.Remove(e.Card.InstanceId);
         v.SetGlow(null);
         v.HideRank();
+        if (_cleaningUp && e.From is not null)
+        {
+            // Clean-up: one sweep across the table, and the cards tumble a little as they're cleared.
+            CleanupSweep();
+            _ = Anim.To(v.Rotate, RotateTransform.AngleProperty, Rand(-35, 35), 480, Anim.Out);
+        }
 
         var to = BoardLayout.PileCenter(e.Pile);
         var pile = _piles[e.Pile];
@@ -532,7 +629,7 @@ public partial class GameView
 
         // A burst of sparks.
         var rng = new Random(boardPoint.GetHashCode() ^ Environment.TickCount);
-        for (int i = 0; i < 14; i++)
+        for (int i = 0; i < FxSettings.Count(14); i++)
         {
             var spark = new Ellipse
             {
@@ -560,21 +657,17 @@ public partial class GameView
         }
     }
 
-    /// <summary>Tiny camera shake when a unit lands.</summary>
-    private void Shake()
+    /// <summary>Camera shake when a unit lands (stronger for Leaders and gavels).</summary>
+    private void Shake(double strength = 1)
     {
-        var t = Viewport.RenderTransform as TranslateTransform;
-        if (t is null)
-        {
-            t = new TranslateTransform();
-            Viewport.RenderTransform = t;
-        }
-        var a = new DoubleAnimationUsingKeyFrames { Duration = Anim.Ms(220) };
-        a.KeyFrames.Add(new LinearDoubleKeyFrame(4, KeyTime.FromPercent(0.2)));
-        a.KeyFrames.Add(new LinearDoubleKeyFrame(-3, KeyTime.FromPercent(0.45)));
-        a.KeyFrames.Add(new LinearDoubleKeyFrame(2, KeyTime.FromPercent(0.7)));
+        strength *= FxSettings.Intensity; // Reduce effects: a gentle nudge instead of a shake
+        EnsureCamera();
+        var a = new DoubleAnimationUsingKeyFrames { Duration = Anim.Ms(220 + 60 * (strength - 1)) };
+        a.KeyFrames.Add(new LinearDoubleKeyFrame(4 * strength, KeyTime.FromPercent(0.2)));
+        a.KeyFrames.Add(new LinearDoubleKeyFrame(-3 * strength, KeyTime.FromPercent(0.45)));
+        a.KeyFrames.Add(new LinearDoubleKeyFrame(2 * strength, KeyTime.FromPercent(0.7)));
         a.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(1)));
-        t.BeginAnimation(TranslateTransform.YProperty, a);
+        _camShake!.BeginAnimation(TranslateTransform.YProperty, a);
     }
 
     private async Task FloatTextAsync(string text, int player)
@@ -621,6 +714,8 @@ public partial class GameView
         _hud.AddLog($"Game over: {GameOverTitle.Text} ({o.RoundsWon0}–{o.RoundsWon1}).");
         GameOverPanel.Opacity = 0;
         GameOverPanel.Visibility = Visibility.Visible;
+        if (o.Winner == 0) Fireworks(9, BoardSurface.PlayerColor);
+        _ = GameOverMomentAsync(o); // effects pass 3: victory lift-off / defeat crack
         _ = Anim.To(GameOverPanel, OpacityProperty, 1, 600, Anim.Out);
     }
 }

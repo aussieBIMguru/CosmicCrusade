@@ -49,16 +49,9 @@ public class M32cTests
     // ------------------------------------------------------------------ implementation status
 
     [Fact]
-    public void Only_the_M3_3_cards_are_still_unimplemented()
+    public void Cards_without_effects_count_as_fully_implemented()
     {
-        var none = TestData.Db.All.Where(c => CardStatus.Of(c) == Implementation.None).Select(c => c.Name)
-            .OrderBy(x => x, StringComparer.Ordinal).ToList();
-        Assert.Equal(new[]
-        {
-            "Ace, Council Tactician", "Commandeer", "Forced Mitosis", "Mr Morph", "One of Us", "Recolonize", "TR-1993.r",
-            "Terraform",
-        }.OrderBy(x => x, StringComparer.Ordinal), none);
-        Assert.DoesNotContain(TestData.Db.All, c => CardStatus.Of(c) == Implementation.Partial);
+        // M3.3 finished the rest: see M33Tests.Every_card_is_now_fully_implemented.
         Assert.Equal(Implementation.Full, CardStatus.Of(TestData.Brute(Race.Blaarg))); // no effects at all
     }
 

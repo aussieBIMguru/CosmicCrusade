@@ -190,7 +190,7 @@ public sealed partial class GameEngine
     /// </summary>
     private async Task<bool> TryNullifyReplacementAsync(CardInstance card, Node node, CancellationToken ct)
     {
-        if (!Placement.CanEnterStandby(card.Definition) || BlackHole() is not null) return false;
+        if (!Placement.CanEnterStandby(card) || BlackHole() is not null) return false;
         if (State.Players[node.Side].StandbyNodes.All(n => !n.IsEmpty)) return false;
 
         foreach (var (src, controller) in ReplacementSources("UnitNullifying"))
@@ -307,7 +307,7 @@ public sealed partial class GameEngine
     internal async Task<bool> MoveToStandbyAsync(CardInstance card, int side, bool retireIfNoRoom, CancellationToken ct)
     {
         if (!card.Definition.IsUnit) return false;
-        if (!Placement.CanEnterStandby(card.Definition))
+        if (!Placement.CanEnterStandby(card))
         {
             await EmitAsync(new LogEvent($"  {card.Name} is a Leader: Leaders can never go into a Standby zone."), ct);
             return false;

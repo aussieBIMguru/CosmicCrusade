@@ -15,6 +15,9 @@
 
             <controls:Starfield />
 
+            <!-- Behind the board, in front of the stars: planets and moons that rise in the sky (Warzone ambients). -->
+            <Canvas x:Name="SkyCanvas" IsHitTestVisible="False" ClipToBounds="True" />
+
             <!-- The board: a 2D canvas mapped onto a tilted 3D plane. It stays fully interactive. -->
             <Viewport3D x:Name="Viewport" ClipToBounds="False">
                 <Viewport3D.Camera>
@@ -34,8 +37,15 @@
                     <Viewport2DVisual3D.Material>
                         <DiffuseMaterial Viewport2DVisual3D.IsVisualHostMaterial="True" Brush="White" />
                     </Viewport2DVisual3D.Material>
+                    <!-- The plane fits the *contents* of this visual, measured inside the root (the root's own clip
+                         doesn't count). So the root is a fixed 1600×1000 frame: a transparent rectangle pins its size,
+                         and BoardCanvas inside it is clipped, so nothing drawn on the board (glows, sparks, ambients past
+                         the edges) can ever change the size the plane sees. Board coordinates are unchanged. -->
                     <Viewport2DVisual3D.Visual>
-                        <Canvas x:Name="BoardCanvas" Width="1600" Height="1000" />
+                        <Canvas x:Name="BoardRoot" Width="1600" Height="1000">
+                            <Rectangle Width="1600" Height="1000" Fill="Transparent" IsHitTestVisible="False" />
+                            <Canvas x:Name="BoardCanvas" Width="1600" Height="1000" ClipToBounds="True" />
+                        </Canvas>
                     </Viewport2DVisual3D.Visual>
                 </Viewport2DVisual3D>
             </Viewport3D>
@@ -166,15 +176,30 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" HorizontalAlignment="Center">
                             <TextBlock Text="{Binding PlayerName}" Foreground="{StaticResource PlayerBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                            <TextBlock x:Name="MyTotalText" Text="{Binding MyTotal}" FontFamily="{StaticResource DisplayFont}" FontSize="58" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="MyTotalText" Text="0" FontFamily="{StaticResource DisplayFont}" FontSize="58" HorizontalAlignment="Center" />
                             <TextBlock Text="{Binding MyPips}" Foreground="{StaticResource GoldBrush}" FontSize="18" HorizontalAlignment="Center" />
                         </StackPanel>
                         <TextBlock Grid.Column="1" Text="vs" VerticalAlignment="Center" Style="{StaticResource Muted}" FontSize="16" />
                         <StackPanel Grid.Column="2" HorizontalAlignment="Center">
                             <TextBlock Text="{Binding AiName}" Foreground="{StaticResource OpponentBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                            <TextBlock x:Name="AiTotalText" Text="{Binding AiTotal}" FontFamily="{StaticResource DisplayFont}" FontSize="58" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="AiTotalText" Text="0" FontFamily="{StaticResource DisplayFont}" FontSize="58" HorizontalAlignment="Center" />
                             <TextBlock Text="{Binding AiPips}" Foreground="{StaticResource GoldBrush}" FontSize="18" HorizontalAlignment="Center" />
                         </StackPanel>
+                    </Grid>
+                    <!-- Tug-of-war: the knot slides towards whoever is winning the round (The Oculus flips it). -->
+                    <Grid x:Name="TugTrack" Height="10" Margin="10,6,10,0"
+                          ToolTip="Who is winning the round right now (with The Oculus, the lower total wins)">
+                        <Border CornerRadius="5" Background="#FFEF4444" Opacity="0.8" />
+                        <Border x:Name="TugBlue" CornerRadius="5" Background="#FF3B82F6" HorizontalAlignment="Left" Width="0" />
+                        <Ellipse x:Name="TugKnot" Width="18" Height="18" Margin="0,-4,0,-4" HorizontalAlignment="Left"
+                                 Fill="White" Stroke="#FFFFC94A" StrokeThickness="2">
+                            <Ellipse.RenderTransform>
+                                <TranslateTransform x:Name="TugKnotShift" />
+                            </Ellipse.RenderTransform>
+                            <Ellipse.Effect>
+                                <DropShadowEffect x:Name="TugGlow" Color="#FFC94A" BlurRadius="12" ShadowDepth="0" />
+                            </Ellipse.Effect>
+                        </Ellipse>
                     </Grid>
                 </StackPanel>
 
@@ -209,6 +234,10 @@
                         <RowDefinition />
                         <RowDefinition />
                         <RowDefinition />
+                        <RowDefinition />
+                        <RowDefinition />
+                        <RowDefinition />
+                        <RowDefinition />
                     </Grid.RowDefinitions>
                     <TextBlock Text="Tilt" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,0" />
                     <Slider x:Name="TiltSlider" Grid.Column="1" Minimum="0" Maximum="58" Value="38" ValueChanged="Camera_Changed" />
@@ -222,6 +251,22 @@
                     <CheckBox x:Name="PauseReactsCheck" Grid.Row="4" Grid.ColumnSpan="2" IsChecked="True"
                               Content="Pause when I can React" Checked="PauseReacts_Changed" Unchecked="PauseReacts_Changed"
                               ToolTip="On: the game stops and asks whenever one of your Reacts can answer what just happened. Off: you never respond (auto-allow everything)." />
+                    <CheckBox x:Name="SoundCheck" Grid.Row="5" IsChecked="True" Content="Sound" VerticalAlignment="Center"
+                              Checked="Sound_Changed" Unchecked="Sound_Changed" ToolTip="Sound effects (generated in code, no files needed)." />
+                    <Slider x:Name="VolumeSlider" Grid.Row="5" Grid.Column="1" Minimum="0" Maximum="1" Value="0.6"
+                            ValueChanged="Sound_Changed" ToolTip="Sound volume" />
+                    <CheckBox x:Name="MusicCheck" Grid.Row="6" Grid.ColumnSpan="2" IsChecked="True" Content="Music"
+                              Checked="Music_Changed" Unchecked="Music_Changed"
+                              ToolTip="A generated music bed. A pulse layer fades in when the round is close." />
+                    <CheckBox x:Name="ReduceFxCheck" Grid.Row="7" Grid.ColumnSpan="2" Content="Reduce effects"
+                              Checked="FxSettings_Changed" Unchecked="FxSettings_Changed"
+                              ToolTip="Tones down flashes, screen shake, lightning and camera pushes (easier on the eyes, faster to follow)." />
+                    <TextBlock Grid.Row="8" Text="Effects" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ComboBox x:Name="FxQualityBox" Grid.Row="8" Grid.Column="1" Margin="0,2,0,0" SelectionChanged="FxSettings_Changed"
+                              ToolTip="Low skips the heavier ambient layers, blurs, idle motion and card trails, and uses fewer particles (for older PCs).">
+                        <ComboBoxItem Content="Low quality" Tag="Low" />
+                        <ComboBoxItem Content="High quality" Tag="High" />
+                    </ComboBox>
                 </Grid>
 
                 <!-- Log -->

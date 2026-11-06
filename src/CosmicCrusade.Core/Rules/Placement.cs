@@ -30,6 +30,13 @@ public static class Placement
     /// </summary>
     public static bool CanEnterStandby(CardDefinition def) => def.IsUnit && !def.IsLeader;
 
+    /// <summary>
+    /// Ruling #36 for a card instance: a copy has to be a non-Leader both as the copy and as printed, because it
+    /// turns back into its printed self the moment it leaves play (Mr Morph copying a Minion is still a Leader card).
+    /// </summary>
+    public static bool CanEnterStandby(CardInstance card) =>
+        CanEnterStandby(card.Definition) && CanEnterStandby(card.PrintedDefinition);
+
     /// <summary>Can <paramref name="player"/> deploy this unit from hand to <paramref name="node"/> right now?</summary>
     public static bool CanDeploy(GameState state, int player, CardInstance card, Node node)
     {
@@ -39,6 +46,26 @@ public static class Placement
         // Static deploy rules (Extreme Sanctions, Even Odds, Military Academy) and extra costs (Mechatron).
         return StaticLayer.DeployAllowed(state, player, card, node) && PlayRules.CanPay(state, player, card);
     }
+
+    /// <summary>
+    /// Recolonize: may the Unit already being Deployed by <paramref name="player"/> go to <paramref name="node"/>
+    /// instead? Same rules as a Deploy (class, side, Even Odds) minus what was settled when it was announced (its cost,
+    /// "can this card be Deployed at all", Military Academy's turn count).
+    /// </summary>
+    public static bool CanRedirectTo(GameState state, int player, CardInstance card, Node node)
+    {
+        if (!node.IsScoring || !node.IsEmpty) return false;
+        if (!ClassAllows(card.Definition, node.Kind)) return false;
+        if (node.Side != player && !AllowsOpponentNode(state, card, node)) return false;
+        return StaticLayer.NodeAllowsDeploy(state, card, node);
+    }
+
+    /// <summary>
+    /// One of Us: may a Unit already in play move to <paramref name="node"/> (an Empty Unit/Leader node its class
+    /// allows)? It isn't Deployed, so deploy rules don't apply.
+    /// </summary>
+    public static bool CanMoveInPlayTo(CardInstance card, Node node) =>
+        node.IsScoring && node.IsEmpty && ClassAllows(card.Definition, node.Kind);
 
     public static IEnumerable<Node> LegalDeployNodes(GameState state, int player, CardInstance card) =>
         state.Players[player].ScoringNodes

@@ -45,6 +45,7 @@ public partial class GameView : UserControl, IGameEventSink
     {
         InitializeComponent();
         _options = options;
+        InitFxSettings();
         _hud = new GameHudViewModel { PlayerName = "You", AiName = "AI", RoundsToWin = options.RoundsToWin };
         DataContext = _hud;
 
@@ -54,7 +55,14 @@ public partial class GameView : UserControl, IGameEventSink
         _human.ChoiceCompleted += OnHumanChoiceCompleted;
 
         Loaded += OnLoaded;
-        Unloaded += (_, _) => _cts.Cancel();
+        Loaded += (_, _) => Sfx.SetMusic(MusicCheck.IsChecked == true);
+        Unloaded += (_, _) =>
+        {
+            _cts.Cancel();
+            Sfx.SetMusic(false);
+            _heartbeat?.Stop();
+            StopAllAmbient();
+        };
         HandCanvas.SizeChanged += (_, _) => LayoutHand(animate: false);
         Viewport.SizeChanged += (_, _) => UpdateCamera();
         OpponentHandCanvas.SizeChanged += (_, _) => LayoutOpponentHand(animate: false);
@@ -81,7 +89,11 @@ public partial class GameView : UserControl, IGameEventSink
         _state = GameEngine.CreateGame(AppPaths.Database, _options, "You", "AI");
         BuildBoard();
 
+        BuildBoardReadout();
+        BuildAiEye();
+
         var ai = new PacedController(new HeuristicAi(_options.Seed ^ 0x5EED));
+        ai.ThinkingChanged += SetAiThinking;
         var engine = new GameEngine(_state, _human, ai, this);
 
         try
@@ -261,6 +273,23 @@ public partial class GameView : UserControl, IGameEventSink
     private void Speed_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (SpeedSlider is not null) Anim.SpeedFactor = SpeedSlider.Value;
+    }
+
+    /// <summary>Sound on/off and volume (one handler for the CheckBox and the Slider).</summary>
+    private void Sound_Changed(object sender, RoutedEventArgs e)
+    {
+        if (SoundCheck is null || VolumeSlider is null) return; // still loading the XAML
+        Sfx.Enabled = SoundCheck.IsChecked == true;
+        Sfx.Volume = VolumeSlider.Value;
+        VolumeSlider.IsEnabled = Sfx.Enabled;
+        Sfx.ApplyMusicVolume();
+    }
+
+    /// <summary>The generated music bed (calm pad; a pulse layer rises in close rounds).</summary>
+    private void Music_Changed(object sender, RoutedEventArgs e)
+    {
+        if (MusicCheck is null || !IsLoaded) return; // OnLoaded starts it
+        Sfx.SetMusic(MusicCheck.IsChecked == true);
     }
 
     private void PlayArea_MouseWheel(object sender, MouseWheelEventArgs e)
@@ -454,6 +483,7 @@ public partial class GameView : UserControl, IGameEventSink
     private void HandCard_MouseEnter(object sender, MouseEventArgs e)
     {
         var v = (CardView)sender;
+        Sfx.Play(SfxKind.Hover, 0.5, minGapMs: 40);
         ShowZoom(v.Card);
         ScheduleMagnify(v);
         if (v == _selected || v.Tag is not HandSpot spot) return;
@@ -651,6 +681,7 @@ public partial class GameView : UserControl, IGameEventSink
 
         ClearSelection();
         _selected = v;
+        Sfx.Play(SfxKind.Flick, 0.7);
         _deployChoices = deployChoices;
         v.SetGlow(Gold, pulse: true);
         if (v.Tag is HandSpot spot)

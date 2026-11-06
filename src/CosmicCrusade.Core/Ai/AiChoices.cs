@@ -15,6 +15,21 @@ public static class AiChoices
         int me = r.Player;
         if (r.Purpose.StartsWith("OptionalDuel:"))
             return new[] { WantsDuel(r, s) ? 0 : 1 };
+
+        // M3.3
+        if (r.Purpose.StartsWith("CopyFor:"))
+        {
+            // Mr Morph / Forced Mitosis: our copy should be big, theirs small (printed Rank: a copy keeps no changes).
+            bool ours = int.Parse(r.Purpose[8..]) == me;
+            return new[] { IndexOfMax(r, o => (ours ? 1 : -1) * CopyValue(o.Card)) };
+        }
+        if (r.Purpose.StartsWith("RearrangeTo:"))
+        {
+            var from = s.FindNode(r.Purpose[12..]);
+            return new[] { from is null ? 0 : IndexOfMax(r, o => Rearrange.WithSwap(s, from, o.Node!, () => Margin(s, me))) };
+        }
+        if (r.Purpose.StartsWith("Redirect:"))
+            return new[] { BestRedirect(r, s, int.Parse(r.Purpose[9..])) };
         switch (r.Purpose)
         {
             case "PayCost":
@@ -59,6 +74,23 @@ public static class AiChoices
 
             case "CoerceNode":
                 return new[] { BestCoerceNode(r, s) };
+
+            case "RearrangeFrom":
+                return BestRearrangeStart(r, s);
+
+            case "Terraform":
+                return new[] { IndexOfMax(r, o => TerraformValue(o.Node!, me, s)) };
+
+            case "TerraformKeep":
+            case "Retarget":
+                return new[] { 0 }; // keep our Unit in Standby rather than lose it; keep a commandeered React's target
+
+            case "Retrigger":
+                // Each Unit's ability runs as its controller: only re-run our own.
+                return r.Options.Select((o, i) => (o, i)).Where(x => x.o.Card is { } c && SideOf(c) == me).Select(x => x.i).ToList();
+
+            case "GainControlNode":
+                return new[] { IndexOfMax(r, o => o.Node is { } n ? (s.OpposingNode(n)?.Card is null ? 2 : 1) + (n.Kind == NodeKind.Leader ? 0.5 : 0) : 0) };
 
             case "CoercedUnit":
                 // Psychic Coercion chose the node (each option carries it): send the Unit that helps us most there.
@@ -107,6 +139,8 @@ public static class AiChoices
                     return 10 - value; // pay with the least valuable cards
                 case "PlayFromPile":
                     return 1 + value;  // bring back the biggest Unit
+                case "GainControl":
+                    return enemy ? value : -value; // One of Us: their best Unit becomes ours
                 default:
                     return 0;
             }
@@ -230,6 +264,82 @@ public static class AiChoices
         if (card is null || from.Side == to.Side) return 0;
         int rank = RankCalculator.GetRank(s, card);
         return to.Side == me ? rank * 2 : -rank * 2; // it leaves one total and joins the other
+    }
+
+    // ------------------------------------------------------------------ M3.3
+
+    /// <summary>Our total minus theirs, plus a little for winning the round as it stands.</summary>
+    internal static double Margin(GameState s, int me)
+    {
+        var result = Scoring.Score(s);
+        double m = result.Total(me) - result.Total(GameState.Other(me));
+        if (result.Winner == me) m += 0.5;
+        else if (result.Winner is not null) m -= 0.5;
+        return m;
+    }
+
+    /// <summary>
+    /// Ace: find the single switch that helps our margin most (both sides count: shoving their Units into Standby
+    /// is as good as bringing ours forward). Answer that switch's first node, or NONE when nothing helps.
+    /// </summary>
+    private static IReadOnlyList<int> BestRearrangeStart(ChoiceRequest r, GameState s)
+    {
+        int me = r.Player;
+        double now = Margin(s, me);
+        double best = 0.01;
+        int pick = -1;
+        for (int i = 0; i < r.Options.Count; i++)
+        {
+            var a = r.Options[i].Node!;
+            foreach (var b in Rearrange.Partners(s, a))
+            {
+                double gain = Rearrange.WithSwap(s, a, b, () => Margin(s, me)) - now;
+                if (gain > best) { best = gain; pick = i; }
+            }
+        }
+        return pick < 0 ? Array.Empty<int>() : new[] { pick };
+    }
+
+    /// <summary>Terraform: both Units on the pair leave scoring (ours can be saved in Standby); empty nodes get Locked.</summary>
+    private static double TerraformValue(Node node, int me, GameState s)
+    {
+        double v = 0;
+        foreach (var n in new[] { node, s.OpposingNode(node) })
+        {
+            if (n is null) continue;
+            bool ours = n.Side == me;
+            if (n.Card is { } c)
+            {
+                if (StaticLayer.IsImmune(s, c)) continue;
+                double val = Value(c, s);
+                bool saved = Placement.CanEnterStandby(c) && s.Players[n.Side].StandbyNodes.Any(x => x.IsEmpty);
+                v += ours ? -(saved ? val * 0.6 : val) : (saved ? val * 0.8 : val);
+            }
+            else if (!n.IsLocked)
+            {
+                v += ours ? -0.5 : 0.5; // Locking an empty node denies it
+            }
+        }
+        return v;
+    }
+
+    private static double CopyValue(CardInstance? c) =>
+        c is null ? 0 : (c.Definition.BaseRank ?? 0) + (c.Definition.IsVanilla ? 0 : 0.5);
+
+    /// <summary>
+    /// Recolonize: our own Deploy goes where it is unopposed; theirs goes to our side if it can (it then scores for
+    /// us), otherwise where our strongest Unit opposes it.
+    /// </summary>
+    private static int BestRedirect(ChoiceRequest r, GameState s, int deployer)
+    {
+        int me = r.Player;
+        return IndexOfMax(r, o =>
+        {
+            if (o.Node is not { } n) return double.MinValue;
+            double opposing = s.OpposingNode(n)?.Card is { } x ? RankCalculator.GetRank(s, x) : 0;
+            if (deployer == me) return n.Side == me ? 10 - opposing : -10;
+            return n.Side == me ? 100 : opposing;
+        });
     }
 
     /// <summary>Fast Eddie: only Duel when it doesn't cost us more than it costs them.</summary>

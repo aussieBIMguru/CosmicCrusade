@@ -17,6 +17,7 @@ public static class EffectSupport
         // M3.2b: phase / "whenever" triggers and play conditions.
         "event", "filter", "includeSelf", "oncePerRound", "priority", "ordering", "playCondition",
         "script", // scripted handlers the engine has (GameEngine.Scripts)
+        "params", // M3.3: a script's parameters (Mr Morph, Forced Mitosis, TR-1993.r)
     };
 
     /// <summary>Events the engine raises for OnEvent abilities.</summary>
@@ -54,6 +55,10 @@ public static class EffectSupport
         ["RemainInPlay"] = new() { "op", "targets", "replaces", "note" },
         ["AddAssembledRank"] = new() { "op", "targets", "amount", "note" },
         ["RevealWarzones"] = new() { "op", "count", "add", "note" },
+        // M3.3
+        ["RedirectDeploy"] = new() { "op", "node", "note" },
+        ["GainControl"] = new() { "op", "targets", "moveTo", "entersPlay", "note" },
+        ["Retarget"] = new() { "op", "targets", "optional", "note" },
     };
 
     private static readonly HashSet<string> NamedSelectors = new()
@@ -67,6 +72,7 @@ public static class EffectSupport
     {
         "zone", "kind", "controller", "race", "notRace", "unitClass", "excludeSelf", "opposed", "sharesRaceWith",
         "excludeBound", "baseRankLessThan", "opposingUnitRace", "orderType", "empty", "locked", "nodeKind", "side", "nodeOf",
+        "legalFor", // M3.3: a node the Unit being Deployed (Event.Unit) / the op's chosen Unit (Target) may legally go to
     };
 
     internal static readonly HashSet<string> Zones = new() { "InPlay", "Standby", "RetiredPile", "NullifiedPile", "IssuedPile", "OrderNode" };
@@ -149,7 +155,7 @@ public static class EffectSupport
         foreach (var p in op.EnumerateObject())
             if (!keys.Contains(p.Name)) return false;
 
-        foreach (var selKey in new[] { "targets", "nodes", "a", "b", "node", "source", "onto" })
+        foreach (var selKey in new[] { "targets", "nodes", "a", "b", "node", "source", "onto", "moveTo" })
             if (op.TryGetProperty(selKey, out var sel) && !SelectorOk(sel)) return false;
         if (op.TryGetProperty("filter", out var f) && !FilterOk(f)) return false;
 
@@ -169,6 +175,18 @@ public static class EffectSupport
                 return Str(op, "targets") == "Self";
             case "AddAssembledRank":
                 return Str(op, "amount") == "Event.AssembledRank";
+            case "RedirectDeploy":
+                return op.TryGetProperty("node", out var rn) && rn.ValueKind == JsonValueKind.Object;
+            case "GainControl":
+            {
+                // Commandeer: the Order being Issued. One of Us: a chosen Unit in play plus the node it moves to.
+                if (op.TryGetProperty("entersPlay", out var ep) && ep.ValueKind != JsonValueKind.False) return false;
+                if (Str(op, "targets") == "Event.Order") return !op.TryGetProperty("moveTo", out _);
+                return op.TryGetProperty("targets", out var gt) && gt.ValueKind == JsonValueKind.Object
+                       && op.TryGetProperty("moveTo", out var mt) && mt.ValueKind == JsonValueKind.Object;
+            }
+            case "Retarget":
+                return Str(op, "targets") == "Event.Order";
             case "RevealWarzones":
                 return op.TryGetProperty("count", out var rc) && rc.ValueKind == JsonValueKind.Number;
             case "Manipulate":

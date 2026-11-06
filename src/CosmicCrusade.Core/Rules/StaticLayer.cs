@@ -307,6 +307,15 @@ public static class StaticLayer
     {
         if (IsPlayRestricted(s, card, "Deploy", out _)) return false;
         if (DeployTurnLimitReached(s, player)) return false;
+        return NodeAllowsDeploy(s, card, node);
+    }
+
+    /// <summary>
+    /// The node-specific part of <see cref="DeployAllowed"/> (Even Odds). Recolonize uses it on a Deploy that is
+    /// already under way: the card was allowed to be Deployed and the Deployment turn has been counted already.
+    /// </summary>
+    public static bool NodeAllowsDeploy(GameState s, CardInstance card, Node node)
+    {
         foreach (var src in ActiveSources(s))
             foreach (var ab in src.Abilities)
             {
