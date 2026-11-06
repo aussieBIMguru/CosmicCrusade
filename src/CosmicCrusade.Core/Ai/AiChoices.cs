@@ -56,6 +56,13 @@ public static class AiChoices
 
             case "Wormhole":
                 return new[] { BestWarzone(r, s) };
+
+            case "CoerceNode":
+                return new[] { BestCoerceNode(r, s) };
+
+            case "CoercedUnit":
+                // Psychic Coercion chose the node (each option carries it): send the Unit that helps us most there.
+                return new[] { IndexOfMax(r, o => o.Card is { } c && o.Node is { } n ? AiVision.DeployGain(s, me, c, n) : 0) };
         }
 
         // Score every option, take the positive ones (within Min..Max), best first.
@@ -151,6 +158,31 @@ public static class AiChoices
             int ours = s.Players[me].UnitsInPlay.Count(u => StaticLayer.HasRace(s, u, race))
                        + s.Players[me].Hand.Count(c => StaticLayer.HasRace(s, c, race));
             return theirs * 2 - ours;
+        });
+    }
+
+    /// <summary>
+    /// Psychic Coercion: we pick the node the opponent must Deploy to before they pick the Unit. A node on our side
+    /// is best (the Unit scores for us). With their hand revealed we know their best answer for each node and take the
+    /// node where it is weakest; otherwise we send them where our strongest Unit opposes them, and away from an empty
+    /// Leader Node (only strong Units go there).
+    /// </summary>
+    private static int BestCoerceNode(ChoiceRequest r, GameState s)
+    {
+        int me = r.Player;
+        int victim = GameState.Other(me);
+        var hand = AiVision.VisibleHand(s, me, victim);
+        return IndexOfMax(r, o =>
+        {
+            if (o.Node is not { } n) return double.MinValue;
+            if (n.Side == me) return 1000;
+            if (hand is not null)
+            {
+                var fits = hand.Where(c => Placement.CanDeploy(s, victim, c, n)).ToList();
+                return fits.Count == 0 ? 0 : -fits.Max(c => AiVision.DeployGain(s, victim, c, n));
+            }
+            double opposing = s.OpposingNode(n)?.Card is { } ours ? RankCalculator.GetRank(s, ours) : -1;
+            return opposing - (n.Kind == NodeKind.Leader ? 2 : 0);
         });
     }
 

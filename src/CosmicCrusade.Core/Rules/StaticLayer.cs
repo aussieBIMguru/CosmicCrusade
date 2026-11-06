@@ -30,6 +30,8 @@ public static class StaticLayer
     {
         ModifyRank, SetBaseRank, SetRaces, Immunity, CannotBeNullified, Suppress, ModifyManipulate,
         InvertRankModifiers, InvertRoundWinner, RestrictPlay, RestrictDeploy, LimitTurns, PlayFromZone, HandledElsewhere,
+        // M3.2c
+        RevealHands, OverrideDecision, GrantAction, ReplaceRaceWords,
     }
 
     internal sealed class Filter
@@ -78,6 +80,13 @@ public static class StaticLayer
         public bool EachPlayer;           // PlayFromZone: "player": "Each"
         public Condition? Condition;
         public required string Text;      // short description for logs / inspect
+        // M3.2c
+        public bool AllPlayers;           // RevealHands "All" (else "Opponents"); GrantAction "Each" (else "You")
+        public bool RandomDecider;        // OverrideDecision: "Random" (else the source's controller decides)
+        public string? ActionName;        // GrantAction
+        public JsonElement Payload;       // GrantAction: the op itself ("do" is run by the EffectRunner)
+        public string? CostRace;          // GrantAction NullifyFromHand filter
+        public CardKind? CostKind;
     }
 
     /// <summary>A card whose Static effects could apply right now, and who controls it (-1 for a Warzone).</summary>
@@ -135,7 +144,10 @@ public static class StaticLayer
     /// <summary>The card's current races after static race changes (Consortium, The Voidslime).</summary>
     public static IReadOnlySet<Race> Races(GameState s, CardInstance card)
     {
-        if (!card.Definition.IsUnit || _inRaces) return card.Races;
+        if (_inRaces) return card.Races;
+        // Stagnation: every card's race is Blaarg (Immune Units keep theirs). It overrides Consortium / The Voidslime.
+        if (ReplacementRace(s) is Race replaced && !IsImmune(s, card)) return new HashSet<Race> { replaced };
+        if (!card.Definition.IsUnit) return card.Races;
         if (!AnyOp(s, Op.SetRaces) || IsImmune(s, card)) return card.Races;
         _inRaces = true;
         try
@@ -201,6 +213,8 @@ public static class StaticLayer
         var lines = new List<string>();
         if (IsImmune(s, card)) lines.Add("Immune to other effects");
         if (IsSuppressed(s, card)) lines.Add("Abilities Suppressed");
+        if (ReplacementRace(s) is Race words)
+            lines.Add(IsImmune(s, card) ? "Immune: keeps its Race and Race words" : $"Race words (and its Race) read as {words}");
         if (!IsUnitInPlay(card)) return lines;
         bool immune = IsImmune(s, card);
         foreach (var src in ActiveSources(s))
@@ -344,10 +358,111 @@ public static class StaticLayer
         return false;
     }
 
+    // ------------------------------------------------------------------ M3.2c: hidden information
+
+    /// <summary>
+    /// The All-knowing / Transparency ("Your Opponents play with their Hands revealed") and Oracle's Arch ("Players
+    /// play with their Hands revealed"): is <paramref name="player"/>'s hand face up for everyone?
+    /// </summary>
+    public static bool IsHandRevealed(GameState s, int player)
+    {
+        foreach (var src in ActiveSources(s))
+            foreach (var ab in src.Abilities)
+                if (ab.Op == Op.RevealHands && CondOk(s, ab, src)
+                    && (ab.AllPlayers || (src.Controller >= 0 && src.Controller != player)))
+                    return true;
+        return false;
+    }
+
+    /// <summary>Can <paramref name="viewer"/> see <paramref name="card"/>'s face? (Hands are hidden unless revealed.)</summary>
+    public static bool CanSee(GameState s, int viewer, CardInstance card) =>
+        card.Location.Kind != LocationKind.Hand || card.Location.Player == viewer || IsHandRevealed(s, card.Location.Player);
+
+    // ------------------------------------------------------------------ M3.2c: deploy node overrides
+
+    /// <summary>Who picks the node when <see cref="DeployNodeOverride"/> applies.</summary>
+    /// <param name="Random">Shoot First, Think Second: the node is picked at random.</param>
+    /// <param name="Chooser">Psychic Coercion: this player picks the node before the Unit is chosen.</param>
+    public sealed record DeployOverride(CardInstance Source, bool Random, int Chooser);
+
+    /// <summary>
+    /// Shoot First, Think Second ("Your Opponent selects Nodes as they Deploy Units at random") and Psychic Coercion
+    /// ("You choose which Nodes your opponents Deploy their Units to, before you know what Unit"). Applies to Deploys
+    /// that choose a node: from hand and from piles. A Standby advance has only one node, so it is unaffected.
+    /// When both apply to the same player, Psychic Coercion wins (a player's choice beats the dice).
+    /// </summary>
+    public static DeployOverride? DeployNodeOverride(GameState s, int player)
+    {
+        DeployOverride? random = null;
+        foreach (var src in ActiveSources(s))
+            foreach (var ab in src.Abilities)
+            {
+                if (ab.Op != Op.OverrideDecision || !CondOk(s, ab, src) || src.Controller < 0 || src.Controller == player) continue;
+                if (!ab.RandomDecider) return new DeployOverride(src.Card, false, src.Controller);
+                random ??= new DeployOverride(src.Card, true, -1);
+            }
+        return random;
+    }
+
+    // ------------------------------------------------------------------ M3.2c: granted actions
+
+    /// <summary>A turn action a card in play grants (Abominations).</summary>
+    public sealed record GrantedActionInfo(CardInstance Source, string Name, JsonElement Op, string? CostRace, CardKind? CostKind);
+
+    /// <summary>Granted actions <paramref name="player"/> may take this turn (cost and targets not checked here).</summary>
+    public static List<GrantedActionInfo> GrantedActions(GameState s, int player)
+    {
+        var list = new List<GrantedActionInfo>();
+        foreach (var src in ActiveSources(s))
+            foreach (var ab in src.Abilities)
+                if (ab.Op == Op.GrantAction && CondOk(s, ab, src) && (ab.AllPlayers || src.Controller == player))
+                    list.Add(new GrantedActionInfo(src.Card, ab.ActionName!, ab.Payload, ab.CostRace, ab.CostKind));
+        return list;
+    }
+
+    // ------------------------------------------------------------------ M3.2c: Stagnation
+
+    /// <summary>
+    /// Stagnation: "Replace all Race words with Blaarg (including Card Races)". While it is active every card's race is
+    /// that race, and every race named in card text reads as it (errata: if it's on a Card and it's written, it
+    /// counts). Null when no such effect is active.
+    /// </summary>
+    public static Race? ReplacementRace(GameState s)
+    {
+        if (_inWords || !AnyOp(s, Op.ReplaceRaceWords)) return null;
+        bool prevRaces = _inRaces;
+        _inWords = true;
+        _inRaces = true; // suppression checks below read races: use the printed / changed ones
+        try
+        {
+            foreach (var src in ActiveSources(s))
+                foreach (var ab in src.Abilities)
+                    if (ab.Op == Op.ReplaceRaceWords && CondOk(s, ab, src))
+                        return ab.Races[0];
+            return null;
+        }
+        finally
+        {
+            _inWords = false;
+            _inRaces = prevRaces;
+        }
+    }
+
+    /// <summary>
+    /// A race word written on <paramref name="source"/>'s text, as it currently reads (Stagnation). An Immune Unit's
+    /// own text is unaffected. Remembered races ("choose a Race") are not written, so they never go through this.
+    /// </summary>
+    public static Race TextRace(GameState s, Race written, CardInstance? source)
+    {
+        if (source is not null && IsImmune(s, source)) return written;
+        return ReplacementRace(s) ?? written;
+    }
+
     // ================================================================== sources and matching
 
     [ThreadStatic] private static bool _inSuppress;
     [ThreadStatic] private static bool _inRaces;
+    [ThreadStatic] private static bool _inWords;
 
     private static bool IsUnitInPlay(CardInstance c) =>
         c.Location.Kind == LocationKind.Node && c.Location.Node is { IsScoring: true };
@@ -495,11 +610,11 @@ public static class StaticLayer
         }
         if (f.Race is { } race)
         {
-            if (ResolveRace(race, src) is not { } r || !Races(s, card).Contains(r)) return false;
+            if (ResolveRace(s, race, src) is not { } r || !Races(s, card).Contains(r)) return false;
         }
         if (f.NotRace is { } notRace)
         {
-            if (ResolveRace(notRace, src) is { } r && Races(s, card).Contains(r)) return false;
+            if (ResolveRace(s, notRace, src) is { } r && Races(s, card).Contains(r)) return false;
         }
         if (f.AlliedEach || f.SharesRaceEach || f.ExcludeEach)
         {
@@ -511,11 +626,11 @@ public static class StaticLayer
         return true;
     }
 
-    private static Race? ResolveRace(string text, Source src)
+    private static Race? ResolveRace(GameState s, string text, Source src)
     {
         if (text.StartsWith("Remembered."))
             return src.Card.Memory.TryGetValue(text[11..], out var v) && v is Race r ? r : null;
-        return Enum.TryParse<Race>(text, out var parsed) ? parsed : null;
+        return Enum.TryParse<Race>(text, out var parsed) ? TextRace(s, parsed, src.Card) : null;
     }
 
     private static int Eval(GameState s, Amount a, Source src, CardInstance target)
@@ -542,6 +657,9 @@ public static class StaticLayer
             return c;
         }
     }
+
+    /// <summary>Does this one Static effect entry compile (i.e. is it live)? For <see cref="CardStatus"/>.</summary>
+    internal static bool IsStaticEntryLive(JsonElement effect, CardDefinition def) => CompileEffect(effect, def) is not null;
 
     private static int StaticEffectCount(CardDefinition def) =>
         def.Effects.ValueKind != JsonValueKind.Array ? 0
@@ -586,6 +704,11 @@ public static class StaticLayer
         ["RestrictDeploy"] = new() { "op", "rule", "forPlayer", "note" },
         ["LimitTurns"] = new() { "op", "kind", "max", "perPlayer", "note" },
         ["PlayFromZone"] = new() { "op", "zone", "filter", "player", "note" },
+        // M3.2c
+        ["RevealHands"] = new() { "op", "players", "note" },
+        ["OverrideDecision"] = new() { "op", "decision", "forPlayer", "decider", "timing", "note" },
+        ["GrantAction"] = new() { "op", "player", "actionName", "countsAsTurn", "cost", "do", "note" },
+        ["ReplaceRaceWords"] = new() { "op", "race", "scope", "note" },
     };
 
     private static List<Ability>? CompileEffect(JsonElement e, CardDefinition def)
@@ -696,6 +819,50 @@ public static class StaticLayer
                     || ParseFilter(pf) is not { Self: false } filter) return null;
                 return new Ability { Op = Op.PlayFromZone, Targets = filter, Pile = pile, EachPlayer = who == "Each", Text = name };
             }
+            case "RevealHands":
+                if (Str(op, "players") is not ("Opponents" or "All")) return null;
+                return new Ability { Op = Op.RevealHands, AllPlayers = Str(op, "players") == "All", Text = name };
+            case "OverrideDecision":
+            {
+                if (Str(op, "decision") != "DeployTargetNode" || Str(op, "forPlayer") != "Opponent") return null;
+                string? decider = Str(op, "decider");
+                string? timing = Str(op, "timing");
+                if (decider == "Random" && timing is null)
+                    return new Ability { Op = Op.OverrideDecision, RandomDecider = true, Text = name };
+                // The chooser always picks the node before the Unit is chosen (spec §7.1).
+                if (decider == "Controller" && timing is null or "BeforeCardChosen")
+                    return new Ability { Op = Op.OverrideDecision, Text = name };
+                return null;
+            }
+            case "GrantAction":
+            {
+                string? who = Str(op, "player");
+                if (who is not ("Each" or "You") || Str(op, "actionName") is not { } actionName) return null;
+                if (!op.TryGetProperty("countsAsTurn", out var cat) || cat.ValueKind != JsonValueKind.True) return null;
+                if (!op.TryGetProperty("cost", out var cost) || cost.ValueKind != JsonValueKind.Object || Str(cost, "op") != "NullifyFromHand") return null;
+                string? costRace = null;
+                CardKind? costKind = null;
+                foreach (var p in cost.EnumerateObject())
+                {
+                    if (p.Name is "op" or "note") continue;
+                    if (p.Name != "filter" || p.Value.ValueKind != JsonValueKind.Object) return null;
+                    foreach (var q in p.Value.EnumerateObject())
+                    {
+                        if (q.Name == "race" && Enum.TryParse<Race>(q.Value.GetString(), out _)) costRace = q.Value.GetString();
+                        else if (q.Name == "kind" && Enum.TryParse<CardKind>(q.Value.GetString(), out var ck)) costKind = ck;
+                        else return null;
+                    }
+                }
+                if (!op.TryGetProperty("do", out var body) || !Effects.EffectSupport.OpsLive(body)) return null;
+                return new Ability
+                {
+                    Op = Op.GrantAction, AllPlayers = who == "Each", ActionName = actionName, Payload = op,
+                    CostRace = costRace, CostKind = costKind, Text = name,
+                };
+            }
+            case "ReplaceRaceWords":
+                if (Str(op, "scope") != "AllCards" || !Enum.TryParse<Race>(Str(op, "race"), out var replacement)) return null;
+                return new Ability { Op = Op.ReplaceRaceWords, Races = new[] { replacement }, Text = name };
             case "LimitTurns":
                 if (Str(op, "kind") != "DeployUnit" || !op.TryGetProperty("max", out var mx) || mx.ValueKind != JsonValueKind.Number) return null;
                 if (op.TryGetProperty("perPlayer", out var pp) && pp.ValueKind != JsonValueKind.True) return null;

@@ -273,7 +273,9 @@ public partial class GameView
             return (rect, false);
         }
 
-        var back = _oppHandViews.LastOrDefault();
+        // A revealed hand shows its faces: take that exact card (face up). Otherwise any card back.
+        var back = _oppHandViews.FirstOrDefault(v => v.Card == card) ?? _oppHandViews.LastOrDefault(v => v.Card is null)
+                   ?? _oppHandViews.LastOrDefault();
         if (back is null)
             return (new Rect(FxCanvas.ActualWidth / 2, -100, OppHandCardW, OppHandCardW / CardFaceFactory.Aspect), true);
 
@@ -281,7 +283,7 @@ public partial class GameView
         _oppHandViews.Remove(back);
         OpponentHandCanvas.Children.Remove(back);
         LayoutOpponentHand();
-        return (r, true);
+        return (r, back.FaceDown);
     }
 
     /// <summary>Screen rect of the card's stack mini-card (or the middle of the stack panel if it has none).</summary>

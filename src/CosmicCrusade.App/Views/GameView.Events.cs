@@ -213,14 +213,21 @@ public partial class GameView
             case LogEvent e:
                 _hud.AddLog(e.Message);
                 break;
+
+            case CardNullifiedFromHandEvent e:
+                await OnCardNullifiedFromHandAsync(e);
+                break;
         }
+
+        // The All-knowing / Transparency / Oracle's Arch: show the AI's hand face up while it is revealed.
+        SyncRevealedHands();
 
         // Static effects (anthems, Acid Rain, Indominus...) change Ranks of Units that weren't involved in the
         // event, so refresh every badge and the totals after anything that can switch a static on or off.
         if (gameEvent is OrderResolvedEvent or CardNullifiedEvent or CardMovedToPileEvent or CardMovedToStandbyEvent
             or CardReturnedToHandEvent or CardRetiredFromHandEvent or CardDrawnEvent or WarzoneRevealedEvent or WarzonesAddedEvent
             or WarzoneReturnedEvent or AbilitiesSuppressedEvent or ChoiceMadeEvent or NullifyPreventedEvent
-            or NodesSwappedEvent or RankChangedEvent)
+            or NodesSwappedEvent or RankChangedEvent or CardNullifiedFromHandEvent)
             RefreshScores();
     }
 
@@ -244,7 +251,7 @@ public partial class GameView
         }
         else
         {
-            var v = CreateOpponentHandCard();
+            var v = CreateOpponentHandCard(StaticLayer.IsHandRevealed(State, 1) ? e.Card : null);
             _oppHandViews.Add(v);
             OpponentHandCanvas.Children.Add(v);
             var start = FxCanvas.TranslatePoint(deckCenter, OpponentHandCanvas);

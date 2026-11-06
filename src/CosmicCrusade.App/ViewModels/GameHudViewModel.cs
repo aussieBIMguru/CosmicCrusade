@@ -16,6 +16,7 @@ public sealed class GameHudViewModel : ObservableObject
     private string _hint = "";
     private bool _isMyTurn;
     private string _passText = "PASS";
+    private string _handRevealNote = "";
 
     public string PlayerName { get; init; } = "You";
     public string AiName { get; init; } = "AI";
@@ -24,6 +25,9 @@ public sealed class GameHudViewModel : ObservableObject
     public string Status { get => _status; set => Set(ref _status, value); }
     public string Hint { get => _hint; set => Set(ref _hint, value); }
     public bool IsMyTurn { get => _isMyTurn; set => Set(ref _isMyTurn, value); }
+
+    /// <summary>"Your hand is revealed to the AI" while The All-knowing / Transparency / Oracle's Arch shows it.</summary>
+    public string HandRevealNote { get => _handRevealNote; set => Set(ref _handRevealNote, value); }
 
     public int MyTotal { get => _myTotal; set { if (Set(ref _myTotal, value)) Raise(nameof(Leader)); } }
     public int AiTotal { get => _aiTotal; set { if (Set(ref _aiTotal, value)) Raise(nameof(Leader)); } }

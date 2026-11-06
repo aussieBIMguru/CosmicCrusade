@@ -332,13 +332,57 @@ public partial class GameView : UserControl, IGameEventSink
         return v;
     }
 
-    private CardView CreateOpponentHandCard()
+    private CardView CreateOpponentHandCard(CardInstance? revealed = null)
     {
-        var v = new CardView(null, faceDown: true, OppHandCardW);
+        var v = new CardView(revealed, faceDown: revealed is null, OppHandCardW);
         v.Rotate.CenterX = v.Width / 2;
         v.Rotate.CenterY = -v.Height * 0.6;
+        if (revealed is not null)
+        {
+            // The All-knowing / Transparency / Oracle's Arch: the AI's hand is face up. Hover to read, right-click to enlarge.
+            v.MouseEnter += (_, _) => ShowZoom(revealed);
+            v.MouseRightButtonDown += Card_MouseRightButtonDown;
+            v.Cursor = Cursors.Help;
+        }
         return v;
     }
+
+    /// <summary>
+    /// Shows the AI's hand face up while it is revealed, and turns it face down again when the reveal ends. Also logs
+    /// when either hand becomes revealed or hidden.
+    /// </summary>
+    private void SyncRevealedHands()
+    {
+        if (_state is null) return;
+        bool aiRevealed = StaticLayer.IsHandRevealed(State, 1);
+        bool youRevealed = StaticLayer.IsHandRevealed(State, 0);
+        if (aiRevealed != _aiHandRevealed)
+            _hud.AddLog(aiRevealed ? "The AI's hand is revealed – hover its cards to read them." : "The AI's hand is hidden again.");
+        if (youRevealed != _yourHandRevealed)
+            _hud.AddLog(youRevealed ? "Your hand is revealed: the AI can see it." : "Your hand is hidden again.");
+        _aiHandRevealed = aiRevealed;
+        _yourHandRevealed = youRevealed;
+        _hud.HandRevealNote = youRevealed ? "Your hand is revealed to the AI" : "";
+
+        var hand = State.Players[1].Hand;
+        bool inSync = aiRevealed
+            ? _oppHandViews.Select(v => v.Card).SequenceEqual(hand)
+            : _oppHandViews.All(v => v.Card is null);
+        if (inSync) return;
+
+        foreach (var v in _oppHandViews) OpponentHandCanvas.Children.Remove(v);
+        _oppHandViews.Clear();
+        foreach (var card in hand)
+        {
+            var v = CreateOpponentHandCard(aiRevealed ? card : null);
+            _oppHandViews.Add(v);
+            OpponentHandCanvas.Children.Add(v);
+        }
+        LayoutOpponentHand(animate: false);
+    }
+
+    private bool _aiHandRevealed;
+    private bool _yourHandRevealed;
 
     private sealed record HandSpot(double X, double Y, double Angle);
 
@@ -470,6 +514,17 @@ public partial class GameView : UserControl, IGameEventSink
             if (node.Card is not null && _boardCards.TryGetValue(node.Card.InstanceId, out var bv))
                 bv.SetGlow(Cyan);
         GlowDeployablePiles(ctx);
+        GlowGrantedActions(ctx);
+    }
+
+    /// <summary>Abominations & co.: the granting card glows green; clicking it takes the action.</summary>
+    private void GlowGrantedActions(DecisionContext ctx)
+    {
+        var granted = ctx.Legal.OfType<GrantedAction>().ToList();
+        foreach (var g in granted)
+            if (_boardCards.TryGetValue(g.Source.InstanceId, out var bv)) bv.SetGlow(Green, pulse: true);
+        if (granted.Count > 0)
+            _hud.Hint += $" Click a green {string.Join(" / ", granted.Select(g => g.Source.Name).Distinct())} to use it.";
     }
 
     /// <summary>Barkeep Bill & co.: the Retired / Nullified pile glows when a Unit can be Deployed from it.</summary>
@@ -515,16 +570,39 @@ public partial class GameView : UserControl, IGameEventSink
             switch (a)
             {
                 case DeployFromHandAction d: set.Add(d.Card); break;
+                case DeployAtRandomAction r: set.Add(r.Card); break;
                 case IssueOrderAction o: set.Add(o.Card); break;
                 case AssembleAction x: set.Add(x.Card); break;
             }
         }
+        // Psychic Coercion: every Unit that could be deployed somewhere (the AI picks the node first).
+        if (ctx.Legal.OfType<CoercedDeployAction>().Any())
+            foreach (var d in LegalActions.Deploys(ctx.State, ctx.Player).Hand) set.Add(d.Card);
         return set;
+    }
+
+    /// <summary>
+    /// Nodes a hand Unit may be deployed to, and the action that does it. Normally one action per node. Under Shoot
+    /// First every possible node maps to the random deploy; under Psychic Coercion to the coerced deploy (the AI then
+    /// picks the node and you pick the Unit).
+    /// </summary>
+    private static Dictionary<Node, GameAction> DeployChoicesFor(DecisionContext ctx, CardInstance card)
+    {
+        var map = new Dictionary<Node, GameAction>();
+        foreach (var d in ctx.Legal.OfType<DeployFromHandAction>().Where(a => a.Card == card)) map[d.Target] = d;
+        if (map.Count > 0) return map;
+        var random = ctx.Legal.OfType<DeployAtRandomAction>().FirstOrDefault(a => a.Card == card);
+        GameAction? coerced = ctx.Legal.OfType<CoercedDeployAction>().FirstOrDefault();
+        GameAction? overridden = (GameAction?)random ?? coerced;
+        if (overridden is null) return map;
+        foreach (var d in LegalActions.Deploys(ctx.State, ctx.Player).Hand.Where(a => a.Card == card)) map[d.Target] = overridden;
+        return map;
     }
 
     // ------------------------------------------------------------------ selection state
 
     private Node? _selectedStandby;
+    private Dictionary<Node, GameAction> _deployChoices = new();
     private IssueOrderAction? _selectedIssue;                       // an Action Order waiting for confirmation
     private readonly Dictionary<CardInstance, AssembleAction> _assembleTargets = new();
 
@@ -553,7 +631,9 @@ public partial class GameView : UserControl, IGameEventSink
         }
 
         var card = v.Card;
-        var deployTargets = ctx.Legal.OfType<DeployFromHandAction>().Where(a => a.Card == card).Select(a => a.Target).ToList();
+        var deployChoices = DeployChoicesFor(ctx, card);
+        var deployTargets = deployChoices.Keys.ToList();
+        var deployOverride = deployChoices.Values.FirstOrDefault(a => a is DeployAtRandomAction or CoercedDeployAction);
         var ongoingTargets = ctx.Legal.OfType<IssueOrderAction>().Where(a => a.Card == card && a.OrderNode is not null).Select(a => a.OrderNode!).ToList();
         var issueAction = ctx.Legal.OfType<IssueOrderAction>().FirstOrDefault(a => a.Card == card && a.OrderNode is null);
         var assembles = ctx.Legal.OfType<AssembleAction>().Where(a => a.Card == card).ToList();
@@ -571,6 +651,7 @@ public partial class GameView : UserControl, IGameEventSink
 
         ClearSelection();
         _selected = v;
+        _deployChoices = deployChoices;
         v.SetGlow(Gold, pulse: true);
         if (v.Tag is HandSpot spot)
         {
@@ -591,7 +672,11 @@ public partial class GameView : UserControl, IGameEventSink
         }
 
         var parts = new List<string>();
-        if (deployTargets.Count > 0)
+        if (deployOverride is DeployAtRandomAction)
+            parts.Add("any glowing node to deploy – Shoot First, Think Second picks one of them at random");
+        else if (deployOverride is CoercedDeployAction)
+            parts.Add("any glowing node to deploy – Psychic Coercion: the AI picks the node, then you choose the Unit");
+        else if (deployTargets.Count > 0)
             parts.Add(deployTargets.Any(n => n.Side != 0)
                 ? "a glowing node (it may also go on the AI's side, where it scores for the AI)"
                 : "a glowing node to deploy");
@@ -609,6 +694,7 @@ public partial class GameView : UserControl, IGameEventSink
             if (_boardCards.TryGetValue(t.InstanceId, out var bv)) bv.SetGlow(null);
         _assembleTargets.Clear();
         _selectedIssue = null;
+        _deployChoices = new();
         if (_human.Current is { IsResponse: false } turn)
             foreach (var a in turn.Legal.OfType<DeployFromPileAction>())
                 if (_piles.TryGetValue(a.Pile, out var pv)) pv.SetTarget(true);
@@ -653,6 +739,15 @@ public partial class GameView : UserControl, IGameEventSink
             return;
         }
 
+        // Abominations: click the Ongoing Order that grants the action.
+        if (ctx.Legal.OfType<GrantedAction>().FirstOrDefault(a => a.Source == v.Card) is { } granted)
+        {
+            e.Handled = true;
+            ClearSelection();
+            _human.Submit(granted);
+            return;
+        }
+
         var advance = ctx.Legal.OfType<AdvanceFromStandbyAction>().FirstOrDefault(a => a.From.Card == v.Card);
         if (advance is null) return;
         e.Handled = true;
@@ -680,7 +775,7 @@ public partial class GameView : UserControl, IGameEventSink
         {
             action = card.Definition.IsOrder
                 ? ctx.Legal.OfType<IssueOrderAction>().FirstOrDefault(a => a.Card == card && a.OrderNode == slot.Node)
-                : ctx.Legal.OfType<DeployFromHandAction>().FirstOrDefault(a => a.Card == card && a.Target == slot.Node);
+                : _deployChoices.GetValueOrDefault(slot.Node);
         }
         else if (_selectedStandby is not null)
         {

@@ -27,7 +27,7 @@ public static class AssembleRules
         if (!card.Definition.IsUnit) return false;
         if (StaticLayer.IsSuppressed(state, card)) return false;
         if (card.Definition.Keywords.Contains(Keyword, StringComparer.OrdinalIgnoreCase)) return true;
-        return ActiveGrants(state).Any(g => g.Race is null || StaticLayer.HasRace(state, card, g.Race.Value));
+        return ActiveGrants(state).Any(g => g.Race is null || StaticLayer.HasRace(state, card, StaticLayer.TextRace(state, g.Race.Value, null)));
     }
 
     /// <summary>Can <paramref name="player"/> Assemble <paramref name="card"/> (in hand) onto <paramref name="target"/>?</summary>
@@ -43,8 +43,10 @@ public static class AssembleRules
 
         if (StaticLayer.IsImmune(state, target)) return false;
 
-        if (StaticLayer.HasRace(state, target, Race.Synthenoid)) return true;
-        return ActiveGrants(state).Any(g => g.AnyUnitTarget && (g.Race is null || StaticLayer.HasRace(state, card, g.Race.Value)));
+        // "Assemble" names Synthenoid on the card: Stagnation makes that word (and every Unit) Blaarg.
+        if (StaticLayer.HasRace(state, target, StaticLayer.TextRace(state, Race.Synthenoid, card))) return true;
+        return ActiveGrants(state).Any(g => g.AnyUnitTarget
+            && (g.Race is null || StaticLayer.HasRace(state, card, StaticLayer.TextRace(state, g.Race.Value, null))));
     }
 
     public static IEnumerable<CardInstance> Targets(GameState state, int player, CardInstance card) =>

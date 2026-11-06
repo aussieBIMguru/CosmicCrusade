@@ -87,9 +87,10 @@ internal sealed class EffectRunner
                 var amountEl = op.GetProperty("amount");
                 bool buff = amountEl.ValueKind != JsonValueKind.Number || amountEl.GetInt32() >= 0;
                 var targets = await SelectAsync(op.GetProperty("targets"), ctx, buff ? "Buff" : "Debuff", ct);
+                if (Str(op, "bind") is { } bindKey) ctx.Bound[bindKey] = targets; // Abominations: "That Unit becomes..."
                 foreach (var card in targets.OfType<CardInstance>().Where(InPlay))
                 {
-                    int amount = EvalAmount(amountEl, card);
+                    int amount = EvalAmount(amountEl, card, ctx);
                     card.PersistentModifiers.Add(new RankModifier(ctx.Source.Name, amount));
                     await _engine.EmitAsync(new RankChangedEvent(card, $"{amount:+0;-0;0} Rank", ctx.Source), ct);
                 }
@@ -260,7 +261,8 @@ internal sealed class EffectRunner
             case "SetRaces":
             {
                 // A lasting race change while the Unit stays in play ("That Unit becomes a Necrolite").
-                var races = op.GetProperty("races").EnumerateArray().Select(x => CardDatabase.ParseEnum<Race>(x.GetString()!)).ToList();
+                // Stagnation: "becomes a Necrolite" is written on the card, so it reads "becomes a Blaarg".
+                var races = op.GetProperty("races").EnumerateArray().Select(x => Word(x.GetString()!, ctx)).Distinct().ToList();
                 var targets = await SelectAsync(op.GetProperty("targets"), ctx, "SetRaces", ct);
                 foreach (var card in targets.OfType<CardInstance>().Where(InPlay))
                 {
@@ -703,10 +705,10 @@ internal sealed class EffectRunner
                     if (ControllerOf(card) != who) return false;
                     break;
                 case "race":
-                    if (!StaticLayer.HasRace(State, card, CardDatabase.ParseEnum<Race>(v.GetString()!))) return false;
+                    if (!StaticLayer.HasRace(State, card, Word(v.GetString()!, ctx))) return false;
                     break;
                 case "notRace":
-                    if (StaticLayer.HasRace(State, card, CardDatabase.ParseEnum<Race>(v.GetString()!))) return false;
+                    if (StaticLayer.HasRace(State, card, Word(v.GetString()!, ctx))) return false;
                     break;
                 case "unitClass":
                     if (card.Definition.UnitClass != CardDatabase.ParseEnum<UnitClass>(v.GetString()!)) return false;
@@ -721,7 +723,7 @@ internal sealed class EffectRunner
                     if ((OpposingCard(card) is not null) != (v.ValueKind == JsonValueKind.True)) return false;
                     break;
                 case "opposingUnitRace":
-                    if (OpposingCard(card) is not { } oc || !StaticLayer.HasRace(State, oc, CardDatabase.ParseEnum<Race>(v.GetString()!))) return false;
+                    if (OpposingCard(card) is not { } oc || !StaticLayer.HasRace(State, oc, Word(v.GetString()!, ctx))) return false;
                     break;
                 case "sharesRaceWith":
                     var others = Named(v.GetString()!, ctx).OfType<CardInstance>().ToList();
@@ -789,8 +791,8 @@ internal sealed class EffectRunner
         {
             var card = Named(unitSel.GetString()!, ctx).OfType<CardInstance>().FirstOrDefault();
             if (card is null) return false;
-            if (Str(cond, "race") is { } race && !StaticLayer.HasRace(State, card, CardDatabase.ParseEnum<Race>(race))) return false;
-            if (Str(cond, "notRace") is { } notRace && StaticLayer.HasRace(State, card, CardDatabase.ParseEnum<Race>(notRace))) return false;
+            if (Str(cond, "race") is { } race && !StaticLayer.HasRace(State, card, Word(race, ctx))) return false;
+            if (Str(cond, "notRace") is { } notRace && StaticLayer.HasRace(State, card, Word(notRace, ctx))) return false;
         }
         if (cond.TryGetProperty("exists", out var exists))
         {
@@ -806,10 +808,10 @@ internal sealed class EffectRunner
         return true;
     }
 
-    private int EvalAmount(JsonElement amount, CardInstance card)
+    private int EvalAmount(JsonElement amount, CardInstance card, EffectContext ctx)
     {
         if (amount.ValueKind == JsonValueKind.Number) return amount.GetInt32();
-        var race = CardDatabase.ParseEnum<Race>(amount.GetProperty("ifRace").GetString()!);
+        var race = Word(amount.GetProperty("ifRace").GetString()!, ctx);
         return StaticLayer.HasRace(State, card, race) ? amount.GetProperty("then").GetInt32() : amount.GetProperty("else").GetInt32();
     }
 
@@ -844,6 +846,10 @@ internal sealed class EffectRunner
     /// <summary>Immune Units (Vigan) can't be chosen or affected by other cards' abilities.</summary>
     private bool Affectable(CardInstance c, EffectContext ctx) =>
         ReferenceEquals(c, ctx.Source) || !StaticLayer.IsImmune(State, c);
+
+    /// <summary>A race word written on the source card, as it reads now (Stagnation: every race word is Blaarg).</summary>
+    private Race Word(string written, EffectContext ctx) =>
+        StaticLayer.TextRace(State, CardDatabase.ParseEnum<Race>(written), ctx.Source);
 
     private static string RaceName(Race r) => r switch
     {

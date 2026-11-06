@@ -414,6 +414,21 @@ public sealed partial class GameEngine
         await RaiseAsync(new TriggerEvent("CardRetiredFromHand", player, card), ct);
     }
 
+    /// <summary>
+    /// Nullify a card from hand (Abominations' cost): a Unit → Nullified pile, an Order → Issued pile. A Unit counts as
+    /// Nullified for "Whenever a Unit is Nullified" (Disturberus); its own player did it, so Mercenary Camp ignores it.
+    /// </summary>
+    internal async Task NullifyFromHandAsync(CardInstance card, CardInstance? source, CancellationToken ct)
+    {
+        if (card.Location.Kind != LocationKind.Hand) return;
+        int player = card.Location.Player;
+        var pile = card.Definition.IsOrder ? PileKind.IssuedOrders : PileKind.NullifiedUnits;
+        State.MoveToPile(card, pile);
+        await EmitAsync(new CardNullifiedFromHandEvent(card, player, pile, source), ct);
+        if (card.Definition.IsUnit)
+            await RaiseAsync(new TriggerEvent("UnitNullified", player, card, source, player, player), ct);
+    }
+
     internal async Task SetLockAsync(Node node, bool locked, CardInstance? source, CancellationToken ct)
     {
         if (node.IsLocked == locked) return;

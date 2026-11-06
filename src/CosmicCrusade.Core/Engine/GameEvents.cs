@@ -87,6 +87,9 @@ public sealed record CardReturnedToHandEvent(CardInstance Card, int Player, Node
 /// <summary>A card went from a hand straight to the Retired pile (10K-LAN, New Recruits...).</summary>
 public sealed record CardRetiredFromHandEvent(CardInstance Card, int Player) : GameEvent;
 
+/// <summary>A card was Nullified straight from a hand (Abominations' cost).</summary>
+public sealed record CardNullifiedFromHandEvent(CardInstance Card, int Player, PileKind To, CardInstance? Source) : GameEvent;
+
 /// <summary>Two Units Duelled. <paramref name="Losers"/>: the Units Nullified by it (empty, one, or both on a matched Rank).</summary>
 public sealed record DuelEvent(CardInstance A, CardInstance B, IReadOnlyList<CardInstance> Losers, bool Protected) : GameEvent
 {

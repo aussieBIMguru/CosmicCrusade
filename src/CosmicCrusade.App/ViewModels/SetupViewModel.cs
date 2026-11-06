@@ -32,6 +32,13 @@ public sealed class CardCountRow : ObservableObject
     };
     public string SetName => Definition.Set;
 
+    /// <summary>Implementation watermark: empty box = not implemented yet, half-filled = partly implemented.</summary>
+    public Implementation Status => CardStatus.Of(Definition);
+    public bool IsFullyImplemented => Status == Implementation.Full;
+    public bool IsPartlyImplemented => Status == Implementation.Partial;
+    public int StatusOrder => (int)Status;
+    public string? StatusTip => IsFullyImplemented ? null : CardStatus.Describe(Definition);
+
     public int Copies
     {
         get => _copies;

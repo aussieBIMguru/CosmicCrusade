@@ -61,7 +61,12 @@ public partial class GameView
                 if (_boardCards.TryGetValue(card.InstanceId, out var bv)) bv.SetGlow(Gold, pulse: true);
                 if (_handViews.FirstOrDefault(v => v.Card == card) is { } hv) hv.SetGlow(Gold, pulse: true);
             }
-            if (option.Node is { } node)
+            if (option.Card is not null && option.Node is { } destination)
+            {
+                // A card going to a known node (Psychic Coercion): just show where; the card is the choice.
+                if (_slots.TryGetValue(destination, out var hintSlot)) hintSlot.SetTarget(true);
+            }
+            else if (option.Node is { } node)
             {
                 _choiceByNode[node] = index;
                 if (_slots.TryGetValue(node, out var slot)) slot.SetTarget(true);
@@ -161,6 +166,7 @@ public partial class GameView
             if (_slots.TryGetValue(node, out var slot)) slot.SetTarget(false);
             if (node.Card is not null && _boardCards.TryGetValue(node.Card.InstanceId, out var nv)) nv.SetGlow(null);
         }
+        foreach (var slot in _slots.Values) if (slot.IsTarget) slot.SetTarget(false); // incl. "where it goes" hints
         _choiceByCard.Clear();
         _choiceByNode.Clear();
         _choicePicked.Clear();

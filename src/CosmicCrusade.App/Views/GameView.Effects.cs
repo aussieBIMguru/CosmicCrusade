@@ -175,6 +175,16 @@ public partial class GameView
         _piles[pile].Pulse();
     }
 
+    /// <summary>Abominations' cost: a card Nullified straight from a hand flies to its pile with a red glow.</summary>
+    private async Task OnCardNullifiedFromHandAsync(CardNullifiedFromHandEvent e)
+    {
+        _hud.AddLog($"  {Who(e.Player)} Nullif{(e.Player == 0 ? "y" : "ies")} {e.Card.Name} from hand{(e.Source is { } s ? $" ({s.Name})" : "")}.");
+        var (start, faceDown) = TakeFromHand(e.Player, e.Card);
+        await FlyAsync(e.Card, start, PileCardRect(e.To), faceDown, flipToFaceUp: faceDown, ms: 380, glow: Red);
+        UpdatePiles();
+        _piles[e.To].Pulse();
+    }
+
     private async Task OnDuelAsync(DuelEvent e)
     {
         string result = e.Losers.Count == 2 ? "matched Ranks: both are Nullified"

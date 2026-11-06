@@ -5,6 +5,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using CosmicCrusade.App.Rendering;
 using CosmicCrusade.Core.Model;
+using CosmicCrusade.Core.Rules;
 
 namespace CosmicCrusade.App.Controls;
 
@@ -19,6 +20,7 @@ public sealed class CardView : Grid
     private readonly TextBlock _rankText;
     private readonly DropShadowEffect _glow;
     private bool _faceDown;
+    private readonly FrameworkElement _implMark;
 
     public CardView(CardInstance? card, bool faceDown, double width, bool vector = false)
     {
@@ -57,6 +59,12 @@ public sealed class CardView : Grid
         };
         Children.Add(_rankBadge);
 
+        _implMark = ImplementationMark.Create(Math.Clamp(width * 0.075, 7, 22), Implementation.Full);
+        _implMark.HorizontalAlignment = HorizontalAlignment.Right;
+        _implMark.VerticalAlignment = VerticalAlignment.Bottom;
+        _implMark.Margin = new Thickness(0, 0, width * 0.05, width * 0.05);
+        Children.Add(_implMark);
+
         _glow = new DropShadowEffect { BlurRadius = 14, ShadowDepth = 3, Color = Colors.Black, Opacity = 0.65, Direction = 270 };
         Effect = _glow;
 
@@ -92,6 +100,11 @@ public sealed class CardView : Grid
                 _image.Source = UseVector ? CardFaceFactory.GetVectorBack() : CardFaceFactory.GetBack();
             else
                 _image.Source = UseVector ? CardFaceFactory.GetVectorFace(Card.Definition) : CardFaceFactory.GetFace(Card.Definition);
+
+            // "Not implemented yet" watermark: an empty box (nothing runs) or a half-filled box (some effects run).
+            var status = value || Card is null ? Implementation.Full : CardStatus.Of(Card.Definition);
+            ImplementationMark.Apply(_implMark, status);
+            _implMark.ToolTip = status == Implementation.Full ? null : CardStatus.Describe(Card!.Definition);
         }
     }
 

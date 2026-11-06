@@ -41,7 +41,7 @@ public static class PlayRules
         return state.Players[player].Hand
             .Where(c => !ReferenceEquals(c, card))
             .Where(c => cost.Kind is null || c.Definition.Kind == cost.Kind)
-            .Where(c => cost.Race is null || StaticLayer.HasRace(state, c, cost.Race.Value))
+            .Where(c => cost.Race is null || StaticLayer.HasRace(state, c, StaticLayer.TextRace(state, cost.Race.Value, card)))
             .ToList();
     }
 

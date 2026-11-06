@@ -182,6 +182,17 @@
                 <StackPanel Grid.Row="2" Margin="0,8,0,0">
                     <TextBlock Text="{Binding Status}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
                     <TextBlock Text="{Binding Hint}" Style="{StaticResource Muted}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,2,0,6" />
+                    <TextBlock Text="{Binding HandRevealNote}" Foreground="#C084FC" FontSize="12" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,4">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <Trigger Property="Text" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                     <Button x:Name="PassButton" Content="{Binding PassText}" Style="{StaticResource GlowButton}" Click="Pass_Click"
                             IsEnabled="{Binding CanPass}" HorizontalAlignment="Stretch" ToolTip="Pass / no response (Space)" />
                 </StackPanel>

@@ -31,7 +31,7 @@ public static class EffectSupport
     private static readonly Dictionary<string, HashSet<string>> OpKeys = new()
     {
         ["Nullify"] = new() { "op", "targets", "bind", "cancelsPlay", "simultaneous", "note" },
-        ["ModifyRank"] = new() { "op", "targets", "amount", "duration", "note" },
+        ["ModifyRank"] = new() { "op", "targets", "amount", "duration", "bind", "note" },
         ["SetBaseRank"] = new() { "op", "targets", "value", "persistent", "note" },
         ["Lock"] = new() { "op", "targets", "remember", "note" },
         ["Unlock"] = new() { "op", "targets", "countAs", "note" },
@@ -137,6 +137,10 @@ public static class EffectSupport
             if (!OpOk(op)) return false;
         return true;
     }
+
+    /// <summary>Can every op of this "do" list run? (Abominations' granted action body.)</summary>
+    internal static bool OpsLive(JsonElement ops) =>
+        ops.ValueKind == JsonValueKind.Array && ops.GetArrayLength() > 0 && ops.EnumerateArray().All(OpOk);
 
     private static bool OpOk(JsonElement op)
     {

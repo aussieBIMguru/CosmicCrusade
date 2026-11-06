@@ -231,6 +231,28 @@ public sealed partial class GameEngine
                 await DeployFromPileAsync(p, ct);
                 break;
 
+            case DeployAtRandomAction r:
+            {
+                var nodes = LegalActions.Deploys(State, r.Player).Hand.Where(d => d.Card == r.Card).Select(d => d.Target).ToList();
+                var node = await RandomDeployNodeAsync(r.Player, r.Card, nodes, ct);
+                State.Players[r.Player].DeployTurnsThisRound++;
+                await DeployAsync(r.Player, r.Card, node, fromNode: null, ct);
+                break;
+            }
+
+            case CoercedDeployAction c:
+            {
+                var options = LegalActions.Deploys(State, c.Player).Hand.Select(d => (d.Card, d.Target)).ToList();
+                var (card, node) = await CoercedDeployPickAsync(c.Player, options, ct);
+                State.Players[c.Player].DeployTurnsThisRound++;
+                await DeployAsync(c.Player, card, node, fromNode: null, ct);
+                break;
+            }
+
+            case GrantedAction g:
+                await RunGrantedActionAsync(g, ct);
+                break;
+
             default:
                 throw new NotSupportedException(action.GetType().Name);
         }
@@ -292,20 +314,97 @@ public sealed partial class GameEngine
         var cards = StaticLayer.PlayableFromPile(State, a.Player, a.Pile)
             .Where(c => LegalActions.DeployNodes(State, a.Player, c).Count > 0).ToList();
         if (cards.Count == 0) return;
-        string pileName = a.Pile == PileKind.RetiredUnits ? "Retired" : "Nullified";
-        var cardPick = await ChooseAsync(new ChoiceRequest(a.Player, null, $"Choose a Unit to Deploy from the {pileName} pile",
-            ChoiceKind.Cards, cards.Select(c => new ChoiceOption($"{c.Name} (Rank {RankCalculator.BaseRank(c)})", c)).ToList(),
-            1, 1, "PlayFromPile"), ct);
-        var card = cards[cardPick.Count > 0 ? cardPick[0] : 0];
 
-        var nodes = LegalActions.DeployNodes(State, a.Player, card);
-        var nodePick = await ChooseAsync(new ChoiceRequest(a.Player, card, $"Deploy {card.Name} to which node?",
-            ChoiceKind.Nodes, nodes.Select(n => new ChoiceOption($"{(n.Side == a.Player ? "Your" : "Opponent's")} {n.Label}", Node: n)).ToList(),
-            1, 1, "DeployNode"), ct);
-        var node = nodes[nodePick.Count > 0 ? nodePick[0] : 0];
+        CardInstance card;
+        Node node;
+        var deployOverride = StaticLayer.DeployNodeOverride(State, a.Player);
+        if (deployOverride is { Random: false })
+        {
+            // Psychic Coercion: the node first, then a Unit from the pile that may go there.
+            var options = cards.SelectMany(c => LegalActions.DeployNodes(State, a.Player, c).Select(n => (c, n))).ToList();
+            (card, node) = await CoercedDeployPickAsync(a.Player, options, ct);
+        }
+        else
+        {
+            string pileName = a.Pile == PileKind.RetiredUnits ? "Retired" : "Nullified";
+            var cardPick = await ChooseAsync(new ChoiceRequest(a.Player, null, $"Choose a Unit to Deploy from the {pileName} pile",
+                ChoiceKind.Cards, cards.Select(c => new ChoiceOption($"{c.Name} (Rank {RankCalculator.BaseRank(c)})", c)).ToList(),
+                1, 1, "PlayFromPile"), ct);
+            card = cards[cardPick.Count > 0 ? cardPick[0] : 0];
+
+            var nodes = LegalActions.DeployNodes(State, a.Player, card);
+            if (deployOverride is { Random: true })
+                node = await RandomDeployNodeAsync(a.Player, card, nodes, ct);
+            else
+            {
+                var nodePick = await ChooseAsync(new ChoiceRequest(a.Player, card, $"Deploy {card.Name} to which node?",
+                    ChoiceKind.Nodes, nodes.Select(n => new ChoiceOption($"{(n.Side == a.Player ? "Your" : "Opponent's")} {n.Label}", Node: n)).ToList(),
+                    1, 1, "DeployNode"), ct);
+                node = nodes[nodePick.Count > 0 ? nodePick[0] : 0];
+            }
+        }
 
         State.Players[a.Player].DeployTurnsThisRound++; // Military Academy counts deploys from any zone (ruling #23)
         await DeployAsync(a.Player, card, node, fromNode: null, ct, fromPile: a.Pile);
+    }
+
+    // ------------------------------------------------------------------ M3.2c: who picks the node
+
+    /// <summary>Shoot First, Think Second: one of the legal nodes, at random (seeded).</summary>
+    private async Task<Node> RandomDeployNodeAsync(int player, CardInstance card, IReadOnlyList<Node> nodes, CancellationToken ct)
+    {
+        var node = nodes[State.Rng.Next(nodes.Count)];
+        string source = StaticLayer.DeployNodeOverride(State, player)?.Source.Name ?? "Random";
+        await EmitAsync(new LogEvent($"{source}: {card.Name} goes to {State.Players[node.Side].Name}'s {node.Label} at random."), ct);
+        return node;
+    }
+
+    /// <summary>
+    /// Psychic Coercion (spec §7.1): the deploying player has declared "I'm deploying a Unit". The coercer picks the
+    /// node first – only nodes at least one of the Units could legally go to, so a Deploy is always possible – then the
+    /// deploying player picks a Unit for that node.
+    /// </summary>
+    private async Task<(CardInstance Card, Node Node)> CoercedDeployPickAsync(int player, List<(CardInstance Card, Node Node)> options,
+        CancellationToken ct)
+    {
+        var coercion = StaticLayer.DeployNodeOverride(State, player)
+            ?? throw new InvalidOperationException("No deploy override applies.");
+        int chooser = coercion.Chooser;
+        var nodes = options.Select(o => o.Node).Distinct().ToList();
+        var nodePick = await ChooseAsync(new ChoiceRequest(chooser, coercion.Source,
+            $"{coercion.Source.Name}: choose the node {State.Players[player].Name} must Deploy a Unit to",
+            ChoiceKind.Nodes, nodes.Select(n => new ChoiceOption($"{(n.Side == chooser ? "Your" : "Opponent's")} {n.Label}", Node: n)).ToList(),
+            1, 1, "CoerceNode"), ct);
+        var node = nodes[nodePick.Count > 0 ? nodePick[0] : 0];
+
+        var cards = options.Where(o => o.Node == node).Select(o => o.Card).Distinct().ToList();
+        var cardPick = await ChooseAsync(new ChoiceRequest(player, coercion.Source,
+            $"{coercion.Source.Name}: choose a Unit to Deploy to {(node.Side == player ? "your" : "the opponent's")} {node.Label}",
+            ChoiceKind.Cards, cards.Select(c => new ChoiceOption($"{c.Name} (Rank {RankCalculator.BaseRank(c)})", c, node)).ToList(),
+            1, 1, "CoercedUnit"), ct);
+        return (cards[cardPick.Count > 0 ? cardPick[0] : 0], node);
+    }
+
+    // ------------------------------------------------------------------ M3.2c: granted actions
+
+    /// <summary>
+    /// Abominations: pay the cost (Nullify a Necrolite card from hand), then run the granted ops as the acting
+    /// player, with the granting card as the source. It resolves at once: no React answers a granted action.
+    /// </summary>
+    private async Task RunGrantedActionAsync(GrantedAction a, CancellationToken ct)
+    {
+        var info = StaticLayer.GrantedActions(State, a.Player).FirstOrDefault(g => g.Source == a.Source);
+        if (info is null) return;
+        await EmitAsync(new LogEvent($"{State.Players[a.Player].Name}: {a.Name} ({a.Source.Name})."), ct);
+
+        var candidates = LegalActions.GrantedCostCandidates(State, a.Player, info);
+        if (candidates.Count == 0) return;
+        var pick = await ChooseAsync(new ChoiceRequest(a.Player, a.Source, $"{a.Name}: choose a card to Nullify from your hand",
+            ChoiceKind.Cards, candidates.Select(c => new ChoiceOption(c.Name, c)).ToList(), 1, 1, "PayCost"), ct);
+        await NullifyFromHandAsync(candidates[pick.Count > 0 ? pick[0] : 0], a.Source, ct);
+
+        var ctx = new EffectContext(this, a.Source, a.Player, a.Source.Location.Node, "GrantAction");
+        await Runner.RunAsync(info.Op, ctx, ct);
     }
 
     /// <summary>PlayCost (Mechatron, Scrapped Metal): Retire the required cards from hand as the card is played.</summary>
