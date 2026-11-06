@@ -13,8 +13,15 @@ public static class AiChoices
     public static IReadOnlyList<int> Choose(ChoiceRequest r, GameState s)
     {
         int me = r.Player;
+        if (r.Purpose.StartsWith("OptionalDuel:"))
+            return new[] { WantsDuel(r, s) ? 0 : 1 };
         switch (r.Purpose)
         {
+            case "PayCost":
+            case "PlayFromPile":
+            case "DeployNode":
+                break; // scored below
+
             case "Optional":
                 return new[] { WantsOptional(r, s) ? 0 : 1 };
 
@@ -43,6 +50,12 @@ public static class AiChoices
 
             case "Swap":
                 return BestSwap(r, s);
+
+            case "ChooseRace":
+                return new[] { BestRace(r, s) };
+
+            case "Wormhole":
+                return new[] { BestWarzone(r, s) };
         }
 
         // Score every option, take the positive ones (within Min..Max), best first.
@@ -83,6 +96,10 @@ public static class AiChoices
                     return side < 0 ? 1 + value : enemy ? value : -value; // from a pile into our Standby: bigger is better
                 case "RetireFromHand":
                     return -1; // keep cards unless forced
+                case "PayCost":
+                    return 10 - value; // pay with the least valuable cards
+                case "PlayFromPile":
+                    return 1 + value;  // bring back the biggest Unit
                 default:
                     return 0;
             }
@@ -100,18 +117,63 @@ public static class AiChoices
                     return ourNode ? -0.5 : 0.5;
                 case "Unlock":
                     return ourNode ? 2.5 : 0.6; // each Unlock also draws a card (Decode)
+                case "DeployNode":
+                {
+                    // Our own nodes; unopposed or a Leader node first.
+                    if (!ourNode) return 0.1;
+                    double score = s.OpposingNode(node)?.Card is null ? 2 : 1;
+                    return node.Kind == NodeKind.Leader ? score + 0.5 : score;
+                }
                 case "Duel":
                 {
                     var a = node.Card;
                     var b = s.OpposingNode(node)?.Card;
                     if (a is null || b is null) return -1;
-                    var loser = Duel.Loser(s, a, b);
-                    if (loser is null) return 0;
-                    return SideOf(loser) == me ? -Value(loser, s) : Value(loser, s);
+                    return Duel.Losers(s, a, b).Sum(l => SideOf(l) == me ? -Value(l, s) : Value(l, s));
                 }
             }
         }
         return 0;
+    }
+
+    /// <summary>
+    /// Extreme Sanctions / Containment Network: name the race that hurts the opponent most and us least – their Units
+    /// in play count double, our own Units in play and in hand count against it.
+    /// </summary>
+    private static int BestRace(ChoiceRequest r, GameState s)
+    {
+        int me = r.Player;
+        int opp = GameState.Other(me);
+        return IndexOfMax(r, o =>
+        {
+            var race = (Race)o.Value;
+            int theirs = s.Players[opp].UnitsInPlay.Count(u => StaticLayer.HasRace(s, u, race));
+            int ours = s.Players[me].UnitsInPlay.Count(u => StaticLayer.HasRace(s, u, race))
+                       + s.Players[me].Hand.Count(c => StaticLayer.HasRace(s, c, race));
+            return theirs * 2 - ours;
+        });
+    }
+
+    /// <summary>Wormhole: try each Warzone as the only Active one and keep the one that helps our margin most.</summary>
+    private static int BestWarzone(ChoiceRequest r, GameState s)
+    {
+        int me = r.Player;
+        int opp = GameState.Other(me);
+        var saved = s.ActiveWarzones.ToList();
+        try
+        {
+            return IndexOfMax(r, o =>
+            {
+                s.ActiveWarzones.Clear();
+                if (o.Card is not null) s.ActiveWarzones.Add(o.Card);
+                return RankCalculator.TotalRank(s, me) - RankCalculator.TotalRank(s, opp);
+            });
+        }
+        finally
+        {
+            s.ActiveWarzones.Clear();
+            s.ActiveWarzones.AddRange(saved);
+        }
     }
 
     /// <summary>Arganium: pick the two Unit nodes whose switch gains us the most Rank.</summary>
@@ -136,6 +198,18 @@ public static class AiChoices
         if (card is null || from.Side == to.Side) return 0;
         int rank = RankCalculator.GetRank(s, card);
         return to.Side == me ? rank * 2 : -rank * 2; // it leaves one total and joins the other
+    }
+
+    /// <summary>Fast Eddie: only Duel when it doesn't cost us more than it costs them.</summary>
+    private static bool WantsDuel(ChoiceRequest r, GameState s)
+    {
+        var ids = r.Purpose.Split(':').Skip(1).Select(int.Parse).ToList();
+        var units = s.AllUnitsInPlay.ToList();
+        var a = units.FirstOrDefault(u => u.InstanceId == ids[0]);
+        var b = units.FirstOrDefault(u => u.InstanceId == ids[1]);
+        if (a is null || b is null) return false;
+        double gain = Duel.Losers(s, a, b).Sum(l => SideOf(l) == r.Player ? -Value(l, s) : Value(l, s));
+        return gain > 0;
     }
 
     private static bool WantsOptional(ChoiceRequest r, GameState s)

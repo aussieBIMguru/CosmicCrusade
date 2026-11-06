@@ -207,13 +207,18 @@ public sealed class PileView : Grid
     {
         int n = virtualCount ?? cards.Count;
         _count.Text = Pile == PileKind.ActiveWarzone
-            ? BoardLayout.PileLabel(Pile)
+            ? (n > 1 ? $"{BoardLayout.PileLabel(Pile)}  ×{n}" : BoardLayout.PileLabel(Pile))
             : $"{BoardLayout.PileLabel(Pile)}  {(virtualCount is null ? n.ToString() : "∞")}";
         bool any = n > 0;
         _under.Visibility = n > 1 ? Visibility.Visible : Visibility.Hidden;
         _top.Visibility = any ? Visibility.Visible : Visibility.Hidden;
         if (!any) return;
         _top.Source = _isDeck || cards.Count == 0 ? CardFaceFactory.GetBack() : CardFaceFactory.GetFace(cards[^1].Definition);
+        // Several Active Warzones (Dimensional Rift): show the next one face up underneath.
+        _under.Source = Pile == PileKind.ActiveWarzone && cards.Count > 1
+            ? CardFaceFactory.GetFace(cards[^2].Definition)
+            : CardFaceFactory.GetBack();
+        _under.Opacity = Pile == PileKind.ActiveWarzone ? 0.9 : 0.6;
         _top.Opacity = Pile == PileKind.NullifiedUnits ? 0.75 : 1;
     }
 

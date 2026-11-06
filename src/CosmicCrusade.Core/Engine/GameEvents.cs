@@ -17,7 +17,7 @@ public sealed record TurnStartedEvent(int Player) : GameEvent;
 public sealed record PassedEvent(int Player) : GameEvent;
 
 /// <summary>A unit has been announced (it is on the stack). <paramref name="FromNode"/> is set for Standby advances.</summary>
-public sealed record UnitDeployAnnouncedEvent(int Player, CardInstance Card, Node Target, Node? FromNode) : GameEvent;
+public sealed record UnitDeployAnnouncedEvent(int Player, CardInstance Card, Node Target, Node? FromNode, PileKind? FromPile = null) : GameEvent;
 
 public sealed record UnitPlayedEvent(int Player, CardInstance Card, Node Node) : GameEvent;
 public sealed record DeployCancelledEvent(int Player, CardInstance Card, PileKind To) : GameEvent;
@@ -87,11 +87,24 @@ public sealed record CardReturnedToHandEvent(CardInstance Card, int Player, Node
 /// <summary>A card went from a hand straight to the Retired pile (10K-LAN, New Recruits...).</summary>
 public sealed record CardRetiredFromHandEvent(CardInstance Card, int Player) : GameEvent;
 
-/// <summary>Two Units Duelled. <paramref name="Loser"/> is null when nothing happened (or the loser was protected).</summary>
-public sealed record DuelEvent(CardInstance A, CardInstance B, CardInstance? Loser, bool Protected) : GameEvent;
+/// <summary>Two Units Duelled. <paramref name="Losers"/>: the Units Nullified by it (empty, one, or both on a matched Rank).</summary>
+public sealed record DuelEvent(CardInstance A, CardInstance B, IReadOnlyList<CardInstance> Losers, bool Protected) : GameEvent
+{
+    /// <summary>The single loser (null when nothing happened, or both lost on a matched Rank).</summary>
+    public CardInstance? Loser => Losers.Count == 1 ? Losers[0] : null;
+}
 
 /// <summary>The contents of two nodes were switched (Arganium). Control follows the side.</summary>
 public sealed record NodesSwappedEvent(Node A, Node B, CardInstance? CardNowOnA, CardInstance? CardNowOnB) : GameEvent;
+
+/// <summary>
+/// Warzones put into play at once by an effect (Dimensional Rift: the top 2; Wormhole: the chosen one).
+/// They are already in the Active Warzone slot when this is published.
+/// </summary>
+public sealed record WarzonesAddedEvent(IReadOnlyList<CardInstance> Warzones, CardInstance? Source) : GameEvent;
+
+/// <summary>A Unit in play would have been Nullified but wasn't (Immune, Diplomatic Immunity, Force Field...).</summary>
+public sealed record NullifyPreventedEvent(CardInstance Card, CardInstance? Source, string Reason) : GameEvent;
 
 /// <summary>A card's abilities were Suppressed (Gloop!).</summary>
 public sealed record AbilitiesSuppressedEvent(CardInstance Card, CardInstance? Source) : GameEvent;

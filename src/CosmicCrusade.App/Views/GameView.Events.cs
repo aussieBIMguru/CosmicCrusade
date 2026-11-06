@@ -161,6 +161,10 @@ public partial class GameView
                 OnAbilitiesSuppressed(e);
                 break;
 
+            case NullifyPreventedEvent e:
+                await OnNullifyPreventedAsync(e);
+                break;
+
             case RoundScoredEvent e:
                 await OnRoundScoredAsync(e.Result);
                 break;
@@ -175,6 +179,21 @@ public partial class GameView
                 _hud.AddLog($"Warzone: {e.Warzone.Name}. {e.Warzone.Definition.Text}");
                 await ShowBannerAsync(e.Warzone.Name.ToUpperInvariant(), "WARZONE  ·  " + e.Warzone.Definition.Text, Purple, 1400);
                 break;
+
+            case WarzonesAddedEvent e:
+            {
+                // Dimensional Rift / Wormhole: every new Warzone flies in together, then one banner names them all.
+                await Task.WhenAll(e.Warzones.Select(w =>
+                    FlyBetweenPilesAsync(w, PileKind.WarzoneDeck, PileKind.ActiveWarzone, startFaceDown: true, endFaceDown: false)));
+                UpdatePiles();
+                foreach (var w in e.Warzones) _hud.AddLog($"Warzone: {w.Name}. {w.Definition.Text}");
+                string names = string.Join(" + ", e.Warzones.Select(w => w.Name.ToUpperInvariant()));
+                string sub = e.Warzones.Count == 1
+                    ? "WARZONE  ·  " + e.Warzones[0].Definition.Text
+                    : $"{State.ActiveWarzones.Count} WARZONES IN PLAY  ·  right-click the Warzone slot to read each";
+                await ShowBannerAsync(names, sub, Purple, 1600);
+                break;
+            }
 
             case WarzoneReturnedEvent e:
                 await FlyBetweenPilesAsync(e.Warzone, PileKind.ActiveWarzone, PileKind.WarzoneDeck, startFaceDown: false, endFaceDown: true);
@@ -195,6 +214,14 @@ public partial class GameView
                 _hud.AddLog(e.Message);
                 break;
         }
+
+        // Static effects (anthems, Acid Rain, Indominus...) change Ranks of Units that weren't involved in the
+        // event, so refresh every badge and the totals after anything that can switch a static on or off.
+        if (gameEvent is OrderResolvedEvent or CardNullifiedEvent or CardMovedToPileEvent or CardMovedToStandbyEvent
+            or CardReturnedToHandEvent or CardRetiredFromHandEvent or CardDrawnEvent or WarzoneRevealedEvent or WarzonesAddedEvent
+            or WarzoneReturnedEvent or AbilitiesSuppressedEvent or ChoiceMadeEvent or NullifyPreventedEvent
+            or NodesSwappedEvent or RankChangedEvent)
+            RefreshScores();
     }
 
     // =================================================================== draws
@@ -248,7 +275,11 @@ public partial class GameView
             return;
         }
 
-        var (startRect, fromBack) = TakeFromHand(e.Player, e.Card);
+        // From a pile (Barkeep Bill & co.): face up from the pile. Otherwise from the hand.
+        var (startRect, fromBack) = e.FromPile is { } pile
+            ? (ProjectRect(BoardLayout.CardRectAt(BoardLayout.PileCenter(pile))), false)
+            : TakeFromHand(e.Player, e.Card);
+        if (e.FromPile is not null) UpdatePiles();
         var flyer = new CardView(e.Card, faceDown: fromBack, HandCardW);
 
         // Place the flyer so its centre sits on the start rect, scaled to match.
@@ -430,6 +461,7 @@ public partial class GameView
             sub += r.Winner is null
                 ? $"  ·  totals and opposed nodes tied ({r.PairsWon0}–{r.PairsWon1})"
                 : $"  ·  tie broken on opposed nodes {r.PairsWon0}–{r.PairsWon1}";
+        if (r.WonBy is { } by) sub += $"  ·  won by {by}";
 
         _hud.AddLog($"Round {r.Round}: {title.ToLowerInvariant()} {sub}.");
         _hud.Status = title;

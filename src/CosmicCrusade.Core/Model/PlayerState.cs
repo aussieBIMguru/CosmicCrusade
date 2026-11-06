@@ -29,6 +29,9 @@ public sealed class PlayerState
 
     public int RoundsWon { get; set; }
 
+    /// <summary>Deploy turns taken this round (Military Academy). Reset at Start-up.</summary>
+    public int DeployTurnsThisRound { get; set; }
+
     /// <summary>Unit nodes then the Leader node (if any): the nodes that score.</summary>
     public IEnumerable<Node> ScoringNodes
     {

@@ -33,6 +33,9 @@ internal sealed class EffectContext
     /// <summary>React effects: the stack item being responded to (Event.Unit, Event.Order, Event.TargetNode).</summary>
     public StackItem? EventItem { get; init; }
 
+    /// <summary>"Whenever ..." abilities: what happened (Event.Unit, Event.AssembledRank, Event.Player...).</summary>
+    public TriggerEvent? Event { get; init; }
+
     /// <summary>"remember" / "Remembered.x": the source card's memory (a snapshot once it has left play).</summary>
     public Dictionary<string, object> Memory { get; init; } = new();
 

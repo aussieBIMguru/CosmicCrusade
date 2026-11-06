@@ -69,6 +69,8 @@ public sealed partial class GameEngine
         State.Round++;
         State.Phase = GamePhase.StartUp;
         _actionsThisRound = 0;
+        foreach (var ps in State.Players) ps.DeployTurnsThisRound = 0;
+        ResetRoundFlags();
 
         if (State.Round == 1) State.FirstPlayer = State.Rng.Next(2);
         else if (State.LastRoundWinner is int w) State.FirstPlayer = w;
@@ -146,6 +148,7 @@ public sealed partial class GameEngine
         }
 
         await EmitAsync(new CardDrawnEvent(player, card, deckKind), ct);
+        await RaiseAsync(new TriggerEvent("CardDrawn", player, card), ct);
         return card;
     }
 
@@ -191,6 +194,8 @@ public sealed partial class GameEngine
                 _lastActionWasPass = false;
                 _actionsThisRound++;
                 await ExecuteAsync(action, ct);
+                await CheckStateAsync(ct);
+                if (_roundEndsNow) break; // Senate Chambers: the round ends at once.
             }
 
             current = GameState.Other(current);
@@ -202,10 +207,12 @@ public sealed partial class GameEngine
         switch (action)
         {
             case DeployFromHandAction d:
+                State.Players[d.Player].DeployTurnsThisRound++;
                 await DeployAsync(d.Player, d.Card, d.Target, fromNode: null, ct);
                 break;
 
             case AdvanceFromStandbyAction a:
+                State.Players[a.Player].DeployTurnsThisRound++;
                 await DeployAsync(a.Player, a.From.Card!, a.To, fromNode: a.From, ct);
                 break;
 
@@ -220,6 +227,10 @@ public sealed partial class GameEngine
                 await AssembleAsync(a, ct);
                 break;
 
+            case DeployFromPileAction p:
+                await DeployFromPileAsync(p, ct);
+                break;
+
             default:
                 throw new NotSupportedException(action.GetType().Name);
         }
@@ -228,16 +239,19 @@ public sealed partial class GameEngine
     // ------------------------------------------------------------------ Deploy (§7.1)
 
     /// <summary>Deploy pipeline (§7.1): announce → priority/stack → Played (or cancelled).</summary>
-    private async Task DeployAsync(int player, CardInstance card, Node target, Node? fromNode, CancellationToken ct)
+    private async Task DeployAsync(int player, CardInstance card, Node target, Node? fromNode, CancellationToken ct,
+        PileKind? fromPile = null)
     {
+        await PayCostAsync(player, card, ct);
         State.MoveToStack(card, player);
-        await EmitAsync(new UnitDeployAnnouncedEvent(player, card, target, fromNode), ct);
+        await EmitAsync(new UnitDeployAnnouncedEvent(player, card, target, fromNode, fromPile), ct);
 
         var item = new StackItem(player, StackItemKind.DeployUnit, card, $"Deploy {card.Name} to {target.Label}",
             (self, token) => ResolveDeployAsync(self, token))
         {
             TargetNode = target,
             FromNode = fromNode,
+            FromPile = fromPile,
         };
         await RunPriorityAsync(item, player, ct);
     }
@@ -260,11 +274,49 @@ public sealed partial class GameEngine
         await EmitAsync(new UnitPlayedEvent(item.Controller, card, target), ct);
 
         // "When you play this Unit": the controller is the side it landed on (ruling #15).
-        if (card.AbilitiesSuppressed)
-            await EmitAsync(new LogEvent($"  {card.Name}'s abilities are Suppressed."), ct);
+        if (StaticLayer.IsTriggerSuppressed(State, card, "OnPlay"))
+        {
+            if (EffectSupport.IsLive(card.Definition, "OnPlay") || card.AbilitiesSuppressed)
+                await EmitAsync(new LogEvent($"  {card.Name}'s abilities are Suppressed."), ct);
+        }
         else
             await FireTriggersAsync(card, "OnPlay", target.Side, target, card.Memory, null, ct);
-        // TODO: OnCardPlayed triggers (Military Academy...), state-based checks (Senate Chambers).
+
+        // "Whenever a Unit / Card is played" (Xeno Laser hits after on-play abilities: ruling #21).
+        await RaisePlayedAsync(item.Controller, card, fromHand: item.FromNode is null && item.FromPile is null, ct);
+    }
+
+    /// <summary>Barkeep Bill & co.: pick the Unit from the pile, then its node, then Deploy it as usual.</summary>
+    private async Task DeployFromPileAsync(DeployFromPileAction a, CancellationToken ct)
+    {
+        var cards = StaticLayer.PlayableFromPile(State, a.Player, a.Pile)
+            .Where(c => LegalActions.DeployNodes(State, a.Player, c).Count > 0).ToList();
+        if (cards.Count == 0) return;
+        string pileName = a.Pile == PileKind.RetiredUnits ? "Retired" : "Nullified";
+        var cardPick = await ChooseAsync(new ChoiceRequest(a.Player, null, $"Choose a Unit to Deploy from the {pileName} pile",
+            ChoiceKind.Cards, cards.Select(c => new ChoiceOption($"{c.Name} (Rank {RankCalculator.BaseRank(c)})", c)).ToList(),
+            1, 1, "PlayFromPile"), ct);
+        var card = cards[cardPick.Count > 0 ? cardPick[0] : 0];
+
+        var nodes = LegalActions.DeployNodes(State, a.Player, card);
+        var nodePick = await ChooseAsync(new ChoiceRequest(a.Player, card, $"Deploy {card.Name} to which node?",
+            ChoiceKind.Nodes, nodes.Select(n => new ChoiceOption($"{(n.Side == a.Player ? "Your" : "Opponent's")} {n.Label}", Node: n)).ToList(),
+            1, 1, "DeployNode"), ct);
+        var node = nodes[nodePick.Count > 0 ? nodePick[0] : 0];
+
+        State.Players[a.Player].DeployTurnsThisRound++; // Military Academy counts deploys from any zone (ruling #23)
+        await DeployAsync(a.Player, card, node, fromNode: null, ct, fromPile: a.Pile);
+    }
+
+    /// <summary>PlayCost (Mechatron, Scrapped Metal): Retire the required cards from hand as the card is played.</summary>
+    private async Task PayCostAsync(int player, CardInstance card, CancellationToken ct)
+    {
+        if (PlayRules.CostOf(State, card) is not { } cost) return;
+        var candidates = PlayRules.CostCandidates(State, card, player);
+        var picks = await ChooseAsync(new ChoiceRequest(player, card,
+            $"{card.Name}: choose {cost.Count} card{(cost.Count == 1 ? "" : "s")} to Retire from your hand",
+            ChoiceKind.Cards, candidates.Select(c => new ChoiceOption(c.Name, c)).ToList(), cost.Count, cost.Count, "PayCost"), ct);
+        foreach (var i in picks) await RetireFromHandAsync(candidates[i], ct);
     }
 
     // ------------------------------------------------------------------ Orders (§3, §7.1)
@@ -272,6 +324,7 @@ public sealed partial class GameEngine
     /// <summary>Card leaves hand, goes on the stack. The caller pushes it (turn action) or it is a React response.</summary>
     private async Task<StackItem> AnnounceOrderAsync(int player, CardInstance card, Node? orderNode, StackItem? respondingTo, CancellationToken ct)
     {
+        await PayCostAsync(player, card, ct);
         State.MoveToStack(card, player);
         string desc = respondingTo is not null
             ? $"{card.Name} → {respondingTo.Card.Name}"
@@ -299,15 +352,32 @@ public sealed partial class GameEngine
                 if (item.OrderNode is { IsEmpty: true } node)
                 {
                     State.MoveToNode(card, node);
-                    bool live = AssembleRules.GrantsAssemble(card.Definition) || Placement.GlobalUnitOverrides(card.Definition).Count > 0;
-                    await EmitAsync(new OrderResolvedEvent(player, card, node, live,
-                        live ? "in effect" : "on its Order Node (its static effect isn't implemented yet)"), ct);
+                    bool suppressed = StaticLayer.IsSuppressed(State, card);
+                    // "As you Issue this Order, choose a Race" (Extreme Sanctions, Containment Network).
+                    if (!suppressed && EffectSupport.IsLive(card.Definition, "OnIssue"))
+                        await FireTriggersAsync(card, "OnIssue", player, node, card.Memory, null, ct);
+                    bool live = StaticLayer.HasLiveStatics(card.Definition);
+                    string detail = suppressed ? "on its Order Node, but Suppressed"
+                        : live ? "in effect"
+                        : "on its Order Node (its effect isn't implemented yet)";
+                    await EmitAsync(new OrderResolvedEvent(player, card, node, live && !suppressed, detail), ct);
+                    await RaisePlayedAsync(player, card, fromHand: true, ct);
                 }
                 else
                 {
                     State.MoveToPile(card, PileKind.IssuedOrders);
                     await EmitAsync(new OrderResolvedEvent(player, card, null, false, "fizzled: its Order Node is no longer Empty"), ct);
                 }
+                break;
+            }
+
+            case OrderType.React when StaticLayer.IsSuppressed(State, card):
+            case OrderType.Action when StaticLayer.IsSuppressed(State, card):
+            {
+                // Suppressing Goop: "Suppress all Card Abilities and Effects (even when not in play)".
+                State.MoveToPile(card, PileKind.IssuedOrders);
+                await EmitAsync(new OrderResolvedEvent(player, card, null, false, "Suppressed: it has no effect"), ct);
+                await RaisePlayedAsync(player, card, fromHand: true, ct);
                 break;
             }
 
@@ -318,6 +388,7 @@ public sealed partial class GameEngine
                 State.MoveToPile(card, PileKind.IssuedOrders);
                 await EmitAsync(new OrderResolvedEvent(player, card, null, live,
                     live ? "resolved" : "its effect isn't implemented yet"), ct);
+                await RaisePlayedAsync(player, card, fromHand: true, ct);
                 break;
             }
 
@@ -328,6 +399,7 @@ public sealed partial class GameEngine
                 State.MoveToPile(card, PileKind.IssuedOrders);
                 await EmitAsync(new OrderResolvedEvent(player, card, null, live,
                     live ? "resolved" : "its effect isn't implemented yet"), ct);
+                await RaisePlayedAsync(player, card, fromHand: true, ct);
                 break;
             }
         }
@@ -361,7 +433,8 @@ public sealed partial class GameEngine
 
         State.MoveToPile(card, PileKind.RetiredUnits);
         await EmitAsync(new AssembledEvent(item.Controller, card, target, amount, ok), ct);
-        // TODO(M3): "Assembled" OnEvent triggers (Cntrl-C Cntrl-V).
+        await RaiseAsync(new TriggerEvent("CardRetiredFromHand", item.Controller, card), ct);
+        if (ok) await RaiseAsync(new TriggerEvent("Assembled", item.Controller, card, AssembledRank: amount, AssembleTarget: target), ct);
     }
 
     // ------------------------------------------------------------------ Priority (§7.2)
@@ -370,8 +443,14 @@ public sealed partial class GameEngine
 
     private async Task PushAsync(StackItem item, CancellationToken ct)
     {
+        // A Nullify window only appears on the stack once someone responds to it (so it doesn't reveal hands).
+        if (item.RespondingTo is { Kind: StackItemKind.UnitNullifying, Shown: false } window)
+        {
+            window.Shown = true;
+            await EmitAsync(new StackPushedEvent(window, StackSnapshot()), ct);
+        }
         _stack.Push(item);
-        await EmitAsync(new StackPushedEvent(item, StackSnapshot()), ct);
+        if (item.Kind != StackItemKind.UnitNullifying) await EmitAsync(new StackPushedEvent(item, StackSnapshot()), ct);
     }
 
     /// <summary>
@@ -382,12 +461,14 @@ public sealed partial class GameEngine
     /// </summary>
     private async Task RunPriorityAsync(StackItem first, int actor, CancellationToken ct)
     {
+        // Windows can open while another item resolves (a Nullify during an ability): resolve only down to here.
+        int baseDepth = _stack.Count;
         await PushAsync(first, ct);
         int priority = GameState.Other(actor);
         int passesInRow = 0;
         int guard = 0;
 
-        while (_stack.Count > 0)
+        while (_stack.Count > baseDepth)
         {
             ct.ThrowIfCancellationRequested();
             if (++guard > 1000) throw new InvalidOperationException("Priority loop did not terminate.");
@@ -441,7 +522,8 @@ public sealed partial class GameEngine
     {
         var top = _stack.Pop();
         await top.Resolve(top, ct); // Each item handles its own Cancelled state.
-        await EmitAsync(new StackPoppedEvent(top, StackSnapshot()), ct);
+        if (top.Kind != StackItemKind.UnitNullifying || top.Shown)
+            await EmitAsync(new StackPoppedEvent(top, StackSnapshot()), ct);
     }
 
     // ================================================================== End of Main (§5.3)
@@ -449,8 +531,12 @@ public sealed partial class GameEngine
     private async Task EndOfMainAsync(CancellationToken ct)
     {
         State.Phase = GamePhase.EndOfMain;
-        // TODO(M3): End of Main triggers (first player's first; rank modifiers before duels).
+        // End of Main triggers (The Empress, High Noon, Weed out the Weak), skipped when Senate Chambers already
+        // ended the round.
+        if (!_roundEndsNow) await FirePhaseTriggersAsync("EndOfMain", ct);
         var result = Scoring.Score(State);
+        if (_forcedRoundWinner is int forced)
+            result = result with { Winner = forced, DecidedByTiebreak = false, WonBy = _forcedRoundReason };
         if (result.Winner is int w) State.Players[w].RoundsWon++;
         State.LastRoundWinner = result.Winner;
         await EmitAsync(new RoundScoredEvent(result), ct);
@@ -461,13 +547,15 @@ public sealed partial class GameEngine
     private async Task CleanUpAsync(CancellationToken ct)
     {
         State.Phase = GamePhase.CleanUp;
-        // TODO(M3): Clean-up triggers (Y'nosh first).
+        // 1. Clean-up triggers: Y'nosh first, then Preferred Candidate, Lone Wolf & co.
+        await FirePhaseTriggersAsync("CleanUp", ct);
 
+        // 2. Units on nodes are Retired, except those that remain in play (Preferred Candidate).
         foreach (int p in TurnOrder())
         {
             foreach (var node in State.Players[p].ScoringNodes.ToList())
             {
-                if (node.Card is null) continue;
+                if (node.Card is null || _remainInPlay.Contains(node.Card)) continue;
                 await RetireAsync(node.Card, ct); // fires "When this Unit leaves play"
             }
         }

@@ -43,6 +43,15 @@ public sealed record ReactAction(int Player, CardInstance Card, StackItem Respon
     public override string Describe() => $"React with {Card.Name} to {RespondingTo.Description}";
 }
 
+/// <summary>
+/// Deploy a Unit from a pile "as if it were in your hand" (Barkeep Bill, Galactomancer, Hills of Decay). The engine
+/// then asks which Unit and which node.
+/// </summary>
+public sealed record DeployFromPileAction(int Player, PileKind Pile) : GameAction(Player)
+{
+    public override string Describe() => $"Deploy a Unit from the {(Pile == PileKind.RetiredUnits ? "Retired" : "Nullified")} pile";
+}
+
 /// <summary>Assemble a Unit from hand onto an allied Unit in play (ruling #18: uses your turn).</summary>
 public sealed record AssembleAction(int Player, CardInstance Card, CardInstance Target) : GameAction(Player)
 {
@@ -80,12 +89,29 @@ public static class LegalActions
         {
             var from = ps.StandbyNodes[i];
             var to = ps.UnitNodes[i];
-            if (from.Card is not null && to.IsEmpty && Placement.ClassAllows(from.Card.Definition, NodeKind.Unit))
+            if (from.Card is not null && to.IsEmpty && Placement.ClassAllows(from.Card.Definition, NodeKind.Unit)
+                && StaticLayer.DeployAllowed(state, player, from.Card, to))
                 list.Add(new AdvanceFromStandbyAction(player, from, to));
         }
 
         // Orders on your own turn: Actions resolve, Ongoings need an Empty Order Node of your own.
-        foreach (var card in ps.Hand.Where(c => c.Definition.IsOrder))
+        // Deploys from piles (Barkeep Bill, Galactomancer, Hills of Decay): one action per pile with a deployable Unit.
+        foreach (var pile in new[] { PileKind.RetiredUnits, PileKind.NullifiedUnits })
+            if (StaticLayer.PlayableFromPile(state, player, pile).Any(c => DeployNodes(state, player, c).Count > 0))
+                list.Add(new DeployFromPileAction(player, pile));
+
+        // Mind Games: "Your Opponents must play Units on Opposed Nodes if able" (otherwise they may use their own).
+        if (StaticLayer.MustDeployToOpposedNodes(state, player))
+        {
+            bool Opposed(Node n) => state.OpposingNode(n)?.Card is not null;
+            bool IsDeploy(GameAction a) => a is DeployFromHandAction or AdvanceFromStandbyAction;
+            Node TargetOf(GameAction a) => a is DeployFromHandAction d ? d.Target : ((AdvanceFromStandbyAction)a).To;
+            if (list.Any(a => IsDeploy(a) && TargetOf(a).Side == player && Opposed(TargetOf(a))))
+                list.RemoveAll(a => IsDeploy(a) && !(TargetOf(a).Side == player && Opposed(TargetOf(a))));
+        }
+
+        // Temporal Stasis / Extreme Sanctions: some Orders can't be Issued.
+        foreach (var card in ps.Hand.Where(c => c.Definition.IsOrder && CanIssue(state, player, c)))
         {
             switch (card.Definition.OrderType)
             {
@@ -109,6 +135,27 @@ public static class LegalActions
         return list;
     }
 
+    /// <summary>Restrictions (Temporal Stasis, Extreme Sanctions), extra costs (Scrapped Metal), play conditions.</summary>
+    private static bool CanIssue(GameState state, int player, CardInstance card) =>
+        !StaticLayer.IsPlayRestricted(state, card, "Issue", out _)
+        && PlayRules.CanPay(state, player, card)
+        && PlayRules.ConditionMet(state, player, card.Definition);
+
+    /// <summary>
+    /// Nodes <paramref name="player"/> may Deploy <paramref name="card"/> to, Mind Games included (used for Units
+    /// deployed from piles, whose node is chosen after the action).
+    /// </summary>
+    public static List<Node> DeployNodes(GameState state, int player, CardInstance card)
+    {
+        var nodes = Placement.LegalDeployNodes(state, player, card).ToList();
+        if (StaticLayer.MustDeployToOpposedNodes(state, player))
+        {
+            var forced = nodes.Where(n => n.Side == player && state.OpposingNode(n)?.Card is not null).ToList();
+            if (forced.Count > 0) return forced;
+        }
+        return nodes;
+    }
+
     /// <summary>
     /// Reacts in <paramref name="player"/>'s hand whose condition is met by an item on the stack.
     /// One action per (React, item) pair, topmost item first. Does not include the Pass.
@@ -117,7 +164,7 @@ public static class LegalActions
     {
         var items = stackTopFirst.ToList();
         var list = new List<GameAction>();
-        foreach (var card in state.Players[player].Hand.Where(c => c.Definition.OrderType == OrderType.React))
+        foreach (var card in state.Players[player].Hand.Where(c => c.Definition.OrderType == OrderType.React && CanIssue(state, player, c)))
             foreach (var item in items)
                 if (ReactConditions.IsMet(state, card, item))
                     list.Add(new ReactAction(player, card, item));

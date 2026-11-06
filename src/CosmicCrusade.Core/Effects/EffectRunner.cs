@@ -33,7 +33,7 @@ internal sealed class EffectRunner
         if (Bool(effect, "optional"))
         {
             bool yes = await _engine.AskYesNoAsync(ctx.Controller, ctx.Source,
-                $"{ctx.Source.Name}: use this ability?", "Optional", ct);
+                $"{ctx.Source.Name}: use this ability?", OptionalPurpose(effect, ctx), ct);
             if (!yes)
             {
                 await _engine.EmitAsync(new LogEvent($"  {ctx.Source.Name}: ability declined."), ct);
@@ -41,8 +41,22 @@ internal sealed class EffectRunner
             }
         }
 
+        if (Str(effect, "script") is { } script)
+        {
+            await _engine.RunScriptAsync(script, ctx, ct);
+            return;
+        }
+
         if (effect.TryGetProperty("choose", out var choose) && choose.ValueKind == JsonValueKind.Object)
-            ctx.Chosen[Str(choose, "name") ?? "chosen"] = await SelectAsync(choose, ctx, "Lock", ct);
+        {
+            string chosenName = Str(choose, "name") ?? "chosen";
+            // Sisters of Blight: the Unit on the chosen node goes to Standby, so a node holding a Leader is not a
+            // legal choice (ruling #36).
+            Func<Node, bool>? nodeOk = MovesChosenUnitToStandby(effect, chosenName)
+                ? n => n.Card is null || Placement.CanEnterStandby(n.Card.Definition)
+                : null;
+            ctx.Chosen[chosenName] = await SelectAsync(choose, ctx, "Lock", ct, nodeOk);
+        }
 
         if (!effect.TryGetProperty("do", out var ops)) return;
         foreach (var op in ops.EnumerateArray())
@@ -149,7 +163,8 @@ internal sealed class EffectRunner
 
             case "Manipulate":
             {
-                int n = op.GetProperty("amount").GetInt32();
+                // Potency Tank: "If you would Manipulate, increase the Number by 2."
+                int n = op.GetProperty("amount").GetInt32() + StaticLayer.ManipulateBonus(State, ctx.Controller);
                 var candidates = op.TryGetProperty("filter", out var f)
                     ? Cards(f, ctx, unitOnly: true)
                     : Cards(default, ctx, unitOnly: true);
@@ -224,9 +239,83 @@ internal sealed class EffectRunner
             {
                 var source = (await SelectAsync(op.GetProperty("source"), ctx, "AssembleSource", ct)).OfType<CardInstance>().FirstOrDefault();
                 if (source is null) break;
-                var onto = (await SelectAsync(op.GetProperty("onto"), ctx, "Buff", ct)).OfType<CardInstance>().FirstOrDefault();
+                // Assemble always adds to an ALLIED Unit (spec §1, ruling #18) – never the opponent's – and never an
+                // Immune one. A Synthenoid Leader on your Leader Node is a fine target.
+                var onto = (await SelectAsync(op.GetProperty("onto"), ctx, "Buff", ct,
+                    cardOk: c => InPlay(c) && ControllerOf(c) == ctx.Controller && !StaticLayer.IsImmune(State, c)))
+                    .OfType<CardInstance>().FirstOrDefault();
                 if (onto is null) break;
                 await _engine.AssembleFromAsync(source, onto, ctx.Controller, ct);
+                break;
+            }
+
+            case "PreventEvent":
+                if (ctx.EventItem is { } prevented)
+                {
+                    prevented.Cancelled = true;
+                    await _engine.EmitAsync(new LogEvent($"  {ctx.Source.Name}: {prevented.Card.Name} is not Nullified."), ct);
+                }
+                break;
+
+            case "SetRaces":
+            {
+                // A lasting race change while the Unit stays in play ("That Unit becomes a Necrolite").
+                var races = op.GetProperty("races").EnumerateArray().Select(x => CardDatabase.ParseEnum<Race>(x.GetString()!)).ToList();
+                var targets = await SelectAsync(op.GetProperty("targets"), ctx, "SetRaces", ct);
+                foreach (var card in targets.OfType<CardInstance>().Where(InPlay))
+                {
+                    card.Races.Clear();
+                    foreach (var race in races) card.Races.Add(race);
+                    string what = races.Count == 0 ? "has no Race" : "becomes " + string.Join("/", races.Select(RaceName));
+                    await _engine.EmitAsync(new LogEvent($"  {card.Name} {what}."), ct);
+                }
+                break;
+            }
+
+            case "WinRound":
+            {
+                int winner = Str(op, "player") == "Event.Player" ? ctx.Event?.Player ?? -1 : ctx.Controller;
+                await _engine.WinRoundAsync(winner, ctx.Source, ct);
+                break;
+            }
+
+            case "DuelAllOpposed":
+                await DuelAllOpposedAsync(ctx, ct);
+                break;
+
+            case "RemainInPlay":
+                if (InPlay(ctx.Source))
+                {
+                    _engine.RemainInPlay(ctx.Source);
+                    await _engine.EmitAsync(new LogEvent($"  {ctx.Source.Name} remains in play."), ct);
+                }
+                break;
+
+            case "AddAssembledRank":
+            {
+                int amount = ctx.Event?.AssembledRank ?? 0;
+                var targets = await SelectAsync(op.GetProperty("targets"), ctx, "Buff", ct);
+                foreach (var card in targets.OfType<CardInstance>().Where(InPlay))
+                {
+                    card.PersistentModifiers.Add(new RankModifier($"Assemble: {ctx.Event?.Card?.Name}", amount));
+                    await _engine.EmitAsync(new RankChangedEvent(card, $"{amount:+0;-0;0} Rank (Assembled as well)", ctx.Source), ct);
+                }
+                break;
+            }
+
+            case "RevealWarzones":
+                await _engine.RevealWarzonesAsync(op.GetProperty("count").GetInt32(), ctx.Source, ct);
+                break;
+
+            case "ChooseRace":
+            {
+                var races = Enum.GetValues<Race>().Where(x => x != Race.Neutral).ToList();
+                var options = races.Select(x => new ChoiceOption(RaceName(x), Value: (int)x)).ToList();
+                var pick = await _engine.ChooseAsync(new ChoiceRequest(ctx.Controller, ctx.Source,
+                    $"{ctx.Source.Name}: choose a Race", ChoiceKind.Options, options, 1, 1, "ChooseRace"), ct);
+                var race = races[pick.Count > 0 ? pick[0] : 0];
+                if (Str(op, "remember") is { } key) ctx.Memory[key] = race;
+                await _engine.EmitAsync(new LogEvent($"  {ctx.Source.Name}: {RaceName(race)} chosen."), ct);
                 break;
             }
 
@@ -294,6 +383,8 @@ internal sealed class EffectRunner
             var node = (await SelectAsync(nodeSel, ctx, "Duel", ct)).OfType<Node>().FirstOrDefault();
             a = node?.Card;
             b = node is null ? null : State.OpposingNode(node)?.Card;
+            if (a is not null && !Affectable(a, ctx)) a = null;
+            if (b is not null && !Affectable(b, ctx)) b = null;
         }
         else
         {
@@ -309,19 +400,100 @@ internal sealed class EffectRunner
         var protect = op.TryGetProperty("protect", out var p) && p.ValueKind == JsonValueKind.Array
             ? p.EnumerateArray().Select(x => x.GetString()).ToHashSet()
             : new HashSet<string?>();
-        var loser = Duel.Loser(State, a, b);
-        bool isProtected = (loser == a && protect.Contains("a")) || (loser == b && protect.Contains("b"));
-        await _engine.EmitAsync(new DuelEvent(a, b, isProtected ? null : loser, isProtected), ct);
-        if (loser is not null && !isProtected) await _engine.NullifyAsync(loser, ctx.Source, ct);
+        var all = Duel.Losers(State, a, b);
+        var losers = all.Where(l => !((l == a && protect.Contains("a")) || (l == b && protect.Contains("b")))).ToList();
+        await _engine.EmitAsync(new DuelEvent(a, b, losers, losers.Count < all.Count), ct);
+        foreach (var loser in losers) await _engine.NullifyAsync(loser, ctx.Source, ct);
+    }
+
+    /// <summary>High Noon: "all Opposed Nodes Duel" – every pair is compared first, then all losers go at once.</summary>
+    private async Task DuelAllOpposedAsync(EffectContext ctx, CancellationToken ct)
+    {
+        var p0 = State.Players[0];
+        var p1 = State.Players[1];
+        var pairs = new List<(CardInstance A, CardInstance B)>();
+        for (int i = 0; i < PlayerState.UnitNodeCount; i++)
+            if (p0.UnitNodes[i].Card is { } a && p1.UnitNodes[i].Card is { } b) pairs.Add((a, b));
+        if (p0.LeaderNode?.Card is { } la && p1.LeaderNode?.Card is { } lb) pairs.Add((la, lb)); // ruling #28
+        pairs = pairs.Where(p => Affectable(p.A, ctx) && Affectable(p.B, ctx)).ToList();
+
+        var losers = new List<CardInstance>();
+        foreach (var (a, b) in pairs)
+        {
+            var l = Duel.Losers(State, a, b);
+            losers.AddRange(l);
+            await _engine.EmitAsync(new DuelEvent(a, b, l, false), ct);
+        }
+        foreach (var loser in losers.Distinct().ToList())
+            if (InPlay(loser)) await _engine.NullifyAsync(loser, ctx.Source, ct);
+    }
+
+    /// <summary>The extra keys of an OnEvent filter (player, targetNot, ...) plus the usual card filter on Event.Card.</summary>
+    internal bool EventFilterMatches(JsonElement filter, EffectContext ctx)
+    {
+        var ev = ctx.Event;
+        if (ev is null || filter.ValueKind != JsonValueKind.Object) return false;
+        bool cardKeys = false;
+        foreach (var p in filter.EnumerateObject())
+        {
+            switch (p.Name)
+            {
+                case "player":
+                    int want = p.Value.GetString() == "You" ? ctx.Controller : ctx.Opponent;
+                    if (ev.Player != want) return false;
+                    break;
+                case "targetNot":
+                    if (p.Value.GetString() == "Self" && ReferenceEquals(ev.AssembleTarget, ctx.Source)) return false;
+                    break;
+                case "sourceIsOpponentOfUnitController":
+                    if (ev.SourceController < 0 || ev.UnitController < 0 || ev.SourceController == ev.UnitController) return false;
+                    break;
+                case "controller":
+                    // A Unit on a node: the side it sits on (ruling #15). Otherwise whoever played / drew it
+                    // (Lance Corporal: "Whenever you play an Order" – the Order is already in the Issued pile).
+                    int side = ev.Card?.Location.Kind == LocationKind.Node ? ev.Card.Location.Node!.Side : ev.Player;
+                    if (side != (p.Value.GetString() == "You" ? ctx.Controller : ctx.Opponent)) return false;
+                    break;
+                default:
+                    cardKeys = true;
+                    break;
+            }
+        }
+        return !cardKeys || (ev.Card is { } card && MatchCard(card, filter, ctx, skipController: true));
+    }
+
+    /// <summary>
+    /// Purpose for an optional ability's yes/no. Optional Duels (Fast Eddie) carry the two Units' ids so an AI can
+    /// check whether the Duel is worth it.
+    /// </summary>
+    private string OptionalPurpose(JsonElement effect, EffectContext ctx)
+    {
+        if (effect.TryGetProperty("do", out var ops) && ops.ValueKind == JsonValueKind.Array && ops.GetArrayLength() > 0
+            && Str(ops[0], "op") == "Duel" && Str(ops[0], "a") is { } a && Str(ops[0], "b") is { } b)
+        {
+            var ca = Named(a, ctx).OfType<CardInstance>().FirstOrDefault();
+            var cb = Named(b, ctx).OfType<CardInstance>().FirstOrDefault();
+            if (ca is not null && cb is not null) return $"OptionalDuel:{ca.InstanceId}:{cb.InstanceId}";
+        }
+        return "Optional";
     }
 
     // ================================================================== selectors
 
     /// <summary>Resolves a selector to cards and/or nodes. Choices are asked of the effect's controller.</summary>
-    private async Task<List<object>> SelectAsync(JsonElement sel, EffectContext ctx, string purpose, CancellationToken ct)
+    private async Task<List<object>> SelectAsync(JsonElement sel, EffectContext ctx, string purpose, CancellationToken ct,
+        Func<Node, bool>? nodeOk = null, Func<CardInstance, bool>? cardOk = null)
     {
         if (sel.ValueKind == JsonValueKind.String) return Named(sel.GetString()!, ctx);
         if (sel.ValueKind != JsonValueKind.Object) return new List<object>();
+        if (sel.TryGetProperty("lowestRank", out var low))
+        {
+            // Weed out the Weak: the Unit(s) with the lowest Rank – ties: all of them.
+            var units = Cards(low, ctx, unitOnly: true).Where(InPlay).ToList();
+            if (units.Count == 0) return new List<object>();
+            int lowest = units.Min(u => RankCalculator.GetRank(State, u));
+            return units.Where(u => RankCalculator.GetRank(State, u) == lowest).Cast<object>().ToList();
+        }
         if (!sel.TryGetProperty("choose", out var what)) return Cards(sel, ctx, unitOnly: false).Cast<object>().ToList();
 
         string kind = what.GetString()!;
@@ -338,6 +510,7 @@ internal sealed class EffectRunner
         if (kind == "Node")
         {
             var nodes = Nodes(filter, ctx);
+            if (nodeOk is not null) nodes = nodes.Where(nodeOk).ToList();
             if (Bool(sel, "perPlayer"))
             {
                 var result = new List<object>();
@@ -349,6 +522,8 @@ internal sealed class EffectRunner
         }
 
         var cards = Cards(filter, ctx, unitOnly: kind == "Unit");
+        if (purpose == "MoveToStandby") cards = cards.Where(c => Placement.CanEnterStandby(c.Definition)).ToList(); // ruling #36
+        if (cardOk is not null) cards = cards.Where(cardOk).ToList();
         return (await AskCardsAsync(ctx, cards, min, max, purpose, PromptFor(ctx, purpose, kind, min, max), ct))
             .Cast<object>().ToList();
     }
@@ -362,14 +537,23 @@ internal sealed class EffectRunner
                 list.Add(ctx.Source);
                 break;
             case "OpposingUnit":
-                if (ctx.SelfNode is not null && State.OpposingNode(ctx.SelfNode)?.Card is { } opp) list.Add(opp);
+                if (ctx.SelfNode is not null && State.OpposingNode(ctx.SelfNode)?.Card is { } opp && Affectable(opp, ctx)) list.Add(opp);
                 break;
             case "OpposingLeader":
-                if (State.Players[ctx.Opponent].LeaderNode?.Card is { } leader) list.Add(leader);
+                if (State.Players[ctx.Opponent].LeaderNode?.Card is { } leader && Affectable(leader, ctx)) list.Add(leader);
                 break;
             case "Event.Unit":
                 if (ctx.EventItem is { Kind: StackItemKind.DeployUnit, Cancelled: false } du && du.Card.Location.Kind == LocationKind.Stack)
                     list.Add(du.Card);
+                else if (ctx.EventItem is { Kind: StackItemKind.UnitNullifying } nw && nw.Card.Location.Kind == LocationKind.Node)
+                    list.Add(nw.Card); // still listed after Already Dead prevents it ("That Unit becomes a Necrolite")
+                else if (ctx.Event?.Card is { } ec && ec.Definition.IsUnit && InPlay(ec) && Affectable(ec, ctx))
+                    list.Add(ec);
+                break;
+            case "Event.Unit.OpposingUnit":
+                if (Named("Event.Unit", ctx).OfType<CardInstance>().FirstOrDefault() is { } eu
+                    && OpposingCard(eu) is { } eo && Affectable(eo, ctx))
+                    list.Add(eo);
                 break;
             case "Event.Order":
                 if (ctx.EventItem is { Kind: StackItemKind.IssueOrder, Cancelled: false } io && io.Card.Location.Kind == LocationKind.Stack)
@@ -387,7 +571,7 @@ internal sealed class EffectRunner
                     if (ctx.Chosen.TryGetValue(parts[1], out var chosen))
                     {
                         if (parts.Length > 2 && parts[2] == "Unit")
-                            list.AddRange(chosen.OfType<Node>().Where(n => n.Card is not null).Select(n => (object)n.Card!));
+                            list.AddRange(chosen.OfType<Node>().Where(n => n.Card is not null && Affectable(n.Card, ctx)).Select(n => (object)n.Card!));
                         else
                             list.AddRange(chosen);
                     }
@@ -499,10 +683,11 @@ internal sealed class EffectRunner
             .Distinct()
             .Where(c => !unitOnly || c.Definition.IsUnit)
             .Where(c => filter.ValueKind != JsonValueKind.Object || MatchCard(c, filter, ctx))
+            .Where(c => Affectable(c, ctx))
             .ToList();
     }
 
-    private bool MatchCard(CardInstance card, JsonElement filter, EffectContext ctx)
+    private bool MatchCard(CardInstance card, JsonElement filter, EffectContext ctx, bool skipController = false)
     {
         foreach (var p in filter.EnumerateObject())
         {
@@ -513,14 +698,15 @@ internal sealed class EffectRunner
                     if (card.Definition.Kind != CardDatabase.ParseEnum<CardKind>(v.GetString()!)) return false;
                     break;
                 case "controller":
+                    if (skipController) break;
                     int who = v.GetString() == "You" ? ctx.Controller : ctx.Opponent;
                     if (ControllerOf(card) != who) return false;
                     break;
                 case "race":
-                    if (!card.Races.Contains(CardDatabase.ParseEnum<Race>(v.GetString()!))) return false;
+                    if (!StaticLayer.HasRace(State, card, CardDatabase.ParseEnum<Race>(v.GetString()!))) return false;
                     break;
                 case "notRace":
-                    if (card.Races.Contains(CardDatabase.ParseEnum<Race>(v.GetString()!))) return false;
+                    if (StaticLayer.HasRace(State, card, CardDatabase.ParseEnum<Race>(v.GetString()!))) return false;
                     break;
                 case "unitClass":
                     if (card.Definition.UnitClass != CardDatabase.ParseEnum<UnitClass>(v.GetString()!)) return false;
@@ -535,18 +721,18 @@ internal sealed class EffectRunner
                     if ((OpposingCard(card) is not null) != (v.ValueKind == JsonValueKind.True)) return false;
                     break;
                 case "opposingUnitRace":
-                    if (OpposingCard(card) is not { } oc || !oc.Races.Contains(CardDatabase.ParseEnum<Race>(v.GetString()!))) return false;
+                    if (OpposingCard(card) is not { } oc || !StaticLayer.HasRace(State, oc, CardDatabase.ParseEnum<Race>(v.GetString()!))) return false;
                     break;
                 case "sharesRaceWith":
                     var others = Named(v.GetString()!, ctx).OfType<CardInstance>().ToList();
-                    if (!others.Any(o => o.Races.Overlaps(card.Races) || o.Definition.Races.Any(card.Races.Contains))) return false;
+                    if (!others.Any(o => StaticLayer.SharesRace(State, o, card) || o.Definition.Races.Any(StaticLayer.Races(State, card).Contains))) return false;
                     break;
                 case "excludeBound":
                     if (v.ValueKind == JsonValueKind.True && ctx.Bound.Values.Any(l => l.Contains(card))) return false;
                     break;
                 case "baseRankLessThan":
                     int count = Cards(v.GetProperty("countOf"), ctx, unitOnly: false).Count;
-                    if (RankCalculator.BaseRank(card) >= count) return false;
+                    if (RankCalculator.CurrentBaseRank(State, card) >= count) return false;
                     break;
                 // zone was applied when gathering; node-only keys don't apply to cards.
             }
@@ -603,8 +789,8 @@ internal sealed class EffectRunner
         {
             var card = Named(unitSel.GetString()!, ctx).OfType<CardInstance>().FirstOrDefault();
             if (card is null) return false;
-            if (Str(cond, "race") is { } race && !card.Races.Contains(CardDatabase.ParseEnum<Race>(race))) return false;
-            if (Str(cond, "notRace") is { } notRace && card.Races.Contains(CardDatabase.ParseEnum<Race>(notRace))) return false;
+            if (Str(cond, "race") is { } race && !StaticLayer.HasRace(State, card, CardDatabase.ParseEnum<Race>(race))) return false;
+            if (Str(cond, "notRace") is { } notRace && StaticLayer.HasRace(State, card, CardDatabase.ParseEnum<Race>(notRace))) return false;
         }
         if (cond.TryGetProperty("exists", out var exists))
         {
@@ -612,6 +798,7 @@ internal sealed class EffectRunner
             bool any = nodeFilter ? Nodes(exists, ctx).Count > 0 : Cards(exists, ctx, unitOnly: false).Count > 0;
             if (!any) return false;
         }
+        if (cond.TryGetProperty("notExists", out var notExists) && Cards(notExists, ctx, unitOnly: false).Count > 0) return false;
         if (cond.TryGetProperty("selfOpposed", out var so) && so.ValueKind == JsonValueKind.True)
         {
             if (ctx.SelfNode is null || State.OpposingNode(ctx.SelfNode)?.Card is null) return false;
@@ -619,11 +806,11 @@ internal sealed class EffectRunner
         return true;
     }
 
-    private static int EvalAmount(JsonElement amount, CardInstance card)
+    private int EvalAmount(JsonElement amount, CardInstance card)
     {
         if (amount.ValueKind == JsonValueKind.Number) return amount.GetInt32();
         var race = CardDatabase.ParseEnum<Race>(amount.GetProperty("ifRace").GetString()!);
-        return card.Races.Contains(race) ? amount.GetProperty("then").GetInt32() : amount.GetProperty("else").GetInt32();
+        return StaticLayer.HasRace(State, card, race) ? amount.GetProperty("then").GetInt32() : amount.GetProperty("else").GetInt32();
     }
 
     private static int EvalCount(JsonElement v, EffectContext ctx) => v.ValueKind switch
@@ -649,6 +836,21 @@ internal sealed class EffectRunner
 
     private CardInstance? OpposingCard(CardInstance card) =>
         card.Location.Kind == LocationKind.Node && card.Location.Node is { IsScoring: true } n ? State.OpposingNode(n)?.Card : null;
+
+    private static bool MovesChosenUnitToStandby(JsonElement effect, string chosenName) =>
+        effect.TryGetProperty("do", out var ops) && ops.ValueKind == JsonValueKind.Array
+        && ops.EnumerateArray().Any(o => Str(o, "op") == "MoveToStandby" && Str(o, "targets") == $"Chosen.{chosenName}.Unit");
+
+    /// <summary>Immune Units (Vigan) can't be chosen or affected by other cards' abilities.</summary>
+    private bool Affectable(CardInstance c, EffectContext ctx) =>
+        ReferenceEquals(c, ctx.Source) || !StaticLayer.IsImmune(State, c);
+
+    private static string RaceName(Race r) => r switch
+    {
+        Race.GalacticCouncil => "Galactic Council",
+        Race.SpaceCowboy => "Space Cowboy",
+        _ => r.ToString(),
+    };
 
     private static bool InPlay(CardInstance c) =>
         c.Location.Kind == LocationKind.Node && c.Location.Node is { IsScoring: true } && c.Definition.IsUnit;

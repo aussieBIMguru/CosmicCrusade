@@ -38,7 +38,7 @@ public partial class GameView
 
     private void OnChoiceMade(ChoiceMadeEvent e)
     {
-        if (e.Request.Kind == ChoiceKind.YesNo && e.Request.Purpose == "Optional")
+        if (e.Request.Kind == ChoiceKind.YesNo && e.Request.Purpose.StartsWith("Optional"))
             _hud.AddLog($"  {Who(e.Request.Player)}: {(e.Picks.Count > 0 && e.Picks[0] == 0 ? "uses it" : "declines")}.");
         else
             _hud.AddLog($"  {Who(e.Request.Player)} chose: {e.Summary}");
@@ -177,7 +177,8 @@ public partial class GameView
 
     private async Task OnDuelAsync(DuelEvent e)
     {
-        string result = e.Loser is not null ? $"{e.Loser.Name} loses"
+        string result = e.Losers.Count == 2 ? "matched Ranks: both are Nullified"
+            : e.Loser is not null ? $"{e.Loser.Name} loses{(e.Protected ? " (the other is protected)" : "")}"
             : e.Protected ? "the loser is protected" : "nothing happens";
         _hud.AddLog($"  DUEL: {e.A.Name} ({RankCalculator.GetRank(State, e.A)}) vs {e.B.Name} ({RankCalculator.GetRank(State, e.B)}) – {result}.");
         CardView? va = _boardCards.GetValueOrDefault(e.A.InstanceId);
@@ -208,6 +209,18 @@ public partial class GameView
         }
         await Task.WhenAll(tasks);
         RefreshScores();
+    }
+
+    /// <summary>Immune / "cannot be Nullified": a cyan shield pulse on the Unit and a log line.</summary>
+    private async Task OnNullifyPreventedAsync(NullifyPreventedEvent e)
+    {
+        _hud.AddLog($"  {e.Card.Name} is not Nullified – {e.Reason}.");
+        if (!_boardCards.TryGetValue(e.Card.InstanceId, out var v) || e.Card.Location.Node is not { } node) return;
+        v.SetGlow(Cyan);
+        Shockwave(BoardLayout.Center(node), Cyan);
+        _ = Anim.To(v.Scale, ScaleTransform.ScaleXProperty, 1, 300, Anim.Back, from: 1.12);
+        await Anim.To(v.Scale, ScaleTransform.ScaleYProperty, 1, 300, Anim.Back, from: 1.12);
+        v.SetGlow(null);
     }
 
     private void OnAbilitiesSuppressed(AbilitiesSuppressedEvent e)

@@ -12,6 +12,12 @@ public enum StackItemKind
 
     /// <summary>A Unit from hand being Assembled onto an allied Unit (ruling #18).</summary>
     Assemble,
+
+    /// <summary>
+    /// A Unit in play is about to be Nullified (M3.2b): the React window for Respond in Kind and Already Dead.
+    /// <see cref="StackItem.Card"/> stays on its node. Shown on the stack only once someone responds to it.
+    /// </summary>
+    UnitNullifying,
 }
 
 /// <summary>
@@ -49,6 +55,9 @@ public sealed class StackItem
     /// <summary>DeployUnit: the node the Unit is going to.</summary>
     public Node? TargetNode { get; init; }
 
+    /// <summary>DeployUnit from a pile (Barkeep Bill, Galactomancer, Hills of Decay): the pile it came from.</summary>
+    public PileKind? FromPile { get; init; }
+
     /// <summary>DeployUnit from Standby: the Standby node it came from.</summary>
     public Node? FromNode { get; init; }
 
@@ -57,6 +66,12 @@ public sealed class StackItem
 
     /// <summary>Assemble: the allied Unit receiving the Rank.</summary>
     public CardInstance? AssembleTarget { get; init; }
+
+    /// <summary>UnitNullifying: the card whose effect is Nullifying the Unit (null for a game rule).</summary>
+    public CardInstance? NullifySource { get; init; }
+
+    /// <summary>UnitNullifying: true once the window has been shown on the stack (someone responded to it).</summary>
+    public bool Shown { get; internal set; }
 
     /// <summary>React: the stack item it responds to.</summary>
     public StackItem? RespondingTo { get; init; }

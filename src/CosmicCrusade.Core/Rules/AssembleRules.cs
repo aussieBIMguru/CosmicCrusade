@@ -10,7 +10,8 @@ namespace CosmicCrusade.Core.Rules;
 /// The keyword comes from the card itself (Sprocket Spider, Cogwork Soldier) or from a GrantKeyword static on an
 /// Ongoing Order in play or the Active Warzone (Cybernetic Enhancements, Production Facility).
 /// <c>"assembleOnto": "AnyUnit"</c> (Cybernetic Enhancements) also allows non-Synthenoid targets.
-/// TODO(M3): respect Suppress on the granting card.
+/// A Suppressed card neither has nor grants Assemble (Suppressing Goop: "even when not in play"). Immune Units
+/// can't be Assembled onto.
 /// </summary>
 public static class AssembleRules
 {
@@ -24,8 +25,9 @@ public static class AssembleRules
     public static bool HasAssemble(GameState state, CardInstance card)
     {
         if (!card.Definition.IsUnit) return false;
+        if (StaticLayer.IsSuppressed(state, card)) return false;
         if (card.Definition.Keywords.Contains(Keyword, StringComparer.OrdinalIgnoreCase)) return true;
-        return ActiveGrants(state).Any(g => g.Race is null || card.Races.Contains(g.Race.Value));
+        return ActiveGrants(state).Any(g => g.Race is null || StaticLayer.HasRace(state, card, g.Race.Value));
     }
 
     /// <summary>Can <paramref name="player"/> Assemble <paramref name="card"/> (in hand) onto <paramref name="target"/>?</summary>
@@ -39,8 +41,10 @@ public static class AssembleRules
         var node = target.Location.Node;
         if (target.Location.Kind != LocationKind.Node || node is null || !node.IsScoring || node.Side != player) return false;
 
-        if (target.Races.Contains(Race.Synthenoid)) return true;
-        return ActiveGrants(state).Any(g => g.AnyUnitTarget && (g.Race is null || card.Races.Contains(g.Race.Value)));
+        if (StaticLayer.IsImmune(state, target)) return false;
+
+        if (StaticLayer.HasRace(state, target, Race.Synthenoid)) return true;
+        return ActiveGrants(state).Any(g => g.AnyUnitTarget && (g.Race is null || StaticLayer.HasRace(state, card, g.Race.Value)));
     }
 
     public static IEnumerable<CardInstance> Targets(GameState state, int player, CardInstance card) =>
@@ -58,10 +62,11 @@ public static class AssembleRules
     {
         foreach (var p in state.Players)
             foreach (var n in p.OrderNodes)
-                if (n.Card is not null)
+                if (n.Card is not null && !StaticLayer.IsSuppressed(state, n.Card))
                     foreach (var g in GrantsOf(n.Card.Definition)) yield return g;
         foreach (var wz in state.ActiveWarzones)
-            foreach (var g in GrantsOf(wz.Definition)) yield return g;
+            if (!StaticLayer.IsSuppressed(state, wz))
+                foreach (var g in GrantsOf(wz.Definition)) yield return g;
     }
 
     private static Grant[] GrantsOf(CardDefinition def)

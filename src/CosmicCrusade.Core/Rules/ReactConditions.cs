@@ -16,7 +16,10 @@ namespace CosmicCrusade.Core.Rules;
 /// </summary>
 public static class ReactConditions
 {
-    public sealed record Condition(string Event, bool TargetNodeOpposed, IReadOnlyList<OrderType>? OrderTypes);
+    /// <param name="MovesUnitToStandby">The React puts the deploying Unit into Standby (Spreading Sickness): it can't
+    /// answer a Leader's deploy (ruling #36).</param>
+    public sealed record Condition(string Event, bool TargetNodeOpposed, IReadOnlyList<OrderType>? OrderTypes,
+        bool MovesUnitToStandby = false, bool NeedsOpposingUnit = false);
 
     private static readonly Dictionary<string, Condition?> _cache = new();
 
@@ -35,15 +38,25 @@ public static class ReactConditions
     public static bool IsMet(GameState state, CardInstance react, StackItem item)
     {
         if (react.Definition.OrderType != OrderType.React) return false;
-        if (item.Cancelled || item.Card.Location.Kind != LocationKind.Stack) return false;
         var c = Of(react.Definition);
-        if (c is null) return false;
+        if (c is null || item.Cancelled) return false;
+
+        // "As a Unit is Nullified": the Unit is still on its node while the window is open.
+        if (item.Kind == StackItemKind.UnitNullifying)
+        {
+            if (c.Event != "UnitNullifying") return false;
+            if (item.Card.Location is not { Kind: LocationKind.Node, Node.IsScoring: true }) return false;
+            if (c.NeedsOpposingUnit && state.OpposingNode(item.Card.Location.Node!)?.Card is null) return false;
+            return true;
+        }
+        if (item.Card.Location.Kind != LocationKind.Stack) return false;
 
         switch (c.Event)
         {
             case "UnitDeploying":
                 if (item.Kind != StackItemKind.DeployUnit || item.TargetNode is null) return false;
                 if (c.TargetNodeOpposed && state.OpposingNode(item.TargetNode)?.Card is null) return false;
+                if (c.MovesUnitToStandby && !Placement.CanEnterStandby(item.Card.Definition)) return false;
                 return true;
 
             case "OrderIssuing":
@@ -51,7 +64,6 @@ public static class ReactConditions
                 return c.OrderTypes is null
                        || (item.Card.Definition.OrderType is { } t && c.OrderTypes.Contains(t));
 
-            // "UnitNullifying" is not a stack item: its window opens when a Nullify happens (effect interpreter, M3).
             default:
                 return false;
         }
@@ -75,7 +87,14 @@ public static class ReactConditions
                 else if (ot.ValueKind == JsonValueKind.Array)
                     foreach (var x in ot.EnumerateArray()) types.Add(CardDatabase.ParseEnum<OrderType>(x.GetString()!));
             }
-            return new Condition(ev, opposed, types);
+            bool toStandby = effect.TryGetProperty("do", out var ops) && ops.ValueKind == JsonValueKind.Array
+                && ops.EnumerateArray().Any(op => op.TryGetProperty("op", out var n) && n.GetString() == "MoveToStandby"
+                                                  && op.TryGetProperty("targets", out var tg) && tg.ValueKind == JsonValueKind.String
+                                                  && tg.GetString() == "Event.Unit");
+            bool needsOpposing = ops.ValueKind == JsonValueKind.Array
+                && ops.EnumerateArray().Any(op => op.TryGetProperty("targets", out var tg) && tg.ValueKind == JsonValueKind.String
+                                                  && tg.GetString() == "Event.Unit.OpposingUnit");
+            return new Condition(ev, opposed, types, toStandby, needsOpposing);
         }
         return null;
     }

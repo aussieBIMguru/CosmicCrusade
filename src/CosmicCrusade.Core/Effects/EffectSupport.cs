@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CosmicCrusade.Core.Model;
+using CosmicCrusade.Core.Rules;
 
 namespace CosmicCrusade.Core.Effects;
 
@@ -10,30 +11,54 @@ namespace CosmicCrusade.Core.Effects;
 /// </summary>
 public static class EffectSupport
 {
-    private static readonly HashSet<string> EffectKeys = new() { "trigger", "do", "optional", "condition", "choose", "note", "when" };
+    private static readonly HashSet<string> EffectKeys = new()
+    {
+        "trigger", "do", "optional", "condition", "choose", "note", "when",
+        // M3.2b: phase / "whenever" triggers and play conditions.
+        "event", "filter", "includeSelf", "oncePerRound", "priority", "ordering", "playCondition",
+        "script", // scripted handlers the engine has (GameEngine.Scripts)
+    };
+
+    /// <summary>Events the engine raises for OnEvent abilities.</summary>
+    internal static readonly HashSet<string> Events = new()
+    {
+        "UnitPlayed", "OrderPlayed", "CardPlayed", "CardPlayedFromHand", "CardRetiredFromHand", "UnitNullified",
+        "CardDrawn", "Assembled",
+    };
+
+    private static readonly HashSet<string> EventFilterKeys = new() { "player", "targetNot", "sourceIsOpponentOfUnitController" };
 
     private static readonly Dictionary<string, HashSet<string>> OpKeys = new()
     {
-        ["Nullify"] = new() { "op", "targets", "bind", "cancelsPlay", "note" },
+        ["Nullify"] = new() { "op", "targets", "bind", "cancelsPlay", "simultaneous", "note" },
         ["ModifyRank"] = new() { "op", "targets", "amount", "duration", "note" },
         ["SetBaseRank"] = new() { "op", "targets", "value", "persistent", "note" },
         ["Lock"] = new() { "op", "targets", "remember", "note" },
         ["Unlock"] = new() { "op", "targets", "countAs", "note" },
-        ["MoveToStandby"] = new() { "op", "targets", "standbyOf", "ifNoRoom", "gainControl", "ifHasKeyword", "countAs", "cancelsPlay", "note" },
-        ["Draw"] = new() { "op", "deck", "min", "max", "count", "deckChoice", "distribution", "note" },
+        ["MoveToStandby"] = new() { "op", "targets", "standbyOf", "ifNoRoom", "gainControl", "ifHasKeyword", "countAs", "cancelsPlay", "replaces", "note" },
+        ["Draw"] = new() { "op", "deck", "min", "max", "count", "deckChoice", "distribution", "player", "note" },
         ["Duel"] = new() { "op", "a", "b", "protect", "node", "note" },
-        ["Manipulate"] = new() { "op", "amount", "filter", "note" },
+        ["Manipulate"] = new() { "op", "amount", "filter", "player", "note" },
         ["ReturnToHand"] = new() { "op", "targets", "hand", "note" },
         ["RetireFromHand"] = new() { "op", "min", "max", "filter", "countAs", "note" },
         ["RetireHand"] = new() { "op", "countAs", "note" },
         ["SwapNodeContents"] = new() { "op", "nodes", "controlFollowsSide", "note" },
         ["Suppress"] = new() { "op", "targets", "what", "duration", "note" },
         ["Assemble"] = new() { "op", "source", "onto", "ignoreKeywordRequirement", "note" },
+        ["ChooseRace"] = new() { "op", "remember", "note" },
+        // M3.2b
+        ["PreventEvent"] = new() { "op", "note" },
+        ["SetRaces"] = new() { "op", "races", "targets", "note" },
+        ["WinRound"] = new() { "op", "player", "note" },
+        ["DuelAllOpposed"] = new() { "op", "simultaneous", "note" },
+        ["RemainInPlay"] = new() { "op", "targets", "replaces", "note" },
+        ["AddAssembledRank"] = new() { "op", "targets", "amount", "note" },
+        ["RevealWarzones"] = new() { "op", "count", "add", "note" },
     };
 
     private static readonly HashSet<string> NamedSelectors = new()
     {
-        "Self", "OpposingUnit", "OpposingLeader", "Event.Unit", "Event.Order", "Event.TargetNode",
+        "Self", "OpposingUnit", "OpposingLeader", "Event.Unit", "Event.Order", "Event.TargetNode", "Event.Unit.OpposingUnit",
     };
 
     private static readonly HashSet<string> ChooseKeys = new() { "choose", "filter", "min", "max", "count", "perPlayer", "name" };
@@ -71,7 +96,7 @@ public static class EffectSupport
         foreach (var e in def.Effects.EnumerateArray())
         {
             string t = e.TryGetProperty("trigger", out var te) ? te.GetString() ?? "" : "";
-            if (t == "PlayCost") return false; // costs (Mechatron, Scrapped Metal) aren't implemented yet
+            if (t == "PlayCost" && !PlayRules.IsCostSupported(e)) return false;
             if (t != trigger) continue;
             any = true;
             if (!IsEffectLive(e)) return false;
@@ -84,9 +109,28 @@ public static class EffectSupport
     {
         if (effect.ValueKind != JsonValueKind.Object) return false;
         foreach (var p in effect.EnumerateObject())
-            if (!EffectKeys.Contains(p.Name)) return false; // script, playCondition, params...
+            if (!EffectKeys.Contains(p.Name)) return false; // params...
+
+        // A scripted handler is live once the engine has it (Wormhole so far; Ace, Terraform... in M3.3).
+        if (Str(effect, "script") is { } script) return Engine.GameEngine.Scripts.Contains(script);
 
         if (effect.TryGetProperty("condition", out var c) && !ConditionOk(c)) return false;
+        if (effect.TryGetProperty("playCondition", out var pc) && !PlayRules.IsConditionSupported(pc)) return false;
+        if (effect.TryGetProperty("event", out var ev))
+        {
+            var names = ev.ValueKind == JsonValueKind.Array ? ev.EnumerateArray().Select(x => x.GetString() ?? "").ToList()
+                : new List<string> { ev.GetString() ?? "" };
+            if (names.Any(n => !Events.Contains(n))) return false;
+        }
+        if (effect.TryGetProperty("filter", out var ef))
+        {
+            if (ef.ValueKind != JsonValueKind.Object) return false;
+            foreach (var p in ef.EnumerateObject())
+            {
+                if (EventFilterKeys.Contains(p.Name)) continue;
+                if (!FilterKeys.Contains(p.Name)) return false;
+            }
+        }
         if (effect.TryGetProperty("choose", out var ch) && !SelectorOk(ch)) return false;
         if (!effect.TryGetProperty("do", out var ops) || ops.ValueKind != JsonValueKind.Array) return false;
         foreach (var op in ops.EnumerateArray())
@@ -112,7 +156,19 @@ public static class EffectSupport
                 return op.TryGetProperty("amount", out var amt) && AmountOk(amt);
             case "SetBaseRank":
                 return op.TryGetProperty("value", out var v) && v.ValueKind == JsonValueKind.Number;
+            case "SetRaces":
+                return op.TryGetProperty("races", out var rs) && rs.ValueKind == JsonValueKind.Array
+                       && rs.EnumerateArray().All(x => Enum.TryParse<Race>(x.GetString(), out _));
+            case "WinRound":
+                return Str(op, "player") is "You" or "Event.Player";
+            case "RemainInPlay":
+                return Str(op, "targets") == "Self";
+            case "AddAssembledRank":
+                return Str(op, "amount") == "Event.AssembledRank";
+            case "RevealWarzones":
+                return op.TryGetProperty("count", out var rc) && rc.ValueKind == JsonValueKind.Number;
             case "Manipulate":
+                if (Str(op, "player") is { } mp && mp != "Event.Card.Controller") return false;
                 return op.TryGetProperty("amount", out var m) && m.ValueKind == JsonValueKind.Number;
             case "Suppress":
                 return op.TryGetProperty("what", out var w) && w.GetString() == "AllAbilities";
@@ -120,6 +176,7 @@ public static class EffectSupport
                 if (op.TryGetProperty("distribution", out var dist) && dist.GetString() != "SameAsRetired") return false;
                 if (op.TryGetProperty("deckChoice", out var dc) && dc.GetString() != "PerCard") return false;
                 if (op.TryGetProperty("deck", out var deck) && deck.GetString() is not ("Units" or "Orders")) return false;
+                if (Str(op, "player") is { } dp && dp != "Event.Source.Controller") return false;
                 return op.TryGetProperty("deck", out _) || op.TryGetProperty("count", out _);
             case "MoveToStandby":
                 if (op.TryGetProperty("ifHasKeyword", out var hk))
@@ -129,6 +186,7 @@ public static class EffectSupport
                         if (p.Name != "Assemble" || p.Value.GetString() != "ReturnToHand") return false;
                 }
                 if (op.TryGetProperty("ifNoRoom", out var nr) && nr.GetString() != "Retire") return false;
+                if (op.TryGetProperty("replaces", out var rp) && rp.GetString() != "Retire") return false;
                 return true;
             case "Duel":
                 return op.TryGetProperty("node", out _) || (op.TryGetProperty("a", out _) && op.TryGetProperty("b", out _));
@@ -156,6 +214,12 @@ public static class EffectSupport
                 return false;
             }
             case JsonValueKind.Object:
+                if (sel.TryGetProperty("lowestRank", out var low))
+                {
+                    foreach (var p in sel.EnumerateObject())
+                        if (p.Name is not ("lowestRank" or "ties")) return false;
+                    return FilterOk(low) && (!sel.TryGetProperty("ties", out var ties) || ties.GetString() == "All");
+                }
                 if (sel.TryGetProperty("choose", out var what))
                 {
                     if (what.GetString() is not ("Unit" or "Card" or "Node")) return false;
@@ -199,11 +263,17 @@ public static class EffectSupport
                 case "race":
                 case "notRace":
                     break;
-                case "exists": if (!FilterOk(p.Value)) return false; break;
+                case "exists":
+                case "notExists":
+                    if (!FilterOk(p.Value)) return false;
+                    break;
                 case "selfOpposed": break;
                 default: return false;
             }
         }
         return true;
     }
+
+    private static string? Str(JsonElement e, string name) =>
+        e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 }

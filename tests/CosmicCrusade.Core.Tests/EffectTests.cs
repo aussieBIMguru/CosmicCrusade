@@ -67,11 +67,11 @@ public class EffectTests
     {
         var actions = TestData.Db.All.Where(c => HasTrigger(c, "OnResolve")).ToList();
         var inert = actions.Where(c => !EffectSupport.IsLive(c, "OnResolve")).Select(c => c.Name).OrderBy(n => n).ToList();
-        Assert.Equal(new[] { "Caustic Creek", "Dimensional Rift", "One of Us", "Scrapped Metal", "Terraform", "Wormhole" }, inert);
+        Assert.Equal(new[] { "One of Us", "Terraform" }, inert); // scripted / control change: M3.3
 
         var liveReacts = TestData.Db.All.Where(c => c.OrderType == OrderType.React && EffectSupport.IsLive(c, "React"))
             .Select(c => c.Name).OrderBy(n => n).ToList();
-        Assert.Equal(new[] { "Gloop!", "Second Thought", "Shadow Strike", "Spreading Sickness", "Target Practice" }, liveReacts);
+        Assert.Equal(new[] { "Already Dead", "Gloop!", "Respond in Kind", "Second Thought", "Shadow Strike", "Spreading Sickness", "Target Practice" }, liveReacts);
     }
 
     private static bool HasTrigger(CardDefinition c, string trigger) =>
@@ -292,7 +292,8 @@ public class EffectTests
     public async Task Depose_nullifies_a_leader()
     {
         var s = TestData.EmptyGame();
-        var leader = TestData.Place(s, TestData.Db.All.First(c => c.IsLeader), s.Players[1].LeaderNode!);
+        // Not the first Leader in the data: that's Vigan, who is Immune since M3.2a.
+        var leader = TestData.Place(s, Def("Quickraw Murphy"), s.Players[1].LeaderNode!);
         var depose = Give(s, 0, "Depose");
 
         await Run(s, Issues(depose), ScriptedController.PassForever());

@@ -4,6 +4,7 @@ namespace CosmicCrusade.Core.Rules;
 
 public sealed record PairResult(string Label, int? Rank0, int? Rank1, int? Winner);
 
+/// <param name="Winner">Null when nobody wins the round.</param>
 public sealed record RoundResult(
     int Round,
     int Total0,
@@ -15,6 +16,9 @@ public sealed record RoundResult(
     IReadOnlyList<PairResult> Pairs)
 {
     public int Total(int player) => player == 0 ? Total0 : Total1;
+
+    /// <summary>Set when an effect decided the round instead of the totals (The Empress, Senate Chambers).</summary>
+    public string? WonBy { get; init; }
 }
 
 /// <summary>End of Main scoring (spec §5.3, rulings #3, #7, #32).</summary>
@@ -47,6 +51,9 @@ public static class Scoring
             tiebreak = true;
             winner = w0 == w1 ? null : (w0 > w1 ? 0 : 1);
         }
+
+        // The Oculus: "The Player with the lowest total Rank wins instead" (the tiebreak is inverted the same way).
+        if (winner is int w && StaticLayer.RoundWinnerInverted(state)) winner = GameState.Other(w);
 
         return new RoundResult(state.Round, t0, t1, winner, tiebreak, w0, w1, pairs);
     }

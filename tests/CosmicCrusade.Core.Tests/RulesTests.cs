@@ -134,8 +134,8 @@ public class DuelTests
         var synth = TestData.Place(s, TestData.Brute(Race.Synthenoid), s.Players[1].UnitNodes[0]);
         Assert.Same(synth, Duel.Loser(s, blaarg, synth)); // Blaarg ▶ Synthenoid
 
-        blaarg.Races.Clear(); // e.g. The Voidslime removed its race
-        Assert.Null(Duel.Loser(s, blaarg, synth));
+        blaarg.Races.Clear(); // e.g. Consortium removed its race
+        Assert.Equal(new[] { blaarg, synth }, Duel.Losers(s, blaarg, synth)); // matched Ranks, no weakness: both (ruling #37)
     }
 
     [Fact]

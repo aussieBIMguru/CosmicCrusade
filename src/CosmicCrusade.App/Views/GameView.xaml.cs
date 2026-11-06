@@ -33,6 +33,7 @@ public partial class GameView : UserControl, IGameEventSink
 
     private readonly Dictionary<Node, NodeSlot> _slots = new();
     private readonly Dictionary<PileKind, PileView> _piles = new();
+    private int _warzoneInspectIndex = -1;
     private readonly Dictionary<int, CardView> _boardCards = new();
     private readonly List<CardView> _handViews = new();
     private readonly List<CardView> _oppHandViews = new();
@@ -136,11 +137,19 @@ public partial class GameView : UserControl, IGameEventSink
             view.MouseLeftButtonDown += Pile_MouseLeftButtonDown;
             view.MouseRightButtonDown += (_, e) =>
             {
-                // Right-click a face-up pile to enlarge its top card.
+                // Right-click a face-up pile to enlarge its top card. Several Active Warzones: each right-click
+                // shows the next one.
                 if (kind is PileKind.UnitDeck or PileKind.OrderDeck or PileKind.WarzoneDeck) return;
                 var list = State.GetPile(kind);
                 if (list.Count == 0) return;
                 e.Handled = true;
+                if (kind == PileKind.ActiveWarzone && list.Count > 1)
+                {
+                    _warzoneInspectIndex = (_warzoneInspectIndex + 1) % list.Count;
+                    OpenInspect(list[list.Count - 1 - _warzoneInspectIndex]);
+                    return;
+                }
+                _warzoneInspectIndex = 0;
                 OpenInspect(list[^1]);
             };
             BoardCanvas.Children.Add(view);
@@ -460,6 +469,16 @@ public partial class GameView : UserControl, IGameEventSink
         foreach (var node in ctx.Legal.OfType<AdvanceFromStandbyAction>().Select(a => a.From))
             if (node.Card is not null && _boardCards.TryGetValue(node.Card.InstanceId, out var bv))
                 bv.SetGlow(Cyan);
+        GlowDeployablePiles(ctx);
+    }
+
+    /// <summary>Barkeep Bill & co.: the Retired / Nullified pile glows when a Unit can be Deployed from it.</summary>
+    private void GlowDeployablePiles(DecisionContext ctx)
+    {
+        foreach (var a in ctx.Legal.OfType<DeployFromPileAction>())
+            if (_piles.TryGetValue(a.Pile, out var pv)) pv.SetTarget(true);
+        if (ctx.Legal.OfType<DeployFromPileAction>().Any())
+            _hud.Hint += " A glowing pile: click it to Deploy a Unit from it.";
     }
 
     private static string DescribeForPrompt(StackItem item)
@@ -469,6 +488,7 @@ public partial class GameView : UserControl, IGameEventSink
         {
             StackItemKind.DeployUnit => $"{who} deploying {item.Card.Name} to {NodeText(item.TargetNode!, 0)}.",
             StackItemKind.Assemble => $"{who} assembling {item.Card.Name} onto {item.AssembleTarget!.Name}.",
+            StackItemKind.UnitNullifying => $"{item.Card.Name} is about to be Nullified{(item.NullifySource is { } src ? $" by {src.Name}" : "")}.",
             _ when item.IsReact => $"{who} reacting with {item.Card.Name} (against {item.RespondingTo?.Card.Name}).",
             _ => $"{who} issuing {item.Card.Name}.",
         };
@@ -481,6 +501,7 @@ public partial class GameView : UserControl, IGameEventSink
         _hud.Hint = "";
         _hud.PassText = "PASS";
         ClearSelection();
+        foreach (var p in _piles.Values) if (p.IsTarget) p.SetTarget(false);
         foreach (var v in _handViews) v.SetGlow(null);
         foreach (var v in _boardCards.Values) v.SetGlow(null);
     }
@@ -588,6 +609,9 @@ public partial class GameView : UserControl, IGameEventSink
             if (_boardCards.TryGetValue(t.InstanceId, out var bv)) bv.SetGlow(null);
         _assembleTargets.Clear();
         _selectedIssue = null;
+        if (_human.Current is { IsResponse: false } turn)
+            foreach (var a in turn.Legal.OfType<DeployFromPileAction>())
+                if (_piles.TryGetValue(a.Pile, out var pv)) pv.SetTarget(true);
 
         if (_selected is not null)
         {
@@ -668,8 +692,15 @@ public partial class GameView : UserControl, IGameEventSink
 
     private void Pile_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not PileView { IsTarget: true }) return;
+        if (sender is not PileView { IsTarget: true } pv) return;
         e.Handled = true;
+        if (_selectedIssue is null && _human.Current is { IsResponse: false } ctx
+            && ctx.Legal.OfType<DeployFromPileAction>().FirstOrDefault(a => a.Pile == pv.Pile) is { } fromPile)
+        {
+            ClearSelection();
+            _human.Submit(fromPile);
+            return;
+        }
         TryIssueSelected();
     }
 

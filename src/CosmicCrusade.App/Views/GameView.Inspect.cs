@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using CosmicCrusade.App.Controls;
 using CosmicCrusade.App.Rendering;
 using CosmicCrusade.Core.Model;
+using CosmicCrusade.Core.Rules;
 
 namespace CosmicCrusade.App.Views;
 
@@ -172,10 +173,38 @@ public partial class GameView
         double w = h * CardFaceFactory.Aspect;
         if (w > availW) { w = availW; h = w / CardFaceFactory.Aspect; }
 
+        // M3.2: list the static effects currently acting on the card (anthems, Immune, cannot be Nullified...).
+        var statics = StaticLayer.Explain(State, card);
+        if (statics.Count > 0)
+        {
+            double lineH = 26;
+            h = Math.Max(200, h - (statics.Count * lineH + 16));
+            w = h * CardFaceFactory.Aspect;
+        }
+
         var view = new CardView(card, faceDown: false, w, vector: true) { IsHitTestVisible = false };
         view.SetGlow(CardLayout.Instance.Accent(card.Definition));
         view.ShowRankIfInPlay(State);
-        InspectHost.Child = view;
+
+        if (statics.Count == 0)
+        {
+            InspectHost.Child = view;
+        }
+        else
+        {
+            var panel = new StackPanel { IsHitTestVisible = false };
+            panel.Children.Add(view);
+            panel.Children.Add(new TextBlock
+            {
+                Text = string.Join(Environment.NewLine, statics),
+                Foreground = new SolidColorBrush(Color.FromRgb(79, 209, 255)),
+                FontSize = 18,
+                Margin = new Thickness(0, 12, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+            });
+            InspectHost.Child = panel;
+        }
 
         InspectOverlay.Visibility = Visibility.Visible;
         Fixed(InspectOverlay, OpacityProperty, 0, 1, 120);

@@ -82,8 +82,11 @@ public sealed partial class GameEngine
 
     /// <summary>
     /// Nullify (spec §1): a Unit → Nullified pile, an Order → Issued pile. On the stack it is cancelled (not Played).
+    /// A Unit in play first gets a chance to be protected (Immune, cannot be Nullified), then a React window opens
+    /// (Respond in Kind, Already Dead), then replacements apply (Glorpaglorp, Fallout Shelter). Returns true when
+    /// the card was Nullified.
     /// </summary>
-    internal async Task NullifyAsync(CardInstance card, CardInstance? source, CancellationToken ct)
+    internal async Task<bool> NullifyAsync(CardInstance card, CardInstance? source, CancellationToken ct)
     {
         var loc = card.Location;
         switch (loc.Kind)
@@ -91,12 +94,14 @@ public sealed partial class GameEngine
             case LocationKind.Stack:
             {
                 var item = FindStackItem(card);
-                if (item is null || item.Cancelled) return;
+                if (item is null || item.Cancelled) return false;
                 item.Cancelled = true;
                 var to = item.Kind == StackItemKind.IssueOrder ? PileKind.IssuedOrders : PileKind.NullifiedUnits;
                 State.MoveToPile(card, to);
                 await EmitAsync(new CardNullifiedOnStackEvent(card, item, to, source ?? card), ct);
-                return;
+                if (card.Definition.IsUnit)
+                    await RaiseAsync(new TriggerEvent("UnitNullified", loc.Player, card, source, ControllerOf(source), loc.Player), ct);
+                return true;
             }
 
             case LocationKind.Node:
@@ -106,28 +111,162 @@ public sealed partial class GameEngine
                 {
                     State.MoveToPile(card, PileKind.IssuedOrders);
                     await EmitAsync(new CardNullifiedEvent(card, node, null, PileKind.IssuedOrders, source), ct);
-                    return;
+                    return true;
                 }
 
-                bool inPlay = node.IsScoring;
-                var memory = new Dictionary<string, object>(card.Memory);
-                bool suppressed = card.AbilitiesSuppressed;
-                State.MoveToPile(card, PileKind.NullifiedUnits);
-                await EmitAsync(new CardNullifiedEvent(card, node, null, PileKind.NullifiedUnits, source), ct);
-                if (inPlay) await LeftPlayAsync(card, node, memory, suppressed, nullified: true, ct);
-                return;
+                if (node.IsScoring)
+                {
+                    if (StaticLayer.PreventsNullify(State, card, source, out string reason))
+                    {
+                        await EmitAsync(new NullifyPreventedEvent(card, source, reason), ct);
+                        return false;
+                    }
+
+                    // "As a Unit is Nullified": priority passes, Reacts may answer (spec §7.2).
+                    int actor = ControllerOf(source) is >= 0 and var a ? a : GameState.Other(node.Side);
+                    var window = new StackItem(actor, StackItemKind.UnitNullifying, card, $"Nullify {card.Name}",
+                        (self, token) => ResolveNullifyWindowAsync(self, token))
+                    {
+                        NullifySource = source,
+                        TargetNode = node,
+                    };
+                    await RunPriorityAsync(window, actor, ct);
+                    return card.Location is { Kind: LocationKind.Pile, Pile: PileKind.NullifiedUnits };
+                }
+
+                return await CompleteNullifyAsync(card, source, ct); // Standby
             }
 
             case LocationKind.Pile when loc.Pile == PileKind.RetiredUnits:
                 State.MoveToPile(card, PileKind.NullifiedUnits);
                 await EmitAsync(new CardNullifiedEvent(card, null, PileKind.RetiredUnits, PileKind.NullifiedUnits, source), ct);
-                return;
+                if (card.Definition.IsUnit)
+                    await RaiseAsync(new TriggerEvent("UnitNullified", -1, card, source, ControllerOf(source), -1), ct);
+                return true;
         }
+        return false;
+    }
+
+    private async Task ResolveNullifyWindowAsync(StackItem item, CancellationToken ct)
+    {
+        var card = item.Card;
+        if (item.Cancelled)
+        {
+            await EmitAsync(new NullifyPreventedEvent(card, item.NullifySource, "the Nullify was prevented"), ct);
+            return;
+        }
+        // It may have left its node (or become protected) while the window was open.
+        if (card.Location.Kind != LocationKind.Node || card.Location.Node != item.TargetNode) return;
+        if (StaticLayer.PreventsNullify(State, card, item.NullifySource, out string reason))
+        {
+            await EmitAsync(new NullifyPreventedEvent(card, item.NullifySource, reason), ct);
+            return;
+        }
+        await CompleteNullifyAsync(card, item.NullifySource, ct);
+    }
+
+    /// <summary>The Nullify itself, for a Unit on a node (in play or in Standby).</summary>
+    private async Task<bool> CompleteNullifyAsync(CardInstance card, CardInstance? source, CancellationToken ct)
+    {
+        var node = card.Location.Node!;
+        bool inPlay = node.IsScoring;
+        int unitController = node.Side;
+
+        if (inPlay && await TryNullifyReplacementAsync(card, node, ct)) return false;
+
+        var memory = new Dictionary<string, object>(card.Memory);
+        bool suppressed = StaticLayer.IsSuppressed(State, card);
+        State.MoveToPile(card, PileKind.NullifiedUnits);
+        await EmitAsync(new CardNullifiedEvent(card, node, null, PileKind.NullifiedUnits, source), ct);
+        if (inPlay) await LeftPlayAsync(card, node, memory, suppressed, nullified: true, ct);
+        await RaiseAsync(new TriggerEvent("UnitNullified", unitController, card, source, ControllerOf(source), unitController), ct);
+        return true;
+    }
+
+    /// <summary>
+    /// "If a Unit would be Nullified, ... may place it in the Standby Zone instead": Glorpaglorp (another Unit you
+    /// control) and Fallout Shelter (any Unit, its controller decides). With no Standby room it is Nullified
+    /// (errata). Leaders can't go to Standby (ruling #36); under Black Hole the move would Nullify it anyway.
+    /// </summary>
+    private async Task<bool> TryNullifyReplacementAsync(CardInstance card, Node node, CancellationToken ct)
+    {
+        if (!Placement.CanEnterStandby(card.Definition) || BlackHole() is not null) return false;
+        if (State.Players[node.Side].StandbyNodes.All(n => !n.IsEmpty)) return false;
+
+        foreach (var (src, controller) in ReplacementSources("UnitNullifying"))
+        {
+            bool isGlorp = src.Location.Kind == LocationKind.Node;
+            if (isGlorp && (controller != node.Side || ReferenceEquals(src, card))) continue; // another Unit YOU control
+            int decider = isGlorp ? controller : node.Side;
+            bool yes = await AskYesNoAsync(decider, src, $"{src.Name}: put {card.Name} into Standby instead of Nullifying it?", "Optional", ct);
+            if (!yes) continue;
+            await EmitAsync(new LogEvent($"  {src.Name}: {card.Name} goes to Standby instead of being Nullified."), ct);
+            if (await MoveToStandbyAsync(card, node.Side, retireIfNoRoom: false, ct)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>Cards in play (Units on Unit/Leader nodes, the Active Warzone) with a live Replacement for this event.</summary>
+    private IEnumerable<(CardInstance Card, int Controller)> ReplacementSources(string eventName)
+    {
+        var list = new List<(CardInstance, int)>();
+        foreach (var p in State.Players)
+            foreach (var n in p.ScoringNodes)
+                if (n.Card is { } c && HasReplacement(c.Definition, eventName) && !StaticLayer.IsSuppressed(State, c))
+                    list.Add((c, n.Side));
+        foreach (var wz in State.ActiveWarzones)
+            if (HasReplacement(wz.Definition, eventName) && !StaticLayer.IsSuppressed(State, wz))
+                list.Add((wz, -1));
+        return list;
+    }
+
+    internal static bool HasReplacement(CardDefinition def, string eventName)
+    {
+        if (def.Effects.ValueKind != JsonValueKind.Array) return false;
+        foreach (var e in def.Effects.EnumerateArray())
+        {
+            if (!e.TryGetProperty("trigger", out var t) || t.GetString() != "Replacement") continue;
+            if (!e.TryGetProperty("replaces", out var r) || !r.TryGetProperty("event", out var ev)) continue;
+            if (ev.ValueKind == JsonValueKind.String && ev.GetString() == eventName) return true;
+            if (ev.ValueKind == JsonValueKind.Array && ev.EnumerateArray().Any(x => x.GetString() == eventName)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>Black Hole: "If a Unit would be Retired or put into a Standby Zone, Nullify it instead."</summary>
+    private CardInstance? BlackHole() =>
+        ReplacementSources("UnitRetiring").Select(x => x.Card).FirstOrDefault(c => HasReplacement(c.Definition, "UnitMovingToStandby"));
+
+    /// <summary>
+    /// Applies Black Hole to a Unit about to be Retired / moved to Standby. True when that is replaced (the Unit was
+    /// Nullified, or is already in the Nullified pile). If the Nullify is prevented, the original move goes ahead.
+    /// </summary>
+    private async Task<bool> BlackHoleReplacesAsync(CardInstance card, CancellationToken ct)
+    {
+        if (!card.Definition.IsUnit || BlackHole() is not { } hole) return false;
+        if (card.Location is { Kind: LocationKind.Pile, Pile: PileKind.NullifiedUnits }) return true;
+        var before = card.Location;
+        await EmitAsync(new LogEvent($"  {hole.Name}: {card.Name} is Nullified instead."), ct);
+        await NullifyAsync(card, hole, ct);
+        return card.Location != before;
+    }
+
+    internal static int ControllerOf(CardInstance? card)
+    {
+        if (card is null) return -1;
+        return card.Location.Kind switch
+        {
+            LocationKind.Node => card.Location.Node!.Side,
+            LocationKind.Stack or LocationKind.Hand => card.Location.Player,
+            _ => -1,
+        };
     }
 
     /// <summary>Retire a card from a node (Clean-up, "Retire it if there is no room"), the stack or a pile.</summary>
     internal async Task RetireAsync(CardInstance card, CancellationToken ct)
     {
+        bool unitMoving = card.Definition.IsUnit && card.Location.Kind is LocationKind.Node or LocationKind.Stack;
+        if (unitMoving && await BlackHoleReplacesAsync(card, ct)) return;
         var loc = card.Location;
         switch (loc.Kind)
         {
@@ -137,7 +276,7 @@ public sealed partial class GameEngine
                 var pile = card.Definition.IsOrder ? PileKind.IssuedOrders : PileKind.RetiredUnits;
                 bool inPlay = node.IsScoring;
                 var memory = new Dictionary<string, object>(card.Memory);
-                bool suppressed = card.AbilitiesSuppressed;
+                bool suppressed = StaticLayer.IsSuppressed(State, card);
                 State.MoveToPile(card, pile);
                 await EmitAsync(new CardMovedToPileEvent(card, node, pile), ct);
                 if (inPlay) await LeftPlayAsync(card, node, memory, suppressed, nullified: false, ct);
@@ -168,6 +307,12 @@ public sealed partial class GameEngine
     internal async Task<bool> MoveToStandbyAsync(CardInstance card, int side, bool retireIfNoRoom, CancellationToken ct)
     {
         if (!card.Definition.IsUnit) return false;
+        if (!Placement.CanEnterStandby(card.Definition))
+        {
+            await EmitAsync(new LogEvent($"  {card.Name} is a Leader: Leaders can never go into a Standby zone."), ct);
+            return false;
+        }
+        if (await BlackHoleReplacesAsync(card, ct)) return true;
         var loc = card.Location;
         var ps = State.Players[side];
 
@@ -214,7 +359,7 @@ public sealed partial class GameEngine
                 var from = loc.Node!;
                 bool inPlay = from.IsScoring;
                 var memory = new Dictionary<string, object>(card.Memory);
-                bool suppressed = card.AbilitiesSuppressed;
+                bool suppressed = StaticLayer.IsSuppressed(State, card);
                 State.MoveToNode(card, dest);
                 if (inPlay) card.ResetInPlayState();
                 await EmitAsync(new CardMovedToStandbyEvent(card, from, null, false, dest), ct);
@@ -243,7 +388,7 @@ public sealed partial class GameEngine
                 var from = loc.Node!;
                 bool inPlay = from.IsScoring;
                 var memory = new Dictionary<string, object>(card.Memory);
-                bool suppressed = card.AbilitiesSuppressed;
+                bool suppressed = StaticLayer.IsSuppressed(State, card);
                 State.MoveToHand(card, player);
                 card.ResetInPlayState();
                 await EmitAsync(new CardReturnedToHandEvent(card, player, from, null), ct);
@@ -266,6 +411,7 @@ public sealed partial class GameEngine
         int player = card.Location.Player;
         State.MoveToPile(card, card.Definition.IsOrder ? PileKind.IssuedOrders : PileKind.RetiredUnits);
         await EmitAsync(new CardRetiredFromHandEvent(card, player), ct);
+        await RaiseAsync(new TriggerEvent("CardRetiredFromHand", player, card), ct);
     }
 
     internal async Task SetLockAsync(Node node, bool locked, CardInstance? source, CancellationToken ct)
@@ -292,9 +438,10 @@ public sealed partial class GameEngine
     {
         var fromPile = source.Location.Kind == LocationKind.Pile ? source.Location.Pile : null;
         int amount = AssembleRules.AssembledRank(source);
-        bool ok = onto.Location.Kind == LocationKind.Node && onto.Location.Node is { IsScoring: true };
+        bool ok = onto.Location.Kind == LocationKind.Node && onto.Location.Node is { IsScoring: true } n && n.Side == player;
         if (ok) onto.PersistentModifiers.Add(new RankModifier($"Assemble: {source.Name}", amount));
         State.MoveToPile(source, PileKind.RetiredUnits);
         await EmitAsync(new AssembledEvent(player, source, onto, amount, ok, fromPile), ct);
+        if (ok) await RaiseAsync(new TriggerEvent("Assembled", player, source, AssembledRank: amount, AssembleTarget: onto), ct);
     }
 }

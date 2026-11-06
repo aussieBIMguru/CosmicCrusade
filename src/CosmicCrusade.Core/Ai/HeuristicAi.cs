@@ -44,6 +44,20 @@ public sealed class HeuristicAi : IPlayerController
         int myTotal = RankCalculator.TotalRank(state, me);
         int oppTotal = RankCalculator.TotalRank(state, opp);
 
+        // M3.2b: one of our Units is about to be Nullified – save it (Already Dead), or take theirs with it
+        // (Respond in Kind).
+        var saves = ctx.Legal.OfType<ReactAction>().Where(r => r.RespondingTo.Kind == StackItemKind.UnitNullifying).ToList();
+        foreach (var r in saves.OrderByDescending(x => x.Card.Definition.Effects.GetRawText().Contains("\"PreventEvent\"")))
+        {
+            var unit = r.RespondingTo.Card;
+            if (unit.Location.Node?.Side != me) continue;
+            string raw = r.Card.Definition.Effects.GetRawText();
+            if (raw.Contains("\"PreventEvent\"")) return r;
+            if (raw.Contains("Event.Unit.OpposingUnit") && unit.Location.Node is { } n && state.OpposingNode(n)?.Card is { } theirs
+                && theirs.Location.Node!.Side == opp)
+                return r;
+        }
+
         foreach (var r in ctx.Legal.OfType<ReactAction>())
         {
             if (!ReactCounters.IsCounter(r.Card.Definition)) continue;
@@ -80,7 +94,7 @@ public sealed class HeuristicAi : IPlayerController
         var hand = ctx.State.Players[ctx.Player].Hand;
         var useful = orders.FirstOrDefault(o => o.OrderNode is not null
                                                 && AssembleRules.GrantsAssemble(o.Card.Definition)
-                                                && hand.Any(c => c.Definition.IsUnit && c.Races.Contains(Race.Synthenoid)));
+                                                && hand.Any(c => c.Definition.IsUnit && StaticLayer.HasRace(ctx.State, c, Race.Synthenoid)));
         if (useful is not null) return useful;
 
         if (!ctx.OpponentJustPassed && _rng.NextDouble() < FillerOrderChance)
@@ -100,10 +114,15 @@ public sealed class HeuristicAi : IPlayerController
 
         // Units score for the side they sit on, so only consider our own nodes for now
         // (cross-side plays such as Visiting Diplomat matter once abilities exist – M3).
+        // M3.2: deploys and Ongoing Orders are valued by how much they change the margin, statics included
+        // (an anthem helps the rest of the board, Acid Rain hurts it). Ongoings only count when they help.
         var plays = ctx.Legal
-            .Where(a => a is DeployFromHandAction or AdvanceFromStandbyAction or AssembleAction)
-            .Select(a => new Candidate(a, RankOf(state, a), Target(a)))
+            .Where(a => a is DeployFromHandAction or AdvanceFromStandbyAction or AssembleAction
+                        or IssueOrderAction { OrderNode: not null })
+            .Select(a => new Candidate(a, RankOf(state, a, me), Target(a)))
+            .Concat(ctx.Legal.OfType<DeployFromPileAction>().Select(a => PileCandidate(state, a, me)).OfType<Candidate>())
             .Where(c => c.Target.Side == me)
+            .Where(c => c.Action is not IssueOrderAction || c.Rank > 0)
             .Where(c => !LosesItsOwnDuel(state, c))
             .ToList();
         if (plays.Count == 0) return pass;
@@ -116,13 +135,13 @@ public sealed class HeuristicAi : IPlayerController
         // Can we catch up at all with the empty nodes we have left? If not, save the cards.
         int emptyNodes = state.Players[me].ScoringNodes.Count(n => n.IsEmpty);
         int bestPossible = plays
-            .Where(c => c.Action is not AssembleAction)
-            .GroupBy(c => CardOf(c.Action))
+            .Where(c => c.Action is DeployFromHandAction or AdvanceFromStandbyAction or DeployFromPileAction)
+            .GroupBy(c => c.PileCard ?? CardOf(c.Action))
             .Select(g => g.Max(c => c.Rank))
             .OrderByDescending(r => r)
             .Take(emptyNodes)
             .Sum()
-            + plays.OfType<Candidate>().Where(c => c.Action is AssembleAction)
+            + plays.Where(c => c.Action is AssembleAction or IssueOrderAction)
                 .GroupBy(c => CardOf(c.Action)).Sum(g => g.Max(c => c.Rank));
         if (bestPossible < needed && myTotal < oppTotal)
             return pass;
@@ -147,7 +166,26 @@ public sealed class HeuristicAi : IPlayerController
             .First().Action;
     }
 
-    private sealed record Candidate(GameAction Action, int Rank, Node Target);
+    private sealed record Candidate(GameAction Action, int Rank, Node Target, CardInstance? PileCard = null);
+
+    /// <summary>
+    /// Barkeep Bill & co.: the AI's choices then take the biggest Unit and an open node (AiChoices "PlayFromPile" /
+    /// "DeployNode"), so value the action as that Unit on that node.
+    /// </summary>
+    private static Candidate? PileCandidate(GameState state, DeployFromPileAction a, int me)
+    {
+        var card = StaticLayer.PlayableFromPile(state, me, a.Pile)
+            .Where(c => LegalActions.DeployNodes(state, me, c).Count > 0)
+            .OrderByDescending(RankCalculator.BaseRank).FirstOrDefault();
+        if (card is null) return null;
+        var nodes = LegalActions.DeployNodes(state, me, card).Where(n => n.Side == me).ToList();
+        if (nodes.Count == 0) return null;
+        var node = nodes.OrderBy(n => state.OpposingNode(n)?.Card is null ? 0 : 1).ThenBy(n => n.Kind == NodeKind.Leader ? 0 : 1).First();
+        int opp = GameState.Other(me);
+        int Margin() => RankCalculator.TotalRank(state, me) - RankCalculator.TotalRank(state, opp);
+        int before = Margin();
+        return new Candidate(a, state.WithTemporaryPlacement(card, node, Margin) - before, node, card);
+    }
 
     /// <summary>
     /// Steady Shooter / Crimson Redeemer Duel the opposing Unit when played. Don't deploy one where it would lose
@@ -155,14 +193,14 @@ public sealed class HeuristicAi : IPlayerController
     /// </summary>
     private static bool LosesItsOwnDuel(GameState state, Candidate c)
     {
-        if (c.Action is AssembleAction) return false;
-        var card = CardOf(c.Action);
+        if (c.Action is AssembleAction or IssueOrderAction) return false;
+        var card = c.PileCard ?? CardOf(c.Action);
         var def = card.Definition;
         if (def.Effects.ValueKind != System.Text.Json.JsonValueKind.Array) return false;
         string raw = def.Effects.GetRawText();
         if (!raw.Contains("\"Duel\"") || !raw.Contains("\"OnPlay\"") || raw.Contains("\"protect\"")) return false;
         var opposing = state.OpposingNode(c.Target)?.Card;
-        return opposing is not null && Duel.Loser(state, card, opposing) == card;
+        return opposing is not null && state.WithTemporaryPlacement(card, c.Target, () => Duel.Losers(state, card, opposing).Contains(card));
     }
 
     private static CardInstance CardOf(GameAction a) => a switch
@@ -170,6 +208,7 @@ public sealed class HeuristicAi : IPlayerController
         DeployFromHandAction d => d.Card,
         AdvanceFromStandbyAction s => s.From.Card!,
         AssembleAction x => x.Card,
+        IssueOrderAction o => o.Card,
         _ => throw new ArgumentException(nameof(a)),
     };
 
@@ -178,20 +217,33 @@ public sealed class HeuristicAi : IPlayerController
         DeployFromHandAction d => d.Target,
         AdvanceFromStandbyAction s => s.To,
         AssembleAction x => x.Target.Location.Node!,
+        IssueOrderAction o => o.OrderNode!,
         _ => throw new ArgumentException(nameof(a)),
     };
 
-    /// <summary>Rank the action adds to our total (Assemble adds the card's printed Rank to an existing unit).</summary>
-    private static int RankOf(GameState state, GameAction a) => a is AssembleAction x
-        ? AssembleRules.AssembledRank(x.Card)
-        : RankCalculator.GetRank(state, CardOf(a));
+    /// <summary>
+    /// How much the action improves our margin (our total minus theirs). Assemble adds the card's printed Rank to an
+    /// existing unit; deploys and Ongoings are tried on the board so static effects count.
+    /// </summary>
+    private static int RankOf(GameState state, GameAction a, int me)
+    {
+        if (a is AssembleAction x) return AssembleRules.AssembledRank(x.Card);
+        int opp = GameState.Other(me);
+        int Margin() => RankCalculator.TotalRank(state, me) - RankCalculator.TotalRank(state, opp);
+        int before = Margin();
+        return state.WithTemporaryPlacement(CardOf(a), Target(a), Margin) - before;
+    }
 
     private static bool WinsPair(GameState state, Candidate c)
     {
         var opposing = state.OpposingNode(c.Target);
-        int mine = c.Action is AssembleAction x ? RankCalculator.GetRank(state, x.Target) + c.Rank : c.Rank;
+        if (c.Action is IssueOrderAction) return false;
         if (opposing?.Card is null) return c.Action is not AssembleAction; // Assembling onto an unopposed unit wins nothing new.
-        return mine > RankCalculator.GetRank(state, opposing.Card);
+        var theirs = opposing.Card;
+        if (c.Action is AssembleAction x) return RankCalculator.GetRank(state, x.Target) + c.Rank > RankCalculator.GetRank(state, theirs);
+        // Try the Unit on the node so static effects on both Units count.
+        var card = c.PileCard ?? CardOf(c.Action);
+        return state.WithTemporaryPlacement(card, c.Target, () => RankCalculator.GetRank(state, card) > RankCalculator.GetRank(state, theirs));
     }
 }
 

@@ -145,6 +145,47 @@ public sealed class GameState
         card.Location = CardLocation.InPile(pile);
     }
 
+    /// <summary>
+    /// What-if helper for the AI: puts <paramref name="card"/> on the empty <paramref name="node"/>, evaluates
+    /// <paramref name="eval"/> (e.g. totals with static effects), then puts the card back exactly where it was
+    /// (same hand / pile position or node). No events, no triggers.
+    /// </summary>
+    internal T WithTemporaryPlacement<T>(CardInstance card, Node node, Func<T> eval)
+    {
+        var loc = card.Location;
+        int index = loc.Kind switch
+        {
+            LocationKind.Hand => Players[loc.Player].Hand.IndexOf(card),
+            LocationKind.Pile => GetPile(loc.Pile!.Value).IndexOf(card),
+            _ => -1,
+        };
+        if (node.Card is not null || loc.Kind is not (LocationKind.Hand or LocationKind.Node or LocationKind.Pile)) return eval();
+
+        MoveToNode(card, node);
+        try
+        {
+            return eval();
+        }
+        finally
+        {
+            RemoveFromCurrentLocation(card);
+            if (loc.Kind == LocationKind.Hand)
+            {
+                Players[loc.Player].Hand.Insert(index, card);
+                card.Location = loc;
+            }
+            else if (loc.Kind == LocationKind.Pile)
+            {
+                GetPile(loc.Pile!.Value).Insert(index, card);
+                card.Location = loc;
+            }
+            else
+            {
+                MoveToNode(card, loc.Node!);
+            }
+        }
+    }
+
     public void Shuffle<T>(IList<T> list)
     {
         for (int i = list.Count - 1; i > 0; i--)

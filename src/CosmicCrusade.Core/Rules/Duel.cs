@@ -2,23 +2,38 @@ using CosmicCrusade.Core.Model;
 
 namespace CosmicCrusade.Core.Rules;
 
-/// <summary>Duel resolution (spec §6). Returns losers; the caller nullifies them (all at once for simultaneous duels).</summary>
+/// <summary>
+/// Duel resolution (spec §6, ruling #37). Returns losers; the caller nullifies them (all at once for simultaneous duels).
+///   1. Different Ranks: the lower Rank loses.
+///   2. Equal Ranks: weaknesses on CURRENT races decide – a Unit that beats the other wins.
+///   3. Equal Ranks and no weakness decides it (or each beats the other, possible with Hybrids): BOTH are Nullified.
+/// </summary>
 public static class Duel
 {
-    /// <summary>The loser of a single duel, or null when nothing happens.</summary>
-    public static CardInstance? Loser(GameState state, CardInstance a, CardInstance b)
+    /// <summary>Everything Nullified by this duel: none, one Unit, or both on an undecided tie.</summary>
+    public static IReadOnlyList<CardInstance> Losers(GameState state, CardInstance a, CardInstance b)
     {
         int ra = RankCalculator.GetRank(state, a);
         int rb = RankCalculator.GetRank(state, b);
-        if (ra != rb) return ra < rb ? a : b;
+        if (ra != rb) return new[] { ra < rb ? a : b };
 
-        bool aBeatsB = a.Races.Any(x => b.Races.Any(y => state.Database.Beats(x, y)));
-        bool bBeatsA = b.Races.Any(x => a.Races.Any(y => state.Database.Beats(x, y)));
-        if (aBeatsB == bBeatsA) return null; // Neither, or both (possible with Hybrids): nothing happens.
-        return aBeatsB ? b : a;
+        // Current races (§6.3): static race changes (Consortium, The Voidslime) included.
+        var racesA = StaticLayer.Races(state, a);
+        var racesB = StaticLayer.Races(state, b);
+        bool aBeatsB = racesA.Any(x => racesB.Any(y => state.Database.Beats(x, y)));
+        bool bBeatsA = racesB.Any(x => racesA.Any(y => state.Database.Beats(x, y)));
+        if (aBeatsB != bBeatsA) return new[] { aBeatsB ? b : a };
+        return new[] { a, b }; // Matched Ranks with no deciding weakness: both are Nullified (ruling #37).
+    }
+
+    /// <summary>The single loser, or null when both lose (undecided tie).</summary>
+    public static CardInstance? Loser(GameState state, CardInstance a, CardInstance b)
+    {
+        var l = Losers(state, a, b);
+        return l.Count == 1 ? l[0] : null;
     }
 
     /// <summary>Resolve several duels simultaneously: compare all first, then return every loser (ruling #13).</summary>
     public static IReadOnlyList<CardInstance> LosersOfSimultaneous(GameState state, IEnumerable<(CardInstance A, CardInstance B)> duels) =>
-        duels.Select(d => Loser(state, d.A, d.B)).Where(l => l is not null).Select(l => l!).Distinct().ToList();
+        duels.ToList().SelectMany(d => Losers(state, d.A, d.B)).Distinct().ToList();
 }

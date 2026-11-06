@@ -24,13 +24,20 @@ public static class Placement
         };
     }
 
+    /// <summary>
+    /// Ruling #36: a Leader can never go into a Standby zone. An effect that would put one there is not a legal
+    /// play: the Leader can't be chosen for it, and if it would happen anyway nothing happens to it.
+    /// </summary>
+    public static bool CanEnterStandby(CardDefinition def) => def.IsUnit && !def.IsLeader;
+
     /// <summary>Can <paramref name="player"/> deploy this unit from hand to <paramref name="node"/> right now?</summary>
     public static bool CanDeploy(GameState state, int player, CardInstance card, Node node)
     {
         if (!node.IsScoring || !node.IsEmpty) return false;
         if (!ClassAllows(card.Definition, node.Kind)) return false;
-        if (node.Side == player) return true;
-        return AllowsOpponentNode(state, card.Definition, node);
+        if (node.Side != player && !AllowsOpponentNode(state, card, node)) return false;
+        // Static deploy rules (Extreme Sanctions, Even Odds, Military Academy) and extra costs (Mechatron).
+        return StaticLayer.DeployAllowed(state, player, card, node) && PlayRules.CanPay(state, player, card);
     }
 
     public static IEnumerable<Node> LegalDeployNodes(GameState state, int player, CardInstance card) =>
@@ -41,10 +48,11 @@ public static class Placement
     // ------------------------------------------------------------------ PlacementOverride
 
     /// <summary>Does a PlacementOverride let this unit go on an opponent's node?</summary>
-    private static bool AllowsOpponentNode(GameState state, CardDefinition def, Node node)
+    private static bool AllowsOpponentNode(GameState state, CardInstance card, Node node)
     {
-        // Card's own override (Visiting Diplomat, The Creeper). TODO(M3): respect Suppress effects.
-        foreach (var allowed in SelfOverrides(def))
+        // Card's own override (Visiting Diplomat, The Creeper), unless Suppressed (Suppressing Goop reaches hands).
+        var def = card.Definition;
+        foreach (var allowed in StaticLayer.IsSuppressed(state, card) ? Array.Empty<string>() : SelfOverrides(def))
         {
             switch (allowed)
             {
@@ -56,12 +64,12 @@ public static class Placement
         }
 
         // Global overrides from the Active Warzone (The Oculus) and Ongoing Orders on Order Nodes.
-        foreach (var wz in state.ActiveWarzones)
+        foreach (var wz in state.ActiveWarzones.Where(w => !StaticLayer.IsSuppressed(state, w)))
             foreach (var allowed in GlobalUnitOverrides(wz.Definition))
                 if (allowed == "AlsoOpponentNodes") return true;
         foreach (var p in state.Players)
             foreach (var on in p.OrderNodes)
-                if (on.Card is not null)
+                if (on.Card is not null && !StaticLayer.IsSuppressed(state, on.Card))
                     foreach (var allowed in GlobalUnitOverrides(on.Card.Definition))
                         if (allowed == "AlsoOpponentNodes") return true;
 

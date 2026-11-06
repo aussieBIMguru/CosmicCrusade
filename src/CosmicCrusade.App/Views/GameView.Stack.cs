@@ -47,7 +47,7 @@ public partial class GameView
         RefreshStackHighlight();
         StackHost.UpdateLayout();
 
-        if (item.Kind == StackItemKind.DeployUnit)
+        if (item.Kind is StackItemKind.DeployUnit or StackItemKind.UnitNullifying)
         {
             Fixed(entry.Root, OpacityProperty, 0, 1, 160);
             return; // The unit itself is already hovering over its node.
@@ -84,6 +84,7 @@ public partial class GameView
         {
             StackItemKind.DeployUnit => $"deploy{(item.Controller == 0 ? "" : "s")} {item.Card.Name} → {NodeText(item.TargetNode!, item.Controller)}",
             StackItemKind.Assemble => $"assemble{(item.Controller == 0 ? "" : "s")} {item.Card.Name} onto {item.AssembleTarget!.Name}",
+            StackItemKind.UnitNullifying => $"Nullify {item.Card.Name}{(item.NullifySource is { } src ? $" ({src.Name})" : "")}",
             _ when item.IsReact => $"React: {item.Card.Name} → {item.RespondingTo?.Card.Name}",
             _ => item.OrderNode is null
                 ? $"issue{(item.Controller == 0 ? "" : "s")} {item.Card.Name}"
@@ -164,7 +165,7 @@ public partial class GameView
             await FlyAsync(e.Card, start, PileCardRect(PileKind.IssuedOrders), false, false, 380, Purple);
             UpdatePiles();
             _piles[PileKind.IssuedOrders].Pulse();
-            _hud.AddLog($"  {e.Card.Name} resolves{(e.EffectApplied ? "" : " (no effect yet)")}: {e.Note}.");
+            _hud.AddLog($"  {e.Card.Name} resolves{(e.EffectApplied || e.Note.Contains("Suppressed") ? "" : " (no effect yet)")}: {e.Note}.");
         }
         RefreshScores(); // Live statics (Cybernetic Enhancements) may change what's legal; ranks are unaffected for now.
     }
