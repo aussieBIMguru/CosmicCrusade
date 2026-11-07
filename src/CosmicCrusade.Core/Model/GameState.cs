@@ -113,7 +113,19 @@ public sealed class GameState
                 Players[loc.Player].Hand.Remove(card);
                 break;
             case LocationKind.Node:
-                if (loc.Node is not null && ReferenceEquals(loc.Node.Card, card)) loc.Node.Card = null;
+                if (loc.Node is { } node)
+                {
+                    if (ReferenceEquals(node.Crew, card))
+                    {
+                        node.Crew = null; // the spacecraft stays, uncrewed (ruling S12)
+                    }
+                    else if (ReferenceEquals(node.Card, card))
+                    {
+                        // A spacecraft leaving drops its crew back to the ground on the same node (brief).
+                        node.Card = node.Crew;
+                        node.Crew = null;
+                    }
+                }
                 break;
             case LocationKind.Pile:
                 GetPile(loc.Pile!.Value).Remove(card);
@@ -127,6 +139,7 @@ public sealed class GameState
 
     public void MoveToHand(CardInstance card, int player)
     {
+        if (VanishIfToken(card)) return;
         // Archons never join a hand (e.g. "return it to its owner's hand"): back to the Archon deck.
         if (card.PrintedDefinition.IsArchon)
         {
@@ -138,17 +151,64 @@ public sealed class GameState
         card.Location = CardLocation.InHand(player);
     }
 
+    /// <summary>
+    /// Puts the card on the node. On an occupied node a Unit and a spacecraft join up (Spacecraft module): a Unit
+    /// boards the uncrewed spacecraft there, or a spacecraft is laid under the Unit there, which becomes its crew.
+    /// Legality (class, crewable, Viscous Fog...) is checked by the callers (Rules.Spacecraft).
+    /// </summary>
     public void MoveToNode(CardInstance card, Node node)
     {
-        if (node.Card is not null) throw new InvalidOperationException($"{node} is occupied by {node.Card}.");
+        if (node.Card is { } occupant)
+        {
+            if (node.Crew is not null || ReferenceEquals(occupant, card))
+                throw new InvalidOperationException($"{node} is occupied by {occupant}.");
+            bool cardIsShip = card.Definition.IsSpacecraft, occupantIsShip = occupant.Definition.IsSpacecraft;
+            if (cardIsShip == occupantIsShip || !card.Definition.IsUnit || !occupant.Definition.IsUnit)
+                throw new InvalidOperationException($"{node} is occupied by {occupant}.");
+            RemoveFromCurrentLocation(card);
+            if (cardIsShip)
+            {
+                node.Card = card;      // the spacecraft is laid under the Unit
+                node.Crew = occupant;  // which stays on this node, now aboard
+            }
+            else
+            {
+                node.Crew = card;      // the Unit boards the spacecraft
+            }
+            card.Location = CardLocation.OnNode(node);
+            return;
+        }
         RemoveFromCurrentLocation(card);
         node.Card = card;
         card.Location = CardLocation.OnNode(node);
     }
 
+    /// <summary>Switches everything on two nodes (spacecraft travel with their crews). No events, no triggers.</summary>
+    public void SwapContents(Node a, Node b)
+    {
+        if (ReferenceEquals(a, b)) return;
+        (a.Card, b.Card) = (b.Card, a.Card);
+        (a.Crew, b.Crew) = (b.Crew, a.Crew);
+        foreach (var c in a.Occupants) c.Location = CardLocation.OnNode(a);
+        foreach (var c in b.Occupants) c.Location = CardLocation.OnNode(b);
+    }
+
+    /// <summary>
+    /// Tokens (the Mothership's Fighters) never go to a hand or pile: leaving play, they simply vanish (ruling S13).
+    /// Returns true when the card was a token and is gone.
+    /// </summary>
+    private bool VanishIfToken(CardInstance card)
+    {
+        if (!card.PrintedDefinition.IsToken) return false;
+        RemoveFromCurrentLocation(card);
+        card.ResetInPlayState();
+        return true;
+    }
+
     /// <summary>Puts the card on top of a pile. Leaving play resets in-play state (rank modifiers, race changes).</summary>
     public void MoveToPile(CardInstance card, PileKind pile)
     {
+        if (VanishIfToken(card)) return;
         // Archons rule P2: an Archon leaving play (Nullified, Retired, Issued...) goes back into the Archon deck.
         if (card.PrintedDefinition.IsArchon && pile != PileKind.ArchonDeck)
         {
@@ -191,6 +251,7 @@ public sealed class GameState
     /// <summary>Puts a card at the BOTTOM of a pile (index 0).</summary>
     public void MoveToPileBottom(CardInstance card, PileKind pile)
     {
+        if (VanishIfToken(card)) return;
         RemoveFromCurrentLocation(card);
         GetPile(pile).Insert(0, card);
         card.Location = CardLocation.InPile(pile);
@@ -210,7 +271,13 @@ public sealed class GameState
             LocationKind.Pile => GetPile(loc.Pile!.Value).IndexOf(card),
             _ => -1,
         };
-        if (node.Card is not null || loc.Kind is not (LocationKind.Hand or LocationKind.Node or LocationKind.Pile or LocationKind.ArchonSlot))
+        bool joins = node.Card is { } occ && node.Crew is null && !ReferenceEquals(occ, card)
+                     && occ.Definition.IsUnit && card.Definition.IsUnit && occ.Definition.IsSpacecraft != card.Definition.IsSpacecraft;
+        if ((node.Card is not null && !joins)
+            || loc.Kind is not (LocationKind.Hand or LocationKind.Node or LocationKind.Pile or LocationKind.ArchonSlot))
+            return eval();
+        // A card already on a node can only be tried elsewhere when it's alone there (no crew to drop).
+        if (loc.Kind == LocationKind.Node && loc.Node is { Crew: not null })
             return eval();
 
         MoveToNode(card, node);
@@ -312,6 +379,12 @@ public sealed class GameState
                 n.Card = copy;
                 copy.Location = CardLocation.OnNode(n);
             }
+            if (node.Crew is { } crew)
+            {
+                var copy = Map(crew);
+                n.Crew = copy;
+                copy.Location = CardLocation.OnNode(n);
+            }
         }
 
         // Remembered values (Roundup Gang's node, Extreme Sanctions' race, once-per-round latches...).
@@ -348,7 +421,7 @@ public sealed class GameState
         Enum.GetValues<PileKind>().SelectMany(k => GetPile(k))
             .Concat(Players.SelectMany(p => p.Hand))
             .Concat(Players.Where(p => p.ArchonSlot is not null).Select(p => p.ArchonSlot!))
-            .Concat(AllNodes.Where(n => n.Card is not null).Select(n => n.Card!));
+            .Concat(AllNodes.SelectMany(n => n.Occupants));
 
     public void Shuffle<T>(IList<T> list)
     {

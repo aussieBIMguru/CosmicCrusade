@@ -39,6 +39,55 @@ public sealed partial class GameEngine
         }
     }
 
+    /// <summary>
+    /// The memory a "leaves play" ability sees: the card's own, plus (Spacecraft) the crew it carried and the Rank it
+    /// had as it left (Exo-Frame).
+    /// </summary>
+    private Dictionary<string, object> LeaveMemory(CardInstance card)
+    {
+        var memory = new Dictionary<string, object>(card.Memory);
+        if (Spacecraft.CrewOf(card) is { } crew) memory["$crew"] = crew;
+        if (card.Definition.IsUnit && card.Location.Kind == LocationKind.Node) memory["$rank"] = RankCalculator.GetRank(State, card);
+        return memory;
+    }
+
+    /// <summary>
+    /// Spacecraft (S24): "When this spacecraft becomes crewed" – however the crew arrived. Fires the spacecraft's
+    /// OnCrewed abilities (unless Suppressed).
+    /// </summary>
+    internal async Task CrewArrivedAsync(Node node, CancellationToken ct)
+    {
+        if (node.Card is not { } ship || node.Crew is null || !Spacecraft.IsShip(ship)) return;
+        if (!EffectsWith(ship.Definition, "OnCrewed").Any()) return;
+        if (StaticLayer.IsTriggerSuppressed(State, ship, "OnCrewed"))
+        {
+            await EmitAsync(new LogEvent($"  {ship.Name}'s abilities are Suppressed."), ct);
+            return;
+        }
+        await FireTriggersAsync(ship, "OnCrewed", node.Side, node, ship.Memory, null, ct);
+    }
+
+    /// <summary>
+    /// Spacecraft: a Unit comes aboard <paramref name="ship"/> without being Deployed (it isn't Played). From a pile or
+    /// Standby it enters play; from another Unit/Leader node it stays in play (control follows the side). Fires
+    /// "when crewed". Returns false when it couldn't (the spacecraft is taken, Viscous Fog...).
+    /// </summary>
+    internal async Task<bool> BoardAsync(CardInstance unit, CardInstance ship, CardInstance? source, CancellationToken ct,
+        bool checkLegal = true)
+    {
+        if (ship.Location.Node is not { } node || !ReferenceEquals(node.Card, ship) || node.Crew is not null) return false;
+        if (checkLegal && !Spacecraft.CanCrew(State, unit, ship, node)) return false;
+        var fromNode = unit.Location.Kind == LocationKind.Node ? unit.Location.Node : null;
+        var fromPile = unit.Location.Kind == LocationKind.Pile ? unit.Location.Pile : null;
+        bool entersPlay = fromNode is not { IsScoring: true };
+        State.MoveToNode(unit, node);
+        if (entersPlay && fromPile is not null) unit.ResetInPlayState();
+        await EmitAsync(new CrewBoardedEvent(unit, ship, node, fromNode, fromPile, source), ct);
+        await EmitAsync(new LogEvent($"  {unit.Name} boards {ship.Name} on {State.Players[node.Side].Name}'s {node.Label}."), ct);
+        await CrewArrivedAsync(node, ct);
+        return true;
+    }
+
     private async Task LeftPlayAsync(CardInstance card, Node node, Dictionary<string, object> memory, bool suppressed,
         bool nullified, CancellationToken ct)
     {
@@ -174,11 +223,15 @@ public sealed partial class GameEngine
 
         if (inPlay && await TryNullifyReplacementAsync(card, node, ct)) return false;
 
-        var memory = new Dictionary<string, object>(card.Memory);
+        var memory = LeaveMemory(card);
         bool suppressed = StaticLayer.IsSuppressed(State, card);
+        var shipCarrying = inPlay ? Spacecraft.ShipOf(card) : null;
         State.MoveToPile(card, PileKind.NullifiedUnits);
         await EmitAsync(new CardNullifiedEvent(card, node, null, PileKind.NullifiedUnits, source), ct);
         if (inPlay) await LeftPlayAsync(card, node, memory, suppressed, nullified: true, ct);
+        // Spacecraft: Hearse – "When this spacecraft's crew is Nullified".
+        if (shipCarrying is not null && node.Holds(shipCarrying) && !StaticLayer.IsTriggerSuppressed(State, shipCarrying, "OnCrewNullified"))
+            await FireTriggersAsync(shipCarrying, "OnCrewNullified", node.Side, node, shipCarrying.Memory, null, ct);
         await RaiseAsync(new TriggerEvent("UnitNullified", unitController, card, source, ControllerOf(source), unitController), ct);
         return true;
     }
@@ -195,9 +248,14 @@ public sealed partial class GameEngine
 
         foreach (var (src, controller) in ReplacementSources("UnitNullifying"))
         {
-            bool isGlorp = src.Location.Kind == LocationKind.Node;
-            if (isGlorp && (controller != node.Side || ReferenceEquals(src, card))) continue; // another Unit YOU control
-            int decider = isGlorp ? controller : node.Side;
+            bool onBoard = src.Location.Kind == LocationKind.Node;
+            if (onBoard && ReplacesForCrewOnly(src.Definition, "UnitNullifying"))
+            {
+                // Medical Frigate: only this spacecraft's own crew.
+                if (!ReferenceEquals(Spacecraft.CrewOf(src), card)) continue;
+            }
+            else if (onBoard && (controller != node.Side || ReferenceEquals(src, card))) continue; // another Unit YOU control
+            int decider = onBoard ? controller : node.Side;
             bool yes = await AskYesNoAsync(decider, src, $"{src.Name}: put {card.Name} into Standby instead of Nullifying it?", "Optional", ct);
             if (!yes) continue;
             await EmitAsync(new LogEvent($"  {src.Name}: {card.Name} goes to Standby instead of being Nullified."), ct);
@@ -212,8 +270,9 @@ public sealed partial class GameEngine
         var list = new List<(CardInstance, int)>();
         foreach (var p in State.Players)
             foreach (var n in p.ScoringNodes)
-                if (n.Card is { } c && HasReplacement(c.Definition, eventName) && !StaticLayer.IsSuppressed(State, c))
-                    list.Add((c, n.Side));
+                foreach (var c in n.Occupants) // crews too
+                    if (HasReplacement(c.Definition, eventName) && !StaticLayer.IsSuppressed(State, c))
+                        list.Add((c, n.Side));
         foreach (var wz in State.ActiveWarzones)
             if (HasReplacement(wz.Definition, eventName) && !StaticLayer.IsSuppressed(State, wz))
                 list.Add((wz, -1));
@@ -229,6 +288,19 @@ public sealed partial class GameEngine
             if (!e.TryGetProperty("replaces", out var r) || !r.TryGetProperty("event", out var ev)) continue;
             if (ev.ValueKind == JsonValueKind.String && ev.GetString() == eventName) return true;
             if (ev.ValueKind == JsonValueKind.Array && ev.EnumerateArray().Any(x => x.GetString() == eventName)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>A replacement limited to the source spacecraft's crew (<c>"replaces": { ..., "unit": "Crew" }</c>).</summary>
+    internal static bool ReplacesForCrewOnly(CardDefinition def, string eventName)
+    {
+        if (def.Effects.ValueKind != JsonValueKind.Array) return false;
+        foreach (var e in def.Effects.EnumerateArray())
+        {
+            if (!e.TryGetProperty("trigger", out var t) || t.GetString() != "Replacement") continue;
+            if (!e.TryGetProperty("replaces", out var r) || !r.TryGetProperty("event", out var ev) || ev.GetString() != eventName) continue;
+            if (r.TryGetProperty("unit", out var u) && u.GetString() == "Crew") return true;
         }
         return false;
     }
@@ -275,7 +347,7 @@ public sealed partial class GameEngine
                 var node = loc.Node!;
                 var pile = card.Definition.IsOrder ? PileKind.IssuedOrders : PileKind.RetiredUnits;
                 bool inPlay = node.IsScoring;
-                var memory = new Dictionary<string, object>(card.Memory);
+                var memory = LeaveMemory(card);
                 bool suppressed = StaticLayer.IsSuppressed(State, card);
                 State.MoveToPile(card, pile);
                 await EmitAsync(new CardMovedToPileEvent(card, node, pile), ct);
@@ -358,7 +430,7 @@ public sealed partial class GameEngine
             {
                 var from = loc.Node!;
                 bool inPlay = from.IsScoring;
-                var memory = new Dictionary<string, object>(card.Memory);
+                var memory = LeaveMemory(card);
                 bool suppressed = StaticLayer.IsSuppressed(State, card);
                 State.MoveToNode(card, dest);
                 if (inPlay) card.ResetInPlayState();
@@ -387,7 +459,7 @@ public sealed partial class GameEngine
             {
                 var from = loc.Node!;
                 bool inPlay = from.IsScoring;
-                var memory = new Dictionary<string, object>(card.Memory);
+                var memory = LeaveMemory(card);
                 bool suppressed = StaticLayer.IsSuppressed(State, card);
                 State.MoveToHand(card, player);
                 card.ResetInPlayState();
@@ -441,10 +513,7 @@ public sealed partial class GameEngine
     {
         var ca = a.Card;
         var cb = b.Card;
-        if (ca is not null) State.RemoveFromCurrentLocation(ca);
-        if (cb is not null) State.RemoveFromCurrentLocation(cb);
-        if (ca is not null) State.MoveToNode(ca, b);
-        if (cb is not null) State.MoveToNode(cb, a);
+        State.SwapContents(a, b); // a spacecraft travels with its crew
         await EmitAsync(new NodesSwappedEvent(a, b, cb, ca), ct);
     }
 
@@ -452,7 +521,7 @@ public sealed partial class GameEngine
     internal async Task AssembleFromAsync(CardInstance source, CardInstance onto, int player, CancellationToken ct)
     {
         var fromPile = source.Location.Kind == LocationKind.Pile ? source.Location.Pile : null;
-        int amount = AssembleRules.AssembledRank(source);
+        int amount = AssembleRules.AssembledRank(source) * StaticLayer.AssembleMultiplier(State, player); // The Crucible
         bool ok = onto.Location.Kind == LocationKind.Node && onto.Location.Node is { IsScoring: true } n && n.Side == player;
         if (ok) onto.PersistentModifiers.Add(new RankModifier($"Assemble: {source.Name}", amount));
         State.MoveToPile(source, PileKind.RetiredUnits);

@@ -11,6 +11,9 @@ public sealed class GameOptions
 
     /// <summary>Archons module (optional, off by default): once per game each player may take an Archon.</summary>
     public bool Archons { get; set; }
+
+    /// <summary>Spacecraft module (optional, off by default): spacecraft, their Orders and Warzones (design/spacecraft.md).</summary>
+    public bool Spacecraft { get; set; }
     public bool Leaders { get; set; } = true;
     public DeckMode DeckMode { get; set; } = DeckMode.Standard;
 
@@ -57,6 +60,7 @@ public sealed class GameOptions
                 if (d.TryGetProperty("emptyDeck", out var e)) options.EmptyDeck = CardDatabase.ParseEnum<EmptyDeckRule>(e.GetString()!);
                 if (d.TryGetProperty("warzones", out var w)) options.Warzones = w.GetBoolean();
                 if (d.TryGetProperty("archons", out var ar)) options.Archons = ar.GetBoolean();
+                if (d.TryGetProperty("spacecraft", out var sc)) options.Spacecraft = sc.GetBoolean();
                 if (d.TryGetProperty("leaders", out var l)) options.Leaders = l.GetBoolean();
                 if (d.TryGetProperty("deckMode", out var m)) options.DeckMode = CardDatabase.ParseEnum<DeckMode>(m.GetString()!);
             }
@@ -67,6 +71,9 @@ public sealed class GameOptions
         var pool = PoolDefinition.Load(Path.Combine(dataDir, poolRel));
         options.CopyCounts = pool.MergedCounts(includeWarzones: true);
         foreach (var kv in pool.Archons) options.CopyCounts[kv.Key] = kv.Value;
+        // Spacecraft counts are always loaded; DeckBuilder only uses them when the module (and Warzones) is on.
+        foreach (var kv in pool.Spacecraft) options.CopyCounts[kv.Key] = kv.Value;
+        foreach (var kv in pool.SpacecraftWarzones) options.CopyCounts[kv.Key] = kv.Value;
         return options;
     }
 }
@@ -78,6 +85,8 @@ public sealed class PoolDefinition
     public Dictionary<string, int> Base { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, int> Warzones { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, int> Archons { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> Spacecraft { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> SpacecraftWarzones { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 
     public Dictionary<string, int> MergedCounts(bool includeWarzones)
     {
@@ -98,6 +107,10 @@ public sealed class PoolDefinition
             foreach (var p in w.EnumerateObject()) pool.Warzones[p.Name] = p.Value.GetInt32();
         if (root.TryGetProperty("archons", out var a))
             foreach (var p in a.EnumerateObject()) pool.Archons[p.Name] = p.Value.GetInt32();
+        if (root.TryGetProperty("spacecraft", out var sc))
+            foreach (var p in sc.EnumerateObject()) pool.Spacecraft[p.Name] = p.Value.GetInt32();
+        if (root.TryGetProperty("spacecraftWarzones", out var sw))
+            foreach (var p in sw.EnumerateObject()) pool.SpacecraftWarzones[p.Name] = p.Value.GetInt32();
         return pool;
     }
 }

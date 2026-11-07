@@ -58,6 +58,20 @@ public sealed class HeuristicAi : IPlayerController
                 return r;
         }
 
+        // Spacecraft: Self-Destruct – one of our spacecraft is going down: take the opposing one (and its crew) along.
+        // Hijack – steal an opposing spacecraft as it is Deployed.
+        foreach (var r in ctx.Legal.OfType<ReactAction>())
+        {
+            string name = r.Card.Definition.Name;
+            var target = r.RespondingTo.Card;
+            if (name == "Self-Destruct" && r.RespondingTo.Kind == StackItemKind.UnitNullifying
+                && target.Location.Node is { } sn && sn.Side == me
+                && state.OpposingNode(sn)?.Card is { } enemyShip && Spacecraft.IsShip(enemyShip))
+                return r;
+            if (name == "Hijack" && r.RespondingTo.Kind == StackItemKind.DeployUnit && r.RespondingTo.Controller == opp)
+                return r;
+        }
+
         // M3.3: Commandeer, Forced Mitosis, Recolonize.
         if (StackReact(ctx, state, me, opp) is { } special) return special;
 

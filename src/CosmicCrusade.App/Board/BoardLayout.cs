@@ -40,6 +40,22 @@ public static class BoardLayout
         };
     }
 
+    /// <summary>Spacecraft module: a crewed spacecraft sits up-left on its node, its crew down-right in front of it.</summary>
+    public const double ShipDX = -22, ShipDY = -26, CrewDX = 22, CrewDY = 26;
+
+    /// <summary>
+    /// Where a card on <paramref name="node"/> is drawn: the node centre, or (Spacecraft) offset when the node holds a
+    /// spacecraft and its crew, so both stay visible.
+    /// </summary>
+    public static Point CardCenter(Node node, CardInstance? card)
+    {
+        var c = Center(node);
+        if (card is null || node.Crew is null) return c;
+        if (ReferenceEquals(node.Crew, card)) return new Point(c.X + CrewDX, c.Y + CrewDY);
+        if (ReferenceEquals(node.Card, card)) return new Point(c.X + ShipDX, c.Y + ShipDY);
+        return c;
+    }
+
     public static Point PileCenter(PileKind pile) => pile switch
     {
         PileKind.UnitDeck => new Point(1290, 385),

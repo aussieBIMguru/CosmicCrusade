@@ -67,6 +67,12 @@ public sealed class StackItem
     /// <summary>DeployUnit from Standby: the Standby node it came from.</summary>
     public Node? FromNode { get; init; }
 
+    /// <summary>
+    /// Spacecraft: a crewed spacecraft advancing from Standby – its crew waits on the Standby node and comes aboard
+    /// again once the spacecraft is Played (it isn't Played itself).
+    /// </summary>
+    public CardInstance? RidingCrew { get; internal set; }
+
     /// <summary>IssueOrder (Ongoing): the Order Node it will occupy.</summary>
     public Node? OrderNode { get; init; }
 

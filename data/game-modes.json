@@ -7,7 +7,8 @@
   "warzones": false,
   "leaders": true,
   "deckMode": "Standard",
-  "archons": false
+  "archons": false,
+  "spacecraft": false
  },
  "options": {
   "roundsToWin": {
@@ -43,6 +44,10 @@
   "archons": {
    "type": "bool",
    "description": "Archons module: once per game each player may take an Archon draw at Start-up (see 3, keep 1, draw one card fewer). Off by default."
+  },
+  "spacecraft": {
+   "type": "bool",
+   "description": "Spacecraft module: adds the 'spacecraft' pool section (ships into the Unit deck, Orders into the Order deck) and, with Warzones on, the 'spacecraftWarzones' section. Off by default. See design/spacecraft.md."
   }
  },
  "leaderRelatedCards": [
@@ -58,6 +63,7 @@
  ],
  "leaderRelatedNotes": {
   "No Gods, No Masters": "Its condition (empty Leader Node) would always be true without Leader Nodes, so it's removed.",
-  "Archons": "The Unnameable and Androsiar are Leaders; Ceasefire and Deify need Leaders."
+  "Archons": "The Unnameable and Androsiar are Leaders; Ceasefire and Deify need Leaders.",
+  "Spacecraft": "The 6 Leader spacecraft are Leader-class Units, so No Leaders mode already removes them (S25). No other spacecraft card needs listing."
  }
 }

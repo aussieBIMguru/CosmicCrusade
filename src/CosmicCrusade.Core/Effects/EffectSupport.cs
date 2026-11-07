@@ -59,6 +59,9 @@ public static class EffectSupport
         ["RedirectDeploy"] = new() { "op", "node", "note" },
         ["GainControl"] = new() { "op", "targets", "moveTo", "entersPlay", "note" },
         ["Retarget"] = new() { "op", "targets", "optional", "note" },
+        // Spacecraft
+        ["Retire"] = new() { "op", "targets", "note" },
+        ["DuelOpposedSpacecraft"] = new() { "op", "simultaneous", "note" },
     };
 
     private static readonly HashSet<string> NamedSelectors = new()
@@ -73,6 +76,7 @@ public static class EffectSupport
         "zone", "kind", "controller", "race", "notRace", "unitClass", "excludeSelf", "opposed", "sharesRaceWith",
         "excludeBound", "baseRankLessThan", "opposingUnitRace", "orderType", "empty", "locked", "nodeKind", "side", "nodeOf",
         "legalFor", // M3.3: a node the Unit being Deployed (Event.Unit) / the op's chosen Unit (Target) may legally go to
+        "spacecraft", "crewed", "inSpacecraft", // Spacecraft module
     };
 
     internal static readonly HashSet<string> Zones = new() { "InPlay", "Standby", "RetiredPile", "NullifiedPile", "IssuedPile", "OrderNode" };
@@ -290,6 +294,9 @@ public static class EffectSupport
                     if (!FilterOk(p.Value)) return false;
                     break;
                 case "selfOpposed": break;
+                case "crewed": // Spacecraft: the source spacecraft has / hasn't a crew
+                    if (p.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
+                    break;
                 default: return false;
             }
         }

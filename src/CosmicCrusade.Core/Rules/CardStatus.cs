@@ -34,6 +34,7 @@ public static class CardStatus
     {
         "OnPlay", "OnResolve", "React", "OnEvent", "CleanUp", "EndOfMain", "OnLeavePlay", "OnSelfNullified", "OnIssue",
         "AsEnters",
+        "OnCrewed", "OnCrewNullified", // Spacecraft
     };
 
     private static readonly HashSet<string> ReplacedEvents = new() { "UnitNullifying", "UnitRetiring", "UnitMovingToStandby" };

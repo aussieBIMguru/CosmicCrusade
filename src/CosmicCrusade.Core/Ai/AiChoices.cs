@@ -121,6 +121,30 @@ public static class AiChoices
                 // Issue drawn Ongoings that help (they stay up for the round); Actions: the first one.
                 return r.Options.Count == 0 ? Array.Empty<int>() : new[] { 0 };
 
+            // ------------------------------------------------------------ Spacecraft
+            case "CrewFromPile":
+            case "BeamUpUnit":
+                // The strongest crew we can get aboard (aboard, it's out of reach of the ground).
+                return new[] { IndexOfMax(r, o => o.Card is { } c ? RankCalculator.BaseRank(c) : 0) };
+
+            case "BeamUpShip":
+                return new[] { IndexOfMax(r, o => o.Card is { } c ? RankCalculator.GetRank(s, c) : 0) };
+
+            case "SwapCrewsFrom":
+                // Pull the biggest enemy crew across (or move our own into a better spacecraft).
+                return new[] { IndexOfMax(r, o => o.Card is { } ship
+                    ? (Spacecraft.CrewOf(ship) is { } crew ? (SideOf(ship) == me ? -1 : 1) * RankCalculator.GetRank(s, crew) : 0)
+                    : 0) };
+
+            case "SwapCrewsTo":
+                return new[] { IndexOfMax(r, o => o.Card is { } ship
+                    ? (SideOf(ship) == me ? 5 : 0) - (Spacecraft.CrewOf(ship) is { } crew ? RankCalculator.GetRank(s, crew) : 0)
+                    : 0) };
+
+            case "HijackNode":
+                // An unopposed node (nothing hits it on arrival), else the first.
+                return new[] { IndexOfMax(r, o => o.Node is { } n && s.OpposingNode(n)?.Card is null ? 1 : 0) };
+
             case "CoercedUnit":
                 // Psychic Coercion chose the node (each option carries it): send the Unit that helps us most there.
                 return new[] { IndexOfMax(r, o => o.Card is { } c && o.Node is { } n ? AiVision.DeployGain(s, me, c, n) : 0) };

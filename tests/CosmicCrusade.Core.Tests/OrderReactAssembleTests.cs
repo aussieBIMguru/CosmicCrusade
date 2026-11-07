@@ -52,10 +52,11 @@ public class OrderReactAssembleTests
     // ------------------------------------------------------------------ data
 
     [Fact]
-    public void All_ten_reacts_have_a_parsed_condition()
+    public void All_twelve_reacts_have_a_parsed_condition()
     {
+        // 10 base + 2 Spacecraft (Hijack, Self-Destruct).
         var reacts = TestData.Db.All.Where(c => c.OrderType == OrderType.React).ToList();
-        Assert.Equal(10, reacts.Count);
+        Assert.Equal(12, reacts.Count);
         Assert.All(reacts, r => Assert.NotNull(ReactConditions.Of(r)));
     }
 

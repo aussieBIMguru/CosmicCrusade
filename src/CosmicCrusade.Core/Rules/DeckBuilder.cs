@@ -11,6 +11,9 @@ public static class DeckBuilder
         if (def.Kind == CardKind.Warzone && !options.Warzones) return false;
         if (def.Set.Equals("Warzones", StringComparison.OrdinalIgnoreCase) && !options.Warzones) return false;
         if (def.IsArchon && !options.Archons) return false;
+        // Spacecraft module: its cards only with the module on (its Warzones also need Warzones). Tokens never.
+        if (def.IsToken) return false;
+        if (def.IsSpacecraftSet && !options.Spacecraft) return false;
         if (!options.Leaders)
         {
             if (def.IsLeader) return false;

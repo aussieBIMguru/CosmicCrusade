@@ -181,8 +181,13 @@ public static class LegalActions
         {
             var from = ps.StandbyNodes[i];
             var to = ps.UnitNodes[i];
-            if (from.Card is not null && to.IsEmpty && Placement.ClassAllows(from.Card.Definition, NodeKind.Unit)
-                && StaticLayer.DeployAllowed(state, player, from.Card, to))
+            if (from.Card is null || to.IsLocked) continue;
+            // Spacecraft: a lone Unit may advance onto its own uncrewed spacecraft (or a spacecraft under its Unit);
+            // a crewed spacecraft needs an Empty node (its crew comes along).
+            bool fits = to.IsEmpty
+                ? Placement.ClassAllows(from.Card.Definition, NodeKind.Unit)
+                : from.Crew is null && Spacecraft.CanJoin(state, from.Card, to);
+            if (fits && StaticLayer.DeployAllowed(state, player, from.Card, to))
                 advances.Add(new AdvanceFromStandbyAction(player, from, to));
         }
 

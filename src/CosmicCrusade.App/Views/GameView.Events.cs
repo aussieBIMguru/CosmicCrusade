@@ -286,7 +286,19 @@ public partial class GameView
             case RacesChangedEvent e:
                 await OnRacesChangedAsync(e);
                 break;
+
+            // Spacecraft module
+            case CrewBoardedEvent e:
+                await OnCrewBoardedAsync(e);
+                break;
+
+            case TokenCreatedEvent e:
+                await OnTokenCreatedAsync(e);
+                break;
         }
+
+        // Spacecraft: keep crews drawn in front of their spacecraft (and recentre a crew that dropped to the ground).
+        SyncCrewLayout();
 
         // The All-knowing / Transparency / Oracle's Arch: show the AI's hand face up while it is revealed.
         SyncRevealedHands();
@@ -298,7 +310,7 @@ public partial class GameView
             or CardReturnedToHandEvent or CardRetiredFromHandEvent or CardDrawnEvent or WarzoneRevealedEvent or WarzonesAddedEvent
             or WarzoneReturnedEvent or AbilitiesSuppressedEvent or ChoiceMadeEvent or NullifyPreventedEvent
             or NodesSwappedEvent or RankChangedEvent or CardNullifiedFromHandEvent or CardCopiedEvent or UnitControlGainedEvent or RacesChangedEvent
-            or ArchonTakenEvent or ArchonLostEvent)
+            or ArchonTakenEvent or ArchonLostEvent or CrewBoardedEvent or TokenCreatedEvent)
             RefreshScores();
     }
 
@@ -532,7 +544,7 @@ public partial class GameView
 
     private static void PlaceOnBoard(CardView v, Node node)
     {
-        var c = BoardLayout.Center(node);
+        var c = BoardLayout.CardCenter(node, v.Card); // Spacecraft: a ship and its crew are drawn offset
         v.BeginAnimation(Canvas.LeftProperty, null);
         v.BeginAnimation(Canvas.TopProperty, null);
         Canvas.SetLeft(v, c.X - v.Width / 2);

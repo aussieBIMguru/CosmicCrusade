@@ -17,9 +17,10 @@ public static class Duel
         int rb = RankCalculator.GetRank(state, b);
         if (ra != rb) return new[] { ra < rb ? a : b };
 
-        // Current races (§6.3): static race changes (Consortium, The Voidslime) included.
-        var racesA = StaticLayer.Races(state, a);
-        var racesB = StaticLayer.Races(state, b);
+        // Current races (§6.3): static race changes (Consortium, The Voidslime) included. A crewed spacecraft
+        // counts as having its crew's races too (Spacecraft S7).
+        var racesA = Spacecraft.DuelRaces(state, a);
+        var racesB = Spacecraft.DuelRaces(state, b);
         bool aBeatsB = racesA.Any(x => racesB.Any(y => state.Database.Beats(x, y)));
         bool bBeatsA = racesB.Any(x => racesA.Any(y => state.Database.Beats(x, y)));
         if (aBeatsB != bBeatsA) return new[] { aBeatsB ? b : a };

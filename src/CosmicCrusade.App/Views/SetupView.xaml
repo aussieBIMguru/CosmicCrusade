@@ -55,6 +55,8 @@
                                   ToolTip="Adds the Warzone deck (one Warzone revealed each round) and the Warzones Orders." />
                         <CheckBox Content="Archons (once-per-game power cards)" IsChecked="{Binding Archons}"
                                   ToolTip="Optional module. Once per game, at a round's Start-up, each player may take an Archon draw: see 3 Archons, keep 1 (revealed) to play that round, and draw one card fewer." />
+                        <CheckBox Content="Spacecraft (ships your Units can crew)" IsChecked="{Binding Spacecraft}"
+                                  ToolTip="Optional module. Adds spacecraft to the Unit deck and their Orders to the Order deck (and their Warzones when Warzones is on). Deploy a Unit onto your own spacecraft, or a spacecraft onto your Unit: the crew is elevated, out of reach of the ground, and both count towards your Rank." />
 
                         <TextBlock Text="Seed (blank = random)" Style="{StaticResource Muted}" Margin="0,8,0,0" />
                         <TextBox Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8" />

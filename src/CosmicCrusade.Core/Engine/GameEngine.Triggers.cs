@@ -76,6 +76,9 @@ public sealed partial class GameEngine
         "Wormhole", "RearrangeAllNodes", "Terraform", "EnterAsCopy", "RetriggerAbilities",
         // Archons
         "Ceasefire", "Insurrection", "QuantumLeap",
+        // Spacecraft
+        "Mothership", "CrewFromPile", "SporePod", "Abduct", "SwapCrews", "BeamUp", "Hijack", "GelatinousHull",
+        "Engulf", "ExoFrame", "Refit", "SelfDestruct",
     };
 
     internal async Task RunScriptAsync(string name, JsonElement effect, EffectContext ctx, CancellationToken ct)
@@ -105,6 +108,20 @@ public sealed partial class GameEngine
                 break;
             case "QuantumLeap":
                 await QuantumLeapAsync(ctx, ct);
+                break;
+            case "Mothership":
+            case "CrewFromPile":
+            case "SporePod":
+            case "Abduct":
+            case "SwapCrews":
+            case "BeamUp":
+            case "Hijack":
+            case "GelatinousHull":
+            case "Engulf":
+            case "ExoFrame":
+            case "Refit":
+            case "SelfDestruct":
+                await RunSpacecraftScriptAsync(name, effect, ctx, ct);
                 break;
             default:
                 await EmitAsync(new LogEvent($"  {ctx.Source.Name}: this ability isn't implemented yet."), ct);
@@ -158,7 +175,8 @@ public sealed partial class GameEngine
         foreach (var p in State.Players)
         {
             foreach (var n in p.ScoringNodes)
-                if (n.Card is { } c) list.Add(new TriggerSource(c, n.Side, n, order++));
+                foreach (var c in n.Occupants) // a spacecraft, then its crew
+                    list.Add(new TriggerSource(c, n.Side, n, order++));
             foreach (var n in p.OrderNodes)
                 if (n.Card is { } c) list.Add(new TriggerSource(c, n.Side, n, order++));
         }
@@ -208,7 +226,7 @@ public sealed partial class GameEngine
     }
 
     private bool StillThere(TriggerSource src) => src.Node is not null
-        ? ReferenceEquals(src.Node.Card, src.Card)
+        ? src.Node.Holds(src.Card)
         : State.ActiveWarzones.Contains(src.Card);
 
     // ================================================================== "Whenever ..." (OnEvent)

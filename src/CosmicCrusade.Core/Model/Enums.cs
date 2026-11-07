@@ -28,6 +28,8 @@ public enum UnitClass
     Brute,
     Champion,
     Leader,
+    /// <summary>Spacecraft module: an ordinary spacecraft (Unit Nodes only).</summary>
+    Craft,
 }
 
 public enum OrderType

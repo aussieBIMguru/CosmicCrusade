@@ -119,7 +119,11 @@
         ]
       ]
     },
-    "coloring": "Race name, rank number and the word 'Order' use the race's textColor; the bracketed class/subtype uses subtypeColor; Leaders print as (*Leader*); 'Warzone' is black."
+    "coloring": "Race name, rank number and the word 'Order' use the race's textColor; the bracketed class/subtype uses subtypeColor; Leaders print as (*Leader*); 'Warzone' is black.",
+    "classDisplay": {
+      "Craft": "Spacecraft",
+      "$note": "Spacecraft module: unitClass 'Craft' prints as (Spacecraft). Leader/Champion spacecraft print their class as usual."
+    }
   },
   "ability": {
     "x": 200,

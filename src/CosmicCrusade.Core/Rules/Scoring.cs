@@ -58,10 +58,11 @@ public static class Scoring
         return new RoundResult(state.Round, t0, t1, winner, tiebreak, w0, w1, pairs);
     }
 
+    /// <summary>A node's strength in the tiebreak: its Unit's Rank, or spacecraft + crew (Spacecraft S23).</summary>
     private static PairResult ComparePair(GameState state, Node a, Node b)
     {
-        int? ra = a.Card is null ? null : RankCalculator.GetRank(state, a.Card);
-        int? rb = b.Card is null ? null : RankCalculator.GetRank(state, b.Card);
+        int? ra = Spacecraft.NodeRank(state, a);
+        int? rb = Spacecraft.NodeRank(state, b);
         int? winner = (ra, rb) switch
         {
             (null, null) => null,

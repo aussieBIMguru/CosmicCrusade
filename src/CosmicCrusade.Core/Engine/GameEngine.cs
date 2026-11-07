@@ -351,6 +351,9 @@ public sealed partial class GameEngine
         PileKind? fromPile = null)
     {
         await PayCostAsync(player, card, ct);
+        // Spacecraft: a crewed spacecraft advancing from Standby leaves its crew waiting on the Standby node; the
+        // crew comes aboard again once the spacecraft is Played.
+        var riding = fromNode is { Kind: NodeKind.Standby } && ReferenceEquals(fromNode.Card, card) ? fromNode.Crew : null;
         State.MoveToStack(card, player);
         await EmitAsync(new UnitDeployAnnouncedEvent(player, card, target, fromNode, fromPile), ct);
 
@@ -360,6 +363,7 @@ public sealed partial class GameEngine
             TargetNode = target,
             FromNode = fromNode,
             FromPile = fromPile,
+            RidingCrew = riding,
         };
         await RunPriorityAsync(item, player, ct);
     }
@@ -370,7 +374,9 @@ public sealed partial class GameEngine
         var target = item.TargetNode!;
         if (item.Cancelled) return; // The counter-effect already moved the card; it is not Played.
 
-        if (!target.IsEmpty)
+        // Spacecraft (S1): a Unit may land on its controller's uncrewed spacecraft, or a spacecraft under a lone Unit.
+        bool joins = !target.IsEmpty && target.Side == item.Controller && Spacecraft.CanJoin(State, card, target);
+        if (!target.IsEmpty && !joins)
         {
             // The node was filled or Locked while the deploy waited (possible once effects exist). Not Played.
             State.MoveToPile(card, PileKind.RetiredUnits);
@@ -395,6 +401,16 @@ public sealed partial class GameEngine
         }
         else
             await FireTriggersAsync(card, "OnPlay", target.Side, target, card.Memory, null, ct);
+
+        // Spacecraft: the crew of a spacecraft advancing from Standby comes back aboard (it isn't Played).
+        if (item.RidingCrew is { } rider && item.FromNode is { } standby && standby.Holds(rider) && target.Holds(card)
+            && Spacecraft.IsShip(card) && target.Crew is null)
+        {
+            if (Spacecraft.CanCrew(State, rider, card, target)) await BoardAsync(rider, card, null, ct, checkLegal: false);
+            else await EmitAsync(new LogEvent($"  {rider.Name} can't come aboard {card.Name} and stays in Standby."), ct);
+        }
+        // "When this spacecraft becomes crewed" (S24): the Unit landed on it, or it was laid under a Unit.
+        else if (joins && target.Crew is not null) await CrewArrivedAsync(target, ct);
 
         // "Whenever a Unit / Card is played" (Xeno Laser hits after on-play abilities: ruling #21).
         await RaisePlayedAsync(item.Controller, card, fromHand: item.FromNode is null && item.FromPile is null, ct);
@@ -639,7 +655,7 @@ public sealed partial class GameEngine
         if (item.Cancelled) return;
         var card = item.Card;
         var target = item.AssembleTarget!;
-        int amount = AssembleRules.AssembledRank(card);
+        int amount = AssembleRules.AssembledRank(card) * StaticLayer.AssembleMultiplier(State, item.Controller); // The Crucible
 
         // The target must still be an allied Unit in play.
         var node = target.Location.Node;
@@ -771,8 +787,13 @@ public sealed partial class GameEngine
         {
             foreach (var node in State.Players[p].ScoringNodes.ToList())
             {
-                if (node.Card is null || _remainInPlay.Contains(node.Card)) continue;
-                await RetireAsync(node.Card, ct); // fires "When this Unit leaves play"
+                // Spacecraft (S9): the spacecraft and its crew each follow their own rules (crew first, so it isn't
+                // dropped to the ground and then Retired as a ground Unit – same result, clearer log).
+                foreach (var card in node.Occupants.Reverse().ToList())
+                {
+                    if (!node.Holds(card) || _remainInPlay.Contains(card)) continue;
+                    await RetireAsync(card, ct); // fires "When this Unit leaves play"
+                }
             }
         }
 

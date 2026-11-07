@@ -147,6 +147,19 @@ public sealed record UnitControlGainedEvent(CardInstance Card, Node From, Node T
 public sealed record RandomDeployNodeChosenEvent(int Player, CardInstance Card, IReadOnlyList<Node> Candidates, Node Chosen,
     CardInstance? Source) : GameEvent;
 
+// ------------------------------------------------------------------ Spacecraft module
+
+/// <summary>
+/// A Unit came aboard a spacecraft without being Deployed there (Beam Up, Chrome Steed, Abductor, Mindscrambler, a
+/// crewed spacecraft advancing from Standby...). <paramref name="FromNode"/> / <paramref name="FromPile"/> say where
+/// the crew came from (both null when it was already on this node, e.g. a spacecraft laid under it by Mothership).
+/// </summary>
+public sealed record CrewBoardedEvent(CardInstance Crew, CardInstance Ship, Node Node, Node? FromNode, PileKind? FromPile,
+    CardInstance? Source) : GameEvent;
+
+/// <summary>A token entered play on a node (the Mothership's Fighters, laid under the Unit there).</summary>
+public sealed record TokenCreatedEvent(CardInstance Token, Node Node, CardInstance? Source) : GameEvent;
+
 public sealed record RoundScoredEvent(RoundResult Result) : GameEvent;
 public sealed record CardMovedToPileEvent(CardInstance Card, Node? From, PileKind Pile) : GameEvent;
 /// <summary>Warzones: the top Warzone was revealed and is now Active (Start-up step 3).</summary>

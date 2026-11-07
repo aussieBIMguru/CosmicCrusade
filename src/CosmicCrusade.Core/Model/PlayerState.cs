@@ -61,8 +61,8 @@ public sealed class PlayerState
         }
     }
 
-    public IEnumerable<CardInstance> UnitsInPlay =>
-        ScoringNodes.Where(n => n.Card is not null).Select(n => n.Card!);
+    /// <summary>Units on Unit/Leader nodes: ground Units, spacecraft and their crews (board order, ship before crew).</summary>
+    public IEnumerable<CardInstance> UnitsInPlay => ScoringNodes.SelectMany(n => n.Occupants);
 
     public int HandUnitCount => Hand.Count(c => c.Definition.IsUnit);
     public int HandOrderCount => Hand.Count(c => c.Definition.IsOrder);

@@ -146,7 +146,10 @@ public partial class GameView : UserControl, IGameEventSink
             view.MouseEnter += (_, _) =>
             {
                 // Inspect the top card of face-up piles (Active Warzone, Retired, Nullified, Issued).
-                if (kind is PileKind.UnitDeck or PileKind.OrderDeck or PileKind.WarzoneDeck or PileKind.ArchonDeck) return;
+                // Spacecraft: Research Vessel lets you look at the top card of each deck while it is crewed.
+                bool peek = kind is PileKind.UnitDeck or PileKind.OrderDeck && StaticLayer.CanSeeTopOfDecks(State, 0)
+                            && State.Options.DeckMode != DeckMode.RandomDraw;
+                if (!peek && kind is PileKind.UnitDeck or PileKind.OrderDeck or PileKind.WarzoneDeck or PileKind.ArchonDeck) return;
                 var list = State.GetPile(kind);
                 if (list.Count > 0) ShowZoom(list[^1]);
             };
@@ -789,7 +792,16 @@ public partial class GameView : UserControl, IGameEventSink
             return;
         }
 
-        var advance = ctx.Legal.OfType<AdvanceFromStandbyAction>().FirstOrDefault(a => a.From.Card == v.Card);
+        // Spacecraft: a card on a glowing node (your spacecraft, or your Unit a spacecraft can go under) takes the deploy.
+        if ((_selected is not null || _selectedStandby is not null) && v.Card.Location.Node is { } onNode
+            && _slots.TryGetValue(onNode, out var underSlot) && underSlot.IsTarget)
+        {
+            e.Handled = true;
+            TrySubmitForNode(onNode);
+            return;
+        }
+
+        var advance = ctx.Legal.OfType<AdvanceFromStandbyAction>().FirstOrDefault(a => a.From.Holds(v.Card));
         if (advance is null) return;
         e.Handled = true;
         ClearSelection();
@@ -810,6 +822,15 @@ public partial class GameView : UserControl, IGameEventSink
         var ctx = _human.Current;
         if (ctx is null || ctx.IsResponse || !slot.IsTarget) return;
         e.Handled = true;
+        TrySubmitForNode(slot.Node);
+    }
+
+    /// <summary>Submits the selected hand card's deploy / Ongoing, or the selected Standby advance, to this node.</summary>
+    private void TrySubmitForNode(Node node)
+    {
+        var ctx = _human.Current;
+        if (ctx is null || ctx.IsResponse) return;
+        var slot = _slots[node];
 
         GameAction? action = null;
         if (_selected?.Card is { } card)

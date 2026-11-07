@@ -27,8 +27,8 @@ public static class Rearrange
     public static bool IsFixed(GameState state, Node node)
     {
         if (node.IsLocked) return true;
-        if (node.Card is not { } c) return false;
-        return c.Definition.IsLeader || c.PrintedDefinition.IsLeader || StaticLayer.IsImmune(state, c);
+        // A spacecraft and its crew move together (Spacecraft module): a Leader or Immune Unit aboard holds both.
+        return node.Occupants.Any(c => c.Definition.IsLeader || c.PrintedDefinition.IsLeader || StaticLayer.IsImmune(state, c));
     }
 
     /// <summary>May <paramref name="card"/> (null = nothing) end up on <paramref name="to"/>?</summary>
@@ -39,13 +39,21 @@ public static class Rearrange
         _ => false,
     };
 
+    /// <summary>May everything on <paramref name="from"/> (a spacecraft travels with its crew) end up on <paramref name="to"/>?</summary>
+    public static bool ContentsFit(Node from, Node to)
+    {
+        if (!Fits(from.Card, to)) return false;
+        if (from.Crew is not { } crew) return true;
+        return to.Kind == NodeKind.Standby ? Placement.CanEnterStandby(crew) : Placement.ClassAllows(crew.Definition, to.Kind);
+    }
+
     /// <summary>Is switching the contents of <paramref name="a"/> and <paramref name="b"/> a legal step?</summary>
     public static bool CanSwap(GameState state, Node a, Node b) =>
         !ReferenceEquals(a, b) && a.Side == b.Side
         && a.Kind != NodeKind.Order && b.Kind != NodeKind.Order
         && (a.Card is not null || b.Card is not null)
         && !IsFixed(state, a) && !IsFixed(state, b)
-        && Fits(a.Card, b) && Fits(b.Card, a);
+        && ContentsFit(a, b) && ContentsFit(b, a);
 
     /// <summary>The nodes <paramref name="a"/> can switch with.</summary>
     public static List<Node> Partners(GameState state, Node a) =>
@@ -61,22 +69,14 @@ public static class Rearrange
     /// </summary>
     internal static T WithSwap<T>(GameState state, Node a, Node b, Func<T> eval)
     {
-        var ca = a.Card;
-        var cb = b.Card;
-        if (ca is not null) state.RemoveFromCurrentLocation(ca);
-        if (cb is not null) state.RemoveFromCurrentLocation(cb);
-        if (ca is not null) state.MoveToNode(ca, b);
-        if (cb is not null) state.MoveToNode(cb, a);
+        state.SwapContents(a, b);
         try
         {
             return eval();
         }
         finally
         {
-            if (ca is not null) state.RemoveFromCurrentLocation(ca);
-            if (cb is not null) state.RemoveFromCurrentLocation(cb);
-            if (ca is not null) state.MoveToNode(ca, a);
-            if (cb is not null) state.MoveToNode(cb, b);
+            state.SwapContents(a, b);
         }
     }
 }

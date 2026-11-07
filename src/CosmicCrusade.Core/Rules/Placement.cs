@@ -40,9 +40,17 @@ public static class Placement
     /// <summary>Can <paramref name="player"/> deploy this unit from hand to <paramref name="node"/> right now?</summary>
     public static bool CanDeploy(GameState state, int player, CardInstance card, Node node)
     {
-        if (!node.IsScoring || !node.IsEmpty) return false;
-        if (!ClassAllows(card.Definition, node.Kind)) return false;
-        if (node.Side != player && !AllowsOpponentNode(state, card, node)) return false;
+        if (!node.IsScoring || node.IsLocked) return false;
+        if (node.Card is not null)
+        {
+            // Spacecraft (S1): onto your own uncrewed spacecraft, or a spacecraft onto your own lone Unit.
+            if (node.Side != player || !Spacecraft.CanJoin(state, card, node)) return false;
+        }
+        else
+        {
+            if (!ClassAllows(card.Definition, node.Kind)) return false;
+            if (node.Side != player && !AllowsOpponentNode(state, card, node)) return false;
+        }
         // Static deploy rules (Extreme Sanctions, Even Odds, Military Academy) and extra costs (Mechatron).
         return StaticLayer.DeployAllowed(state, player, card, node) && PlayRules.CanPay(state, player, card);
     }
@@ -86,6 +94,7 @@ public static class Placement
                 case "AnyUnitNodeEitherSide" when node.Kind == NodeKind.Unit:
                 case "OpponentLeader" when node.Kind == NodeKind.Leader:
                 case "AlsoOpponentNodes":
+                case "OpponentUnitEmpty" when node.Kind == NodeKind.Unit && node.IsEmpty: // Stagnant Station
                     return true;
             }
         }

@@ -52,8 +52,13 @@ public static class RankCalculator
         }
     }
 
+    /// <summary>
+    /// Round total: every Unit in play on the player's side, spacecraft and crews included (Spacecraft S23).
+    /// The Unnameable makes others count as 0; Dreadnought's own Rank doesn't count without a Leader/Champion crew.
+    /// </summary>
     public static int TotalRank(GameState state, int player) =>
-        state.Players[player].UnitsInPlay.Sum(u => StaticLayer.CountsAsZero(state, u) ? 0 : GetRank(state, u)); // The Unnameable
+        state.Players[player].UnitsInPlay.Sum(u =>
+            StaticLayer.CountsAsZero(state, u) || StaticLayer.RankDoesNotCount(state, u) ? 0 : GetRank(state, u));
 
     private static bool InPlay(CardInstance c) =>
         c.Definition.IsUnit && c.Location.Kind == LocationKind.Node && c.Location.Node is { IsScoring: true };

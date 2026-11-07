@@ -27,11 +27,16 @@ public sealed class CardCountRow : ObservableObject
     public string Race => string.Join(" / ", Definition.Races.Select(r => CardLayout.Instance.Style(r).Display));
     public string Type => Definition.Kind switch
     {
-        CardKind.Unit => $"{Definition.UnitClass} ({(Definition.BaseRankIsX ? "X" : Definition.BaseRank?.ToString())})",
+        CardKind.Unit => $"{ClassName} ({(Definition.BaseRankIsX ? "X" : Definition.BaseRank?.ToString())})",
         CardKind.Order => $"{Definition.OrderType} Order",
         _ => "Warzone",
     };
     public string SetName => Definition.Set;
+
+    /// <summary>Spacecraft print as "Spacecraft" / "Leader spacecraft" / "Champion spacecraft".</summary>
+    private string ClassName => Definition.IsSpacecraft
+        ? (Definition.UnitClass is UnitClass.Craft ? "Spacecraft" : $"{Definition.UnitClass} spacecraft")
+        : Definition.UnitClass?.ToString() ?? "";
 
     /// <summary>Implementation watermark: empty box = not implemented yet, half-filled = partly implemented.</summary>
     public Implementation Status => CardStatus.Of(Definition);
@@ -60,6 +65,7 @@ public sealed class SetupViewModel : ObservableObject
     private bool _warzones;
     private AiDifficulty _aiDifficulty;
     private bool _archons;
+    private bool _spacecraft;
     private string _seed = "";
     private string _filter = "";
     private CardCountRow? _selectedCard;
@@ -75,10 +81,12 @@ public sealed class SetupViewModel : ObservableObject
         _warzones = _defaults.Warzones;
         _aiDifficulty = _defaults.AiDifficulty;
         _archons = _defaults.Archons;
+        _spacecraft = _defaults.Spacecraft;
 
         // Every card, Warzones included (their counts only matter while the Warzones expansion is on).
         foreach (var def in AppPaths.Database.All.OrderBy(d => d.Id, StringComparer.Ordinal))
         {
+            if (def.IsToken) continue; // the Mothership's Fighter: never in a pool
             _defaults.CopyCounts.TryGetValue(def.Id, out int n);
             Cards.Add(new CardCountRow(def, n, UpdateTotals));
         }
@@ -112,6 +120,7 @@ public sealed class SetupViewModel : ObservableObject
     public bool Leaders { get => _leaders; set { if (Set(ref _leaders, value)) UpdateTotals(); } }
     public bool Warzones { get => _warzones; set { if (Set(ref _warzones, value)) UpdateTotals(); } }
     public bool Archons { get => _archons; set { if (Set(ref _archons, value)) UpdateTotals(); } }
+    public bool Spacecraft { get => _spacecraft; set { if (Set(ref _spacecraft, value)) UpdateTotals(); } }
 
     /// <summary>Blank = random. Any integer replays the same shuffle.</summary>
     public string Seed { get => _seed; set => Set(ref _seed, value); }
@@ -136,6 +145,7 @@ public sealed class SetupViewModel : ObservableObject
         o.Warzones = Warzones;
         o.AiDifficulty = AiDifficulty;
         o.Archons = Archons;
+        o.Spacecraft = Spacecraft;
         o.Seed = int.TryParse(Seed, out int s) ? s : Environment.TickCount;
         foreach (var row in Cards) o.CopyCounts[row.Id] = row.Copies;
         return o;

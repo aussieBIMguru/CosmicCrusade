@@ -54,19 +54,19 @@ public class StaticTests
     // ------------------------------------------------------------------ coverage
 
     [Fact]
-    public void All_78_static_effects_are_live()
+    public void All_100_static_effects_are_live()
     {
         // 71 base + Warzones, plus 7 Archons (The Unnameable, Androsiar, Archon Arsenal, Unstoppable,
-        // Galactic Siege, Open Source, Deify): one Static entry each.
+        // Galactic Siege, Open Source, Deify), plus 22 Spacecraft cards: one Static entry each.
         var withStatics = TestData.Db.All.Where(c => HasTrigger(c, "Static")).ToList();
         int total = withStatics.Sum(c => c.Effects.EnumerateArray()
             .Count(e => e.TryGetProperty("trigger", out var t) && t.GetString() == "Static"));
-        Assert.Equal(78, total);
+        Assert.Equal(100, total);
 
         var inert = withStatics.SelectMany(c => StaticLayer.InertStatics(c)).ToList();
         Assert.Empty(inert); // M3.2c: RevealHands ×3, OverrideDecision ×2, GrantAction, ReplaceRaceWords
-        Assert.Equal(76, withStatics.Count);
-        Assert.Equal(76, withStatics.Count(c => StaticLayer.HasLiveStatics(c)));
+        Assert.Equal(98, withStatics.Count);
+        Assert.Equal(98, withStatics.Count(c => StaticLayer.HasLiveStatics(c)));
     }
 
     [Fact]

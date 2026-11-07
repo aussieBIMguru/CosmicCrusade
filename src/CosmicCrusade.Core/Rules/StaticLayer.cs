@@ -34,6 +34,8 @@ public static class StaticLayer
         RevealHands, OverrideDecision, GrantAction, ReplaceRaceWords,
         // Archons
         ExtraAction, CountAsZero, OfferCopyOfSelf,
+        // Spacecraft
+        CannotBeCrewed, RestrictBoarding, DisableElevation, RevealTopCards, ModifyAssembledRank, RankDoesNotCount,
     }
 
     internal sealed class Filter
@@ -48,6 +50,11 @@ public static class StaticLayer
         public string? Controller;       // "You" / "Opponent" ("owner" is read as controller: ruling #15)
         public bool ExcludeSelf;
         public bool AlliedEach, SharesRaceEach, ExcludeEach;
+        // Spacecraft
+        public bool Crew;                // "Crew": the Unit aboard the source spacecraft
+        public bool? Spacecraft;         // is / isn't a spacecraft
+        public bool? Crewed;             // a spacecraft with / without a crew (never matches a non-spacecraft)
+        public bool? InSpacecraft;       // a Unit aboard a spacecraft / on the ground
     }
 
     internal sealed class Amount
@@ -57,12 +64,18 @@ public static class StaticLayer
         public Amount? Negate;
         public bool MaxHandOpponents;
         public bool RankOfSelf;
+        public int Times = 1;            // Earthrise: "+2 Rank for each ..."
+        public bool BaseRankOfCrew;      // High Roller
     }
 
     internal sealed class Condition
     {
         public Filter? Exists;
         public bool YourLeaderNodeEmpty;
+        // Spacecraft: about the source spacecraft's crew.
+        public bool? Crewed;
+        public UnitClass[]? CrewClassNot;   // Dreadnought: no crew, or one that isn't a Leader/Champion
+        public string? CrewRace;            // Blazing Saddle
     }
 
     internal sealed class Ability
@@ -89,6 +102,7 @@ public static class StaticLayer
         public JsonElement Payload;       // GrantAction: the op itself ("do" is run by the EffectRunner)
         public string? CostRace;          // GrantAction NullifyFromHand filter
         public CardKind? CostKind;
+        public int Multiplier = 1;        // ModifyAssembledRank (The Crucible)
     }
 
     /// <summary>A card whose Static effects could apply right now, and who controls it (-1 for a Warzone).</summary>
@@ -129,6 +143,57 @@ public static class StaticLayer
             return null;
         }
         finally { _inImmune = false; }
+    }
+
+    // ------------------------------------------------------------------ Spacecraft
+
+    /// <summary>Remnant AI, Stagnant Station, Auto-Turret: "cannot be crewed" (Ion Storm switches it off with the rest).</summary>
+    public static bool CannotBeCrewed(GameState s, CardInstance ship)
+    {
+        foreach (var src in ActiveSources(s))
+            foreach (var ab in src.Abilities)
+                if (ab.Op == Op.CannotBeCrewed && Applies(s, ab, src, ship)) return true;
+        // A spacecraft in hand isn't a source yet: read its own text (unless Suppressed, e.g. Suppressing Goop).
+        if (!IsInPlay(ship) && !IsSuppressed(s, ship))
+            foreach (var ab in Compiled(ship.Definition).Abilities)
+                if (ab.Op == Op.CannotBeCrewed && ab.Targets is { Self: true }) return true;
+        return false;
+    }
+
+    /// <summary>Viscous Fog: "Units can't board or leave spacecraft."</summary>
+    public static bool BoardingRestricted(GameState s) => AnyActive(s, Op.RestrictBoarding, out _);
+
+    /// <summary>Gravity Well: "Spacecraft and their crews can be affected from the ground" (elevation off, S19).</summary>
+    public static bool ElevationDisabled(GameState s) => AnyActive(s, Op.DisableElevation, out _);
+
+    /// <summary>Research Vessel: may <paramref name="player"/> look at the top card of each deck?</summary>
+    public static bool CanSeeTopOfDecks(GameState s, int player)
+    {
+        foreach (var src in ActiveSources(s))
+            foreach (var ab in src.Abilities)
+                if (ab.Op == Op.RevealTopCards && src.Controller == player && CondOk(s, ab, src)) return true;
+        return false;
+    }
+
+    /// <summary>The Crucible: Rank <paramref name="player"/> Assembles is multiplied (doubled per active source).</summary>
+    public static int AssembleMultiplier(GameState s, int player)
+    {
+        int m = 1;
+        foreach (var src in ActiveSources(s))
+            foreach (var ab in src.Abilities)
+                if (ab.Op == Op.ModifyAssembledRank && src.Controller == player && CondOk(s, ab, src)) m *= Math.Max(1, ab.Multiplier);
+        return m;
+    }
+
+    /// <summary>Dreadnought: "This spacecraft's Rank only counts if it is crewed by a Leader or Champion" (total and pairs).</summary>
+    public static bool RankDoesNotCount(GameState s, CardInstance card)
+    {
+        if (!IsUnitInPlay(card) || card.AbilitiesSuppressed || IsSuppressed(s, card)) return false;
+        foreach (var ab in Compiled(card.Definition).Abilities)
+            if (ab.Op == Op.RankDoesNotCount && ab.Targets is { Self: true }
+                && CondOk(s, ab, new Source(card, card.Location.Node!.Side, Compiled(card.Definition).Abilities)))
+                return true;
+        return false;
     }
 
     // ------------------------------------------------------------------ Archons
@@ -561,8 +626,9 @@ public static class StaticLayer
         foreach (var p in s.Players)
         {
             foreach (var n in p.ScoringNodes)
-                if (n.Card is { } c && c.Definition.IsUnit && Compiled(c.Definition).Abilities.Length > 0)
-                    yield return new Source(c, n.Side, Compiled(c.Definition).Abilities);
+                foreach (var c in n.Occupants) // a spacecraft, then its crew
+                    if (c.Definition.IsUnit && Compiled(c.Definition).Abilities.Length > 0)
+                        yield return new Source(c, n.Side, Compiled(c.Definition).Abilities);
             foreach (var n in p.OrderNodes)
                 if (n.Card is { } c && Compiled(c.Definition).Abilities.Length > 0)
                     yield return new Source(c, n.Side, Compiled(c.Definition).Abilities);
@@ -625,6 +691,13 @@ public static class StaticLayer
         if (c is null) return true;
         if (c.Exists is { } f && !CardsIn(s, f.Zones).Any(x => Matches(s, f, x, src))) return false;
         if (c.YourLeaderNodeEmpty && (src.Controller < 0 || s.Players[src.Controller].LeaderNode is not { IsEmpty: true })) return false;
+        if (c.Crewed is not null || c.CrewClassNot is not null || c.CrewRace is not null)
+        {
+            var crew = Spacecraft.CrewOf(src.Card);
+            if (c.Crewed is bool crewed && (crew is not null) != crewed) return false;
+            if (c.CrewClassNot is { } classes && crew is not null && crew.Definition.UnitClass is { } uc && classes.Contains(uc)) return false;
+            if (c.CrewRace is { } race && (crew is null || ResolveRace(s, race, src) is not { } r || !Races(s, crew).Contains(r))) return false;
+        }
         return true;
     }
 
@@ -638,7 +711,7 @@ public static class StaticLayer
                 case "InPlay":
                     foreach (var p in s.Players)
                     {
-                        foreach (var n in p.ScoringNodes) if (n.Card is not null) set.Add(n.Card);
+                        foreach (var n in p.ScoringNodes) foreach (var c in n.Occupants) set.Add(c);
                         foreach (var n in p.OrderNodes) if (n.Card is not null) set.Add(n.Card);
                     }
                     foreach (var w in s.ActiveWarzones) set.Add(w);
@@ -673,7 +746,11 @@ public static class StaticLayer
     private static bool Matches(GameState s, Filter f, CardInstance card, Source src, CardInstance? each = null, bool ignoreZone = false)
     {
         if (f.Self) return ReferenceEquals(card, src.Card);
+        if (f.Crew) return Spacecraft.CrewOf(src.Card) is { } crewOfSource && ReferenceEquals(card, crewOfSource);
         if (!ignoreZone && !InZone(card, f.Zones)) return false;
+        if (f.Spacecraft is bool isShip && card.Definition.IsSpacecraft != isShip) return false;
+        if (f.Crewed is bool crewed && (!Spacecraft.IsShip(card) || (Spacecraft.CrewOf(card) is not null) != crewed)) return false;
+        if (f.InSpacecraft is bool aboard && Spacecraft.IsCrew(card) != aboard) return false;
         if (f.Kind is { } k && card.Definition.Kind != k) return false;
         if (f.UnitClass is { } uc && card.Definition.UnitClass != uc) return false;
         if (f.Name is { } name && card.Name != name) return false;
@@ -713,7 +790,8 @@ public static class StaticLayer
     {
         if (a.Const is int c) return c;
         if (a.Negate is { } inner) return -Eval(s, inner, src, target);
-        if (a.CountOf is { } f) return CardsIn(s, f.Zones).Count(x => Matches(s, f, x, src, each: target));
+        if (a.CountOf is { } f) return a.Times * CardsIn(s, f.Zones).Count(x => Matches(s, f, x, src, each: target));
+        if (a.BaseRankOfCrew) return Spacecraft.CrewOf(src.Card) is { } crew ? RankCalculator.CurrentBaseRank(s, crew) : 0;
         if (a.MaxHandOpponents) return src.Controller < 0 ? 0 : s.Players[GameState.Other(src.Controller)].Hand.Count;
         if (a.RankOfSelf) return RankCalculator.GetRank(s, src.Card);
         return 0;
@@ -789,6 +867,13 @@ public static class StaticLayer
         ["ExtraAction"] = new() { "op", "player", "count", "note" },
         ["CountAsZero"] = new() { "op", "targets", "note" },
         ["OfferCopyOfSelf"] = new() { "op", "targets", "note" },
+        // Spacecraft
+        ["CannotBeCrewed"] = new() { "op", "targets", "note" },
+        ["RestrictBoarding"] = new() { "op", "note" },
+        ["DisableElevation"] = new() { "op", "note" },
+        ["RevealTopCards"] = new() { "op", "to", "note" },
+        ["ModifyAssembledRank"] = new() { "op", "player", "multiplier", "note" },
+        ["RankDoesNotCount"] = new() { "op", "targets", "note" },
     };
 
     private static List<Ability>? CompileEffect(JsonElement e, CardDefinition def)
@@ -869,6 +954,23 @@ public static class StaticLayer
             case "CannotBeNullified":
                 if (targets is null) return null;
                 return new Ability { Op = Op.CannotBeNullified, Targets = targets, Text = name };
+            // ---------------------------------------------------------------- Spacecraft
+            case "CannotBeCrewed":
+                if (targets is not { Self: true }) return null;
+                return new Ability { Op = Op.CannotBeCrewed, Targets = targets, Text = name };
+            case "RestrictBoarding":
+                return new Ability { Op = Op.RestrictBoarding, Text = name };
+            case "DisableElevation":
+                return new Ability { Op = Op.DisableElevation, Text = name };
+            case "RevealTopCards":
+                if (Str(op, "to") != "You") return null;
+                return new Ability { Op = Op.RevealTopCards, Text = name };
+            case "ModifyAssembledRank":
+                if (Str(op, "player") != "You" || !op.TryGetProperty("multiplier", out var mul) || mul.ValueKind != JsonValueKind.Number) return null;
+                return new Ability { Op = Op.ModifyAssembledRank, Multiplier = mul.GetInt32(), Text = name };
+            case "RankDoesNotCount":
+                if (targets is not { Self: true }) return null;
+                return new Ability { Op = Op.RankDoesNotCount, Targets = targets, Text = name };
             case "Suppress":
             {
                 if (targets is null) return null;
@@ -969,13 +1071,20 @@ public static class StaticLayer
     {
         "zone", "kind", "race", "notRace", "unitClass", "name", "controller", "owner", "excludeSelf",
         "allied", "sharesRaceWith", "excludeEach",
+        "spacecraft", "crewed", "inSpacecraft", // Spacecraft
     };
 
     private static readonly HashSet<string> ZoneNames = new() { "InPlay", "Hand", "Any", "NullifiedPile", "RetiredPile" };
 
     private static Filter? ParseFilter(JsonElement f)
     {
-        if (f.ValueKind == JsonValueKind.String) return f.GetString() == "Self" ? new Filter { Self = true } : null;
+        if (f.ValueKind == JsonValueKind.String)
+            return f.GetString() switch
+            {
+                "Self" => new Filter { Self = true },
+                "Crew" => new Filter { Crew = true }, // Spacecraft: the Unit aboard the source (Goo Bubble)
+                _ => null,
+            };
         if (f.ValueKind != JsonValueKind.Object) return null;
         var r = new Filter();
         foreach (var p in f.EnumerateObject())
@@ -1026,6 +1135,15 @@ public static class StaticLayer
                 case "excludeEach":
                     r.ExcludeEach = v.ValueKind == JsonValueKind.True;
                     break;
+                case "spacecraft":
+                case "crewed":
+                case "inSpacecraft":
+                    if (v.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return null;
+                    bool b = v.ValueKind == JsonValueKind.True;
+                    if (p.Name == "spacecraft") r.Spacecraft = b;
+                    else if (p.Name == "crewed") r.Crewed = b;
+                    else r.InSpacecraft = b;
+                    break;
             }
         }
         return r;
@@ -1035,6 +1153,13 @@ public static class StaticLayer
     {
         if (a.ValueKind == JsonValueKind.Number) return new Amount { Const = a.GetInt32() };
         if (a.ValueKind != JsonValueKind.Object) return null;
+        // Earthrise: { "countOf": {...}, "times": 2 }.
+        if (a.TryGetProperty("times", out var times))
+        {
+            if (times.ValueKind != JsonValueKind.Number || a.EnumerateObject().Count() != 2
+                || !a.TryGetProperty("countOf", out var co) || ParseFilter(co) is not { Self: false } cf) return null;
+            return new Amount { CountOf = cf, Times = times.GetInt32() };
+        }
         var props = a.EnumerateObject().ToList();
         if (props.Count != 1) return null;
         var p = props[0];
@@ -1048,6 +1173,8 @@ public static class StaticLayer
                 return p.Value.GetString() == "Opponents" ? new Amount { MaxHandOpponents = true } : null;
             case "rankOf":
                 return p.Value.GetString() == "Self" ? new Amount { RankOfSelf = true } : null;
+            case "baseRankOf":
+                return p.Value.GetString() == "Crew" ? new Amount { BaseRankOfCrew = true } : null; // High Roller
         }
         return null;
     }
@@ -1061,6 +1188,34 @@ public static class StaticLayer
             if (c.EnumerateObject().Count() != 1 || ParseFilter(ex) is not { Self: false } f) return null;
             r.Exists = f;
             return r;
+        }
+        // Spacecraft: conditions on the source spacecraft's crew (one key each).
+        if (c.EnumerateObject().Count() == 1)
+        {
+            if (c.TryGetProperty("crewed", out var cw))
+            {
+                if (cw.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return null;
+                r.Crewed = cw.ValueKind == JsonValueKind.True;
+                return r;
+            }
+            if (c.TryGetProperty("crewClassNot", out var cc))
+            {
+                if (cc.ValueKind != JsonValueKind.Array) return null;
+                var list = new List<UnitClass>();
+                foreach (var x in cc.EnumerateArray())
+                {
+                    if (!Enum.TryParse<UnitClass>(x.GetString(), out var uc)) return null;
+                    list.Add(uc);
+                }
+                r.CrewClassNot = list.ToArray();
+                return r;
+            }
+            if (c.TryGetProperty("crewRace", out var cr))
+            {
+                if (!Enum.TryParse<Race>(cr.GetString(), out _)) return null;
+                r.CrewRace = cr.GetString();
+                return r;
+            }
         }
         if (c.TryGetProperty("node", out var node))
         {

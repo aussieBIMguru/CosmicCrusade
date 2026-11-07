@@ -51,7 +51,7 @@ public class EffectTests
     {
         var onPlay = TestData.Db.All.Where(c => HasTrigger(c, "OnPlay")).ToList();
         var notLive = onPlay.Where(c => !EffectSupport.IsLive(c, "OnPlay")).Select(c => c.Name).OrderBy(n => n).ToList();
-        Assert.Equal(38, onPlay.Count);
+        Assert.Equal(46, onPlay.Count); // 38 + 8 Spacecraft
         Assert.Empty(notLive); // M3.3: Ace and TR-1993.r are scripted handlers now
     }
 
@@ -73,8 +73,8 @@ public class EffectTests
             .Select(c => c.Name).OrderBy(n => n).ToList();
         Assert.Equal(new[]
         {
-            "Already Dead", "Commandeer", "Forced Mitosis", "Gloop!", "Recolonize", "Respond in Kind", "Second Thought",
-            "Shadow Strike", "Spreading Sickness", "Target Practice",
+            "Already Dead", "Commandeer", "Forced Mitosis", "Gloop!", "Hijack", "Recolonize", "Respond in Kind",
+            "Second Thought", "Self-Destruct", "Shadow Strike", "Spreading Sickness", "Target Practice",
         }, liveReacts);
     }
 

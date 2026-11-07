@@ -61,31 +61,27 @@ public sealed partial class GameEngine
     {
         // Black Hole: "If a Unit would be put into a Standby Zone, Nullify it instead" (prevented → it moves anyway).
         foreach (var (from, to) in new[] { (a, b), (b, a) })
-            if (from.Card is { } c && from.IsScoring && to.Kind == NodeKind.Standby)
-                await BlackHoleReplacesAsync(c, ct);
+            if (from.IsScoring && to.Kind == NodeKind.Standby)
+                foreach (var c in from.Occupants.ToList())
+                    await BlackHoleReplacesAsync(c, ct);
 
         var ca = a.Card;
         var cb = b.Card;
         if (ca is null && cb is null) return;
-        if (!Rearrange.Fits(ca, b) || !Rearrange.Fits(cb, a)) return; // something changed during a Nullify window
+        if (!Rearrange.ContentsFit(a, b) || !Rearrange.ContentsFit(b, a)) return; // something changed during a Nullify window
 
-        bool aLeaves = ca is not null && a.IsScoring && !b.IsScoring;
-        bool bLeaves = cb is not null && b.IsScoring && !a.IsScoring;
-        var memA = ca is null ? null : new Dictionary<string, object>(ca.Memory);
-        var memB = cb is null ? null : new Dictionary<string, object>(cb.Memory);
-        bool supA = ca is not null && StaticLayer.IsSuppressed(State, ca);
-        bool supB = cb is not null && StaticLayer.IsSuppressed(State, cb);
+        // Everything that crosses between play (Unit/Leader nodes) and Standby. A spacecraft travels with its crew.
+        var leaving = new List<(CardInstance Card, Node From, Dictionary<string, object> Memory, bool Suppressed)>();
+        foreach (var (from, to) in new[] { (a, b), (b, a) })
+            if (from.IsScoring && !to.IsScoring)
+                foreach (var c in from.Occupants)
+                    leaving.Add((c, from, LeaveMemory(c), StaticLayer.IsSuppressed(State, c)));
 
-        if (ca is not null) State.RemoveFromCurrentLocation(ca);
-        if (cb is not null) State.RemoveFromCurrentLocation(cb);
-        if (ca is not null) State.MoveToNode(ca, b);
-        if (cb is not null) State.MoveToNode(cb, a);
-        if (aLeaves) ca!.ResetInPlayState();
-        if (bLeaves) cb!.ResetInPlayState();
+        State.SwapContents(a, b);
+        foreach (var l in leaving) l.Card.ResetInPlayState();
 
         await EmitAsync(new NodesSwappedEvent(a, b, cb, ca), ct);
-        if (aLeaves) await LeftPlayAsync(ca!, a, memA!, supA, nullified: false, ct);
-        if (bLeaves) await LeftPlayAsync(cb!, b, memB!, supB, nullified: false, ct);
+        foreach (var l in leaving) await LeftPlayAsync(l.Card, l.From, l.Memory, l.Suppressed, nullified: false, ct);
     }
 
     // ================================================================== Terraform
@@ -109,9 +105,10 @@ public sealed partial class GameEngine
         var chosen = nodes[pick.Count > 0 ? pick[0] : 0];
         var pair = new[] { chosen, State.OpposingNode(chosen)! };
 
-        foreach (var node in pair)
+        // Spacecraft: a spacecraft and its crew are both Units on the node; the crew is dealt with first.
+        foreach (var (node, unit) in pair.SelectMany(n => n.Occupants.Reverse().Select(u => (n, u))).ToList())
         {
-            if (node.Card is not { } unit || !unit.Definition.IsUnit) continue;
+            if (!node.Holds(unit) || !unit.Definition.IsUnit) continue;
             if (StaticLayer.IsImmune(State, unit))
             {
                 await EmitAsync(new LogEvent($"  {unit.Name} is Immune: {source.Name} doesn't move it."), ct);
@@ -133,7 +130,7 @@ public sealed partial class GameEngine
                 await EmitAsync(new LogEvent($"  {unit.Name} can't go to Standby ({why})."), ct);
             }
 
-            if (!moved && ReferenceEquals(node.Card, unit)) await NullifyAsync(unit, source, ct);
+            if (!moved && node.Holds(unit)) await NullifyAsync(unit, source, ct);
         }
 
         foreach (var node in pair) await SetLockAsync(node, true, source, ct);
@@ -180,10 +177,13 @@ public sealed partial class GameEngine
             side = subject.Location.Node?.Side ?? ctx.Controller;
         }
 
-        var candidates = State.AllUnitsInPlay.Where(u => !ReferenceEquals(u, subject)).ToList();
+        // Spacecraft: a spacecraft only copies spacecraft (Morphership), a Unit only copies Units (Mr Morph, Forced Mitosis).
+        bool ship = subject.PrintedDefinition.IsSpacecraft;
+        var candidates = State.AllUnitsInPlay
+            .Where(u => !ReferenceEquals(u, subject) && u.Definition.IsSpacecraft == ship).ToList();
         if (candidates.Count == 0)
         {
-            await EmitAsync(new LogEvent($"  {ctx.Source.Name}: there is no other Unit in play to copy."), ct);
+            await EmitAsync(new LogEvent($"  {ctx.Source.Name}: there is no other {(ship ? "spacecraft" : "Unit")} in play to copy."), ct);
             return;
         }
 

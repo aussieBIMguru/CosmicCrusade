@@ -53,7 +53,7 @@ internal sealed class EffectRunner
             // Sisters of Blight: the Unit on the chosen node goes to Standby, so a node holding a Leader is not a
             // legal choice (ruling #36).
             Func<Node, bool>? nodeOk = MovesChosenUnitToStandby(effect, chosenName)
-                ? n => n.Card is null || Placement.CanEnterStandby(n.Card)
+                ? n => n.Occupants.All(u => Placement.CanEnterStandby(u))
                 : null;
             ctx.Chosen[chosenName] = await SelectAsync(choose, ctx, "Lock", ct, nodeOk);
         }
@@ -67,6 +67,9 @@ internal sealed class EffectRunner
     }
 
     // ================================================================== ops
+
+    /// <summary>Runs one op on behalf of a scripted handler (Gelatinous Hull's Manipulate).</summary>
+    internal Task RunSingleOpAsync(JsonElement op, EffectContext ctx, CancellationToken ct) => RunOpAsync(op, ctx, ct);
 
     private async Task RunOpAsync(JsonElement op, EffectContext ctx, CancellationToken ct)
     {
@@ -372,6 +375,21 @@ internal sealed class EffectRunner
                 if (IssuingItem(ctx) is { } retarget) await _engine.RetargetAsync(retarget, ctx.Controller, ctx.Source, ct);
                 break;
 
+            // ------------------------------------------------------------ Spacecraft
+
+            case "Retire":
+            {
+                // Decommission: "Retire a spacecraft." Its crew drops to the ground.
+                var targets = await SelectAsync(op.GetProperty("targets"), ctx, "Retire", ct);
+                foreach (var card in targets.OfType<CardInstance>().Where(InPlay).ToList())
+                    await _engine.RetireAsync(card, ct);
+                break;
+            }
+
+            case "DuelOpposedSpacecraft":
+                await DuelOpposedSpacecraftAsync(ctx, ct);
+                break;
+
             default:
                 await _engine.EmitAsync(new LogEvent($"  {ctx.Source.Name}: '{name}' is not implemented yet."), ct);
                 break;
@@ -486,6 +504,33 @@ internal sealed class EffectRunner
         foreach (var loser in losers) await _engine.NullifyAsync(loser, ctx.Source, ct);
     }
 
+    /// <summary>
+    /// Dogfight (Spacecraft S17): every node pair where both sides have a spacecraft – those two Duel, all at once.
+    /// The spacecraft fight alone (S5): their crews aren't compared and aren't Nullified with them.
+    /// </summary>
+    private async Task DuelOpposedSpacecraftAsync(EffectContext ctx, CancellationToken ct)
+    {
+        var pairs = new List<(CardInstance A, CardInstance B)>();
+        foreach (var n in State.Players[0].ScoringNodes)
+            if (n.Card is { } a && Spacecraft.IsShip(a) && State.OpposingNode(n)?.Card is { } b && Spacecraft.IsShip(b)
+                && Affectable(a, ctx) && Affectable(b, ctx))
+                pairs.Add((a, b));
+        if (pairs.Count == 0)
+        {
+            await _engine.EmitAsync(new LogEvent($"  {ctx.Source.Name}: no spacecraft face each other."), ct);
+            return;
+        }
+        var losers = new List<CardInstance>();
+        foreach (var (a, b) in pairs)
+        {
+            var l = Duel.Losers(State, a, b);
+            losers.AddRange(l);
+            await _engine.EmitAsync(new DuelEvent(a, b, l, false), ct);
+        }
+        foreach (var loser in losers.Distinct().ToList())
+            if (InPlay(loser)) await _engine.NullifyAsync(loser, ctx.Source, ct);
+    }
+
     /// <summary>High Noon: "all Opposed Nodes Duel" – every pair is compared first, then all losers go at once.</summary>
     private async Task DuelAllOpposedAsync(EffectContext ctx, CancellationToken ct)
     {
@@ -564,7 +609,22 @@ internal sealed class EffectRunner
     private async Task<List<object>> SelectAsync(JsonElement sel, EffectContext ctx, string purpose, CancellationToken ct,
         Func<Node, bool>? nodeOk = null, Func<CardInstance, bool>? cardOk = null)
     {
-        if (sel.ValueKind == JsonValueKind.String) return Named(sel.GetString()!, ctx);
+        if (sel.ValueKind == JsonValueKind.String)
+        {
+            var named = Named(sel.GetString()!, ctx);
+            // Spacecraft S6/S8: from the air (or under Gravity Well) "the Opposing Unit" may be the spacecraft or its
+            // crew; the effect's controller chooses. From the ground the crew is out of reach (S4).
+            if (sel.GetString() == "OpposingUnit" && named.Count == 1 && named[0] is CardInstance ship
+                && Spacecraft.CrewOf(ship) is { } crew && Affectable(crew, ctx)
+                && (Spacecraft.InAir(ctx.Source) || StaticLayer.ElevationDisabled(State)))
+            {
+                var both = new List<CardInstance> { ship, crew };
+                var pick = await AskCardsAsync(ctx, both, 1, 1, purpose,
+                    $"{ctx.Source.Name}: the opposing spacecraft or its crew?", ct);
+                return pick.Cast<object>().ToList();
+            }
+            return named;
+        }
         if (sel.ValueKind != JsonValueKind.Object) return new List<object>();
         if (sel.TryGetProperty("lowestRank", out var low))
         {
@@ -651,7 +711,9 @@ internal sealed class EffectRunner
                     if (ctx.Chosen.TryGetValue(parts[1], out var chosen))
                     {
                         if (parts.Length > 2 && parts[2] == "Unit")
-                            list.AddRange(chosen.OfType<Node>().Where(n => n.Card is not null && Affectable(n.Card, ctx)).Select(n => (object)n.Card!));
+                            // Spacecraft: the crew too (listed first, so the spacecraft doesn't just drop it).
+                            list.AddRange(chosen.OfType<Node>().SelectMany(n => n.Occupants.Reverse())
+                                .Where(u => Affectable(u, ctx)).Select(u => (object)u));
                         else
                             list.AddRange(chosen);
                     }
@@ -742,14 +804,14 @@ internal sealed class EffectRunner
             switch (zone)
             {
                 case "InPlay":
-                    result.AddRange(State.Players.SelectMany(p => p.ScoringNodes).Where(n => n.Card is not null).Select(n => n.Card!));
+                    result.AddRange(State.Players.SelectMany(p => p.ScoringNodes).SelectMany(n => n.Occupants)); // crews too
                     result.AddRange(State.Players.SelectMany(p => p.OrderNodes).Where(n => n.Card is not null).Select(n => n.Card!));
                     break;
                 case "OrderNode":
                     result.AddRange(State.Players.SelectMany(p => p.OrderNodes).Where(n => n.Card is not null).Select(n => n.Card!));
                     break;
                 case "Standby":
-                    result.AddRange(State.Players.SelectMany(p => p.StandbyNodes).Where(n => n.Card is not null).Select(n => n.Card!));
+                    result.AddRange(State.Players.SelectMany(p => p.StandbyNodes).SelectMany(n => n.Occupants));
                     break;
                 case "RetiredPile": result.AddRange(State.RetiredUnits); break;
                 case "NullifiedPile": result.AddRange(State.NullifiedUnits); break;
@@ -813,6 +875,16 @@ internal sealed class EffectRunner
                 case "baseRankLessThan":
                     int count = Cards(v.GetProperty("countOf"), ctx, unitOnly: false).Count;
                     if (RankCalculator.CurrentBaseRank(State, card) >= count) return false;
+                    break;
+                // Spacecraft module
+                case "spacecraft":
+                    if (card.Definition.IsSpacecraft != (v.ValueKind == JsonValueKind.True)) return false;
+                    break;
+                case "crewed":
+                    if (!Spacecraft.IsShip(card) || (Spacecraft.CrewOf(card) is not null) != (v.ValueKind == JsonValueKind.True)) return false;
+                    break;
+                case "inSpacecraft":
+                    if (Spacecraft.IsCrew(card) != (v.ValueKind == JsonValueKind.True)) return false;
                     break;
                 // zone was applied when gathering; node-only keys don't apply to cards.
             }
@@ -905,6 +977,8 @@ internal sealed class EffectRunner
         {
             if (ctx.SelfNode is null || State.OpposingNode(ctx.SelfNode)?.Card is null) return false;
         }
+        if (cond.TryGetProperty("crewed", out var cw) && Spacecraft.IsCrewed(ctx.Source) != (cw.ValueKind == JsonValueKind.True))
+            return false;
         return true;
     }
 

@@ -5,6 +5,9 @@ namespace CosmicCrusade.Core.Model;
 /// <summary>All card definitions plus the race weakness cycle, loaded from cards.json.</summary>
 public sealed class CardDatabase
 {
+    /// <summary>Set name of the Spacecraft module's cards.</summary>
+    public const string SpacecraftSet = "Spacecraft";
+
     private readonly Dictionary<string, CardDefinition> _cards;
     private readonly Dictionary<Race, Race> _beats;
 
@@ -79,8 +82,13 @@ public sealed class CardDatabase
             Flavor = OptString(c, "flavor") ?? "",
             Image = OptString(c, "image") ?? "",
             Effects = c.TryGetProperty("effects", out var fx) ? fx.Clone() : default,
+            IsSpacecraft = OptBool(c, "spacecraft"),
+            IsToken = OptBool(c, "token"),
         };
     }
+
+    private static bool OptBool(JsonElement e, string name) =>
+        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
 
     private static string? OptString(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;

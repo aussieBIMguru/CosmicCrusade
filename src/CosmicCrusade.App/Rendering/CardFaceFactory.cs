@@ -157,7 +157,7 @@ public static class CardFaceFactory
                 ("Rank:", new[]
                 {
                     (def.BaseRankIsX ? "X" : (def.BaseRank ?? 0).ToString(CultureInfo.InvariantCulture), own),
-                    ("  (" + (def.IsLeader ? "*Leader*" : def.UnitClass?.ToString() ?? "") + ")", Grey),
+                    ("  (" + ClassLabel(def) + ")", Grey),
                 }),
             },
             CardKind.Order => new[]
@@ -378,5 +378,16 @@ public static class CardFaceFactory
     {
         f.Freeze();
         return f;
+    }
+
+    /// <summary>
+    /// The bracketed class on the Rank line: "*Leader*" for Leaders; Spacecraft module: "Spacecraft", "*Leader* ship",
+    /// "Champion ship" (card-layout.json <c>header.classDisplay</c>).
+    /// </summary>
+    private static string ClassLabel(CardDefinition def)
+    {
+        string cls = def.IsLeader ? "*Leader*" : def.UnitClass?.ToString() ?? "";
+        if (!def.IsSpacecraft) return cls;
+        return def.UnitClass == UnitClass.Craft ? "Spacecraft" : cls + " ship";
     }
 }

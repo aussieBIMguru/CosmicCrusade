@@ -36,6 +36,15 @@ public sealed class CardDefinition
     /// <summary>Archons module card (set "Archons"): lives in the Archon deck, never in the normal decks or piles.</summary>
     public bool IsArchon => Set.Equals("Archons", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Spacecraft module: this Unit is a spacecraft ("spacecraft": true). Spacecraft are Units (ruling S21).</summary>
+    public bool IsSpacecraft { get; init; }
+
+    /// <summary>A token (the Mothership's Fighter): never in a deck or pool; it vanishes whenever it leaves play.</summary>
+    public bool IsToken { get; init; }
+
+    /// <summary>Card of the Spacecraft module (set "Spacecraft"): ships, their Orders and Warzones.</summary>
+    public bool IsSpacecraftSet => Set.Equals(CardDatabase.SpacecraftSet, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>True when the card has no effects at all (e.g. Brutes). Useful while the effect engine is incomplete.</summary>
     public bool IsVanilla => Effects.ValueKind != JsonValueKind.Array || Effects.GetArrayLength() == 0;
 

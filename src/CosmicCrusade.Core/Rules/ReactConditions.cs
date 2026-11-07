@@ -20,9 +20,11 @@ public static class ReactConditions
     /// answer a Leader's deploy (ruling #36).</param>
     /// <param name="NeedsRedirectNode">Recolonize: there must be another legal node to send the Unit to.</param>
     /// <param name="NeedsCopySource">Forced Mitosis: there must be a Unit in play to copy.</param>
+    /// <param name="OnlySpacecraft">Spacecraft module: only answers a spacecraft (Hijack, Self-Destruct).</param>
+    /// <param name="NeedsOwnNode">Hijack: the issuer needs an Empty node of their own the spacecraft may go to.</param>
     public sealed record Condition(string Event, bool TargetNodeOpposed, IReadOnlyList<OrderType>? OrderTypes,
         bool MovesUnitToStandby = false, bool NeedsOpposingUnit = false, bool NeedsRedirectNode = false,
-        bool NeedsCopySource = false);
+        bool NeedsCopySource = false, bool OnlySpacecraft = false, bool NeedsOwnNode = false);
 
     private static readonly Dictionary<string, Condition?> _cache = new();
 
@@ -45,6 +47,8 @@ public static class ReactConditions
         if (c is null || item.Cancelled) return false;
 
         // "As a Unit is Nullified": the Unit is still on its node while the window is open.
+        if (c.OnlySpacecraft && !item.Card.Definition.IsSpacecraft) return false;
+
         if (item.Kind == StackItemKind.UnitNullifying)
         {
             if (c.Event != "UnitNullifying") return false;
@@ -60,7 +64,15 @@ public static class ReactConditions
                 if (item.Kind != StackItemKind.DeployUnit || item.TargetNode is null) return false;
                 if (c.TargetNodeOpposed && state.OpposingNode(item.TargetNode)?.Card is null) return false;
                 if (c.MovesUnitToStandby && !Placement.CanEnterStandby(item.Card)) return false;
-                if (c.NeedsCopySource && !state.AllUnitsInPlay.Any()) return false;
+                if (c.NeedsCopySource && !state.AllUnitsInPlay.Any(u => u.Definition.IsSpacecraft == item.Card.PrintedDefinition.IsSpacecraft))
+                    return false;
+                if (c.NeedsOwnNode)
+                {
+                    int me = react.Location.Kind == LocationKind.Hand ? react.Location.Player : -1;
+                    if (me < 0 || me == item.Controller) return false; // you Hijack your opponent's spacecraft
+                    if (!state.Players[me].ScoringNodes.Any(n => n.IsEmpty && Placement.ClassAllows(item.Card.Definition, n.Kind)))
+                        return false;
+                }
                 if (c.NeedsRedirectNode && !state.AllNodes.Any(n => !ReferenceEquals(n, item.TargetNode)
                                                                    && Placement.CanRedirectTo(state, item.Controller, item.Card, n)))
                     return false;
@@ -104,7 +116,9 @@ public static class ReactConditions
             bool redirect = ops.ValueKind == JsonValueKind.Array
                 && ops.EnumerateArray().Any(op => op.TryGetProperty("op", out var n) && n.GetString() == "RedirectDeploy");
             bool copy = effect.TryGetProperty("script", out var sc) && sc.GetString() == "EnterAsCopy";
-            return new Condition(ev, opposed, types, toStandby, needsOpposing, redirect, copy);
+            bool onlyShips = when.TryGetProperty("spacecraft", out var sp) && sp.ValueKind == JsonValueKind.True;
+            bool ownNode = effect.TryGetProperty("script", out var hs) && hs.GetString() == "Hijack";
+            return new Condition(ev, opposed, types, toStandby, needsOpposing, redirect, copy, onlyShips, ownNode);
         }
         return null;
     }

@@ -5813,6 +5813,1386 @@
     }
    ],
    "printedText": "Nullify all Units. You may Draw up to 3 Unit Cards."
+  },
+  {
+   "id": "0SL1",
+   "name": "Dreadnought",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Leader",
+   "baseRank": 4,
+   "spacecraft": true,
+   "races": [
+    "GalacticCouncil"
+   ],
+   "text": "This spacecraft's Rank only counts if it is crewed by a Leader or Champion.",
+   "flavor": "",
+   "image": "images/0SL1.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "condition": {
+      "crewClassNot": [
+       "Leader",
+       "Champion"
+      ]
+     },
+     "note": "Spacecraft S15: a Champion crew counts too. Without one it counts as 0 in the round total and the pair tiebreak; Duels use its real Rank.",
+     "do": [
+      {
+       "op": "RankDoesNotCount",
+       "targets": "Self"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "0SL2",
+   "name": "Mothership",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Champion",
+   "baseRank": 1,
+   "spacecraft": true,
+   "races": [
+    "GalacticCouncil"
+   ],
+   "text": "When you play this spacecraft, put each ground Unit on your side without a spacecraft into a Rank 1 Galactic Council spacecraft called Fighter.",
+   "flavor": "",
+   "image": "images/0SL2.jpg",
+   "effects": [
+    {
+     "trigger": "OnPlay",
+     "script": "Mothership",
+     "note": "Spacecraft S13: Fighters are tokens (0ST1) that vanish when they leave play. They form around the Unit on its node (a Leader on the Leader Node included). 'When crewed' fires (S24). Viscous Fog stops it."
+    }
+   ]
+  },
+  {
+   "id": "0SU1",
+   "name": "Medical Frigate",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "GalacticCouncil"
+   ],
+   "text": "If this spacecraft's crew would be Nullified, you may place it in your Standby Zone instead.",
+   "flavor": "",
+   "image": "images/0SU1.jpg",
+   "effects": [
+    {
+     "trigger": "Replacement",
+     "optional": true,
+     "replaces": {
+      "event": "UnitNullifying",
+      "unit": "Crew"
+     },
+     "note": "Leaders can't go to Standby (ruling #36), so a Leader crew is Nullified as normal. With no Standby room it is Nullified.",
+     "do": [
+      {
+       "op": "MoveToStandby",
+       "targets": "Event.Unit",
+       "standbyOf": "Controller"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "0SU2",
+   "name": "Research Vessel",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "GalacticCouncil"
+   ],
+   "text": "While this spacecraft is crewed, you may look at the top card of each deck.",
+   "flavor": "",
+   "image": "images/0SU2.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "condition": {
+      "crewed": true
+     },
+     "note": "A continuous peek while crewed (visible to you only): hover the Unit and Order decks.",
+     "do": [
+      {
+       "op": "RevealTopCards",
+       "to": "You"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "0SU3",
+   "name": "Requisitions Unit",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 1,
+   "spacecraft": true,
+   "races": [
+    "GalacticCouncil"
+   ],
+   "text": "When you play this spacecraft, you may set an opposing spacecraft's Base Rank to 0.",
+   "flavor": "",
+   "image": "images/0SU3.jpg",
+   "effects": [
+    {
+     "trigger": "OnPlay",
+     "optional": true,
+     "do": [
+      {
+       "op": "SetBaseRank",
+       "value": 0,
+       "persistent": true,
+       "targets": {
+        "choose": "Unit",
+        "filter": {
+         "zone": "InPlay",
+         "kind": "Unit",
+         "spacecraft": true,
+         "controller": "Opponent"
+        }
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "0SO1",
+   "name": "Decommission",
+   "set": "Spacecraft",
+   "kind": "Order",
+   "orderType": "Action",
+   "races": [
+    "GalacticCouncil"
+   ],
+   "text": "Retire a spacecraft.",
+   "flavor": "",
+   "image": "images/0SO1.jpg",
+   "effects": [
+    {
+     "trigger": "OnResolve",
+     "note": "Its crew stays on the node, on the ground.",
+     "do": [
+      {
+       "op": "Retire",
+       "targets": {
+        "choose": "Unit",
+        "filter": {
+         "zone": "InPlay",
+         "kind": "Unit",
+         "spacecraft": true
+        }
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "0SO2",
+   "name": "Nuke from Orbit",
+   "set": "Spacecraft",
+   "kind": "Order",
+   "orderType": "Action",
+   "races": [
+    "GalacticCouncil"
+   ],
+   "text": "If you control a Unit in a spacecraft, Nullify all ground Units not in a spacecraft.",
+   "flavor": "",
+   "image": "images/0SO2.jpg",
+   "effects": [
+    {
+     "trigger": "OnResolve",
+     "condition": {
+      "exists": {
+       "zone": "InPlay",
+       "kind": "Unit",
+       "spacecraft": false,
+       "controller": "You",
+       "inSpacecraft": true
+      }
+     },
+     "note": "Spacecraft themselves aren't hit (they're in orbit).",
+     "do": [
+      {
+       "op": "Nullify",
+       "simultaneous": true,
+       "targets": {
+        "zone": "InPlay",
+        "kind": "Unit",
+        "spacecraft": false,
+        "inSpacecraft": false
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1SL1",
+   "name": "Earthrise",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Leader",
+   "baseRank": 1,
+   "spacecraft": true,
+   "races": [
+    "SpaceCowboy"
+   ],
+   "text": "This spacecraft gets +2 Rank for each other Space Cowboy you control.",
+   "flavor": "",
+   "image": "images/1SL1.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "note": "Spacecraft S16: counts Space Cowboy Units and spacecraft, including its own crew.",
+     "do": [
+      {
+       "op": "ModifyRank",
+       "targets": "Self",
+       "amount": {
+        "countOf": {
+         "zone": "InPlay",
+         "kind": "Unit",
+         "controller": "You",
+         "race": "SpaceCowboy",
+         "excludeSelf": true
+        },
+        "times": 2
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1SL2",
+   "name": "High Roller",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Champion",
+   "baseRank": 0,
+   "spacecraft": true,
+   "races": [
+    "SpaceCowboy"
+   ],
+   "text": "This spacecraft's Base Rank is equal to its crew's Base Rank.",
+   "flavor": "",
+   "image": "images/1SL2.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "condition": {
+      "crewed": true
+     },
+     "do": [
+      {
+       "op": "SetBaseRank",
+       "targets": "Self",
+       "value": {
+        "baseRankOf": "Crew"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1SU1",
+   "name": "Remnant AI",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 3,
+   "spacecraft": true,
+   "races": [
+    "SpaceCowboy"
+   ],
+   "text": "This spacecraft cannot be crewed (so it can't be played onto a Unit either).",
+   "flavor": "",
+   "image": "images/1SU1.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "do": [
+      {
+       "op": "CannotBeCrewed",
+       "targets": "Self"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1SU2",
+   "name": "Chrome Steed",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 1,
+   "spacecraft": true,
+   "races": [
+    "SpaceCowboy"
+   ],
+   "text": "When you play this spacecraft, you may move a Retired Unit to crew it.",
+   "flavor": "",
+   "image": "images/1SU2.jpg",
+   "effects": [
+    {
+     "trigger": "OnPlay",
+     "optional": true,
+     "script": "CrewFromPile",
+     "params": {
+      "zone": "RetiredPile"
+     },
+     "note": "The Unit enters play but isn't Played, and must be able to crew this spacecraft (S11)."
+    }
+   ]
+  },
+  {
+   "id": "1SU3",
+   "name": "Blazing Saddle",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 1,
+   "spacecraft": true,
+   "races": [
+    "SpaceCowboy"
+   ],
+   "text": "If this spacecraft is crewed by a Space Cowboy, it gets +2 Rank.",
+   "flavor": "",
+   "image": "images/1SU3.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "condition": {
+      "crewRace": "SpaceCowboy"
+     },
+     "do": [
+      {
+       "op": "ModifyRank",
+       "amount": 2,
+       "targets": "Self"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1SO1",
+   "name": "Greased Engines",
+   "set": "Spacecraft",
+   "kind": "Order",
+   "orderType": "Ongoing",
+   "races": [
+    "SpaceCowboy"
+   ],
+   "text": "Spacecraft you control get +1 Rank.",
+   "flavor": "",
+   "image": "images/1SO1.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "do": [
+      {
+       "op": "ModifyRank",
+       "amount": 1,
+       "targets": {
+        "zone": "InPlay",
+        "kind": "Unit",
+        "spacecraft": true,
+        "controller": "You"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1SO2",
+   "name": "Dogfight",
+   "set": "Spacecraft",
+   "kind": "Order",
+   "orderType": "Action",
+   "races": [
+    "SpaceCowboy"
+   ],
+   "text": "All opposed spacecraft Duel.",
+   "flavor": "",
+   "image": "images/1SO2.jpg",
+   "effects": [
+    {
+     "trigger": "OnResolve",
+     "note": "Spacecraft S17: each node pair where both sides have a spacecraft; those two Duel at once (spacecraft Rank only, S5).",
+     "do": [
+      {
+       "op": "DuelOpposedSpacecraft",
+       "simultaneous": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "2SL1",
+   "name": "Sarcophagar",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Leader",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "Necrolite"
+   ],
+   "text": "When you play this spacecraft, you may crew it with a Unit from the Nullified pile. That Unit becomes a Necrolite.",
+   "flavor": "",
+   "image": "images/2SL1.jpg",
+   "effects": [
+    {
+     "trigger": "OnPlay",
+     "optional": true,
+     "script": "CrewFromPile",
+     "params": {
+      "zone": "NullifiedPile",
+      "setRaces": [
+       "Necrolite"
+      ]
+     },
+     "note": "The crew must be a Leader or Champion (Leader Node, S11). It enters play but isn't Played."
+    }
+   ]
+  },
+  {
+   "id": "2SL2",
+   "name": "Ghost Ship",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Champion",
+   "baseRank": 1,
+   "spacecraft": true,
+   "races": [
+    "Necrolite"
+   ],
+   "text": "This spacecraft gets +1 Rank for each Nullified spacecraft.",
+   "flavor": "",
+   "image": "images/2SL2.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "do": [
+      {
+       "op": "ModifyRank",
+       "targets": "Self",
+       "amount": {
+        "countOf": {
+         "zone": "NullifiedPile",
+         "kind": "Unit",
+         "spacecraft": true
+        }
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "2SU1",
+   "name": "Hearse",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "Necrolite"
+   ],
+   "text": "When this spacecraft's crew is Nullified, you may Draw a card.",
+   "flavor": "",
+   "image": "images/2SU1.jpg",
+   "effects": [
+    {
+     "trigger": "OnCrewNullified",
+     "optional": true,
+     "do": [
+      {
+       "op": "Draw",
+       "count": 1,
+       "deckChoice": "PerCard"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "2SU2",
+   "name": "Spore Pod",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 1,
+   "spacecraft": true,
+   "races": [
+    "Necrolite"
+   ],
+   "text": "When this spacecraft leaves play, Lock its Node and the opposing Node. Units on those Nodes are placed in their controllers' Standby Zones.",
+   "flavor": "",
+   "image": "images/2SU2.jpg",
+   "effects": [
+    {
+     "trigger": "OnLeavePlay",
+     "script": "SporePod",
+     "note": "As Sisters of Blight: Units move before the Lock; Retired if no Standby room. A Leader stays put (ruling #36), and the node is still Locked."
+    }
+   ]
+  },
+  {
+   "id": "2SU3",
+   "name": "Scuttler",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "Necrolite"
+   ],
+   "text": "While this spacecraft is crewed, it gets +1 Rank whenever a Unit is Nullified.",
+   "flavor": "",
+   "image": "images/2SU3.jpg",
+   "effects": [
+    {
+     "trigger": "OnEvent",
+     "event": "UnitNullified",
+     "condition": {
+      "crewed": true
+     },
+     "do": [
+      {
+       "op": "ModifyRank",
+       "amount": 1,
+       "targets": "Self",
+       "duration": "WhileInPlay"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "2SO1",
+   "name": "Shipwreck",
+   "set": "Spacecraft",
+   "kind": "Order",
+   "orderType": "Action",
+   "races": [
+    "Necrolite"
+   ],
+   "text": "Place a Nullified spacecraft into your Standby Zone.",
+   "flavor": "",
+   "image": "images/2SO1.jpg",
+   "effects": [
+    {
+     "trigger": "OnResolve",
+     "note": "Leader spacecraft can't be chosen (ruling #36).",
+     "do": [
+      {
+       "op": "MoveToStandby",
+       "standbyOf": "You",
+       "gainControl": true,
+       "targets": {
+        "choose": "Card",
+        "filter": {
+         "zone": "NullifiedPile",
+         "kind": "Unit",
+         "spacecraft": true
+        }
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "2SO2",
+   "name": "Hull Rot",
+   "set": "Spacecraft",
+   "kind": "Order",
+   "orderType": "Ongoing",
+   "races": [
+    "Necrolite"
+   ],
+   "text": "Crewed spacecraft get -1 Rank. Uncrewed spacecraft get -2 Rank.",
+   "flavor": "",
+   "image": "images/2SO2.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "do": [
+      {
+       "op": "ModifyRank",
+       "amount": -1,
+       "targets": {
+        "zone": "InPlay",
+        "kind": "Unit",
+        "spacecraft": true,
+        "crewed": true
+       }
+      },
+      {
+       "op": "ModifyRank",
+       "amount": -2,
+       "targets": {
+        "zone": "InPlay",
+        "kind": "Unit",
+        "spacecraft": true,
+        "crewed": false
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "3SL1",
+   "name": "Train of Thought",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Leader",
+   "baseRank": 3,
+   "spacecraft": true,
+   "races": [
+    "Overmind"
+   ],
+   "text": "When this spacecraft becomes crewed, you may Draw 2 cards.",
+   "flavor": "",
+   "image": "images/3SL1.jpg",
+   "effects": [
+    {
+     "trigger": "OnCrewed",
+     "optional": true,
+     "do": [
+      {
+       "op": "Draw",
+       "count": 2,
+       "deckChoice": "PerCard"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "3SL2",
+   "name": "Hive Carrier",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Champion",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "Overmind"
+   ],
+   "text": "Crewed spacecraft you control get +1 Rank.",
+   "flavor": "",
+   "image": "images/3SL2.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "do": [
+      {
+       "op": "ModifyRank",
+       "amount": 1,
+       "targets": {
+        "zone": "InPlay",
+        "kind": "Unit",
+        "spacecraft": true,
+        "controller": "You",
+        "crewed": true
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "3SU1",
+   "name": "Abductor",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 0,
+   "spacecraft": true,
+   "races": [
+    "Overmind"
+   ],
+   "text": "When you play this spacecraft, if it is uncrewed and the Opposing Unit is a ground Unit, move that Unit onto this spacecraft.",
+   "flavor": "",
+   "image": "images/3SU1.jpg",
+   "effects": [
+    {
+     "trigger": "OnPlay",
+     "script": "Abduct",
+     "note": "The Unit crosses sides and control follows (ruling #15); it stays in play and isn't Played again. It must be able to crew Abductor (S11)."
+    }
+   ]
+  },
+  {
+   "id": "3SU2",
+   "name": "Mindscrambler",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 1,
+   "spacecraft": true,
+   "races": [
+    "Overmind"
+   ],
+   "text": "When you play this spacecraft, you may switch the crews of any 2 spacecraft.",
+   "flavor": "",
+   "image": "images/3SU2.jpg",
+   "effects": [
+    {
+     "trigger": "OnPlay",
+     "optional": true,
+     "script": "SwapCrews",
+     "note": "One of the two may be uncrewed (its crew just moves). Control follows the side. Each crew must be legal on its new node (S11). 'When crewed' fires (S24)."
+    }
+   ]
+  },
+  {
+   "id": "3SU3",
+   "name": "Thought Courier",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 1,
+   "spacecraft": true,
+   "races": [
+    "Overmind"
+   ],
+   "text": "When this spacecraft becomes crewed, you may Draw a card.",
+   "flavor": "",
+   "image": "images/3SU3.jpg",
+   "effects": [
+    {
+     "trigger": "OnCrewed",
+     "optional": true,
+     "do": [
+      {
+       "op": "Draw",
+       "count": 1,
+       "deckChoice": "PerCard"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "3SO1",
+   "name": "Beam Up",
+   "set": "Spacecraft",
+   "kind": "Order",
+   "orderType": "Action",
+   "races": [
+    "Overmind"
+   ],
+   "text": "Move one of your ground Units onto an uncrewed spacecraft you control. It isn't Played again.",
+   "flavor": "",
+   "image": "images/3SO1.jpg",
+   "effects": [
+    {
+     "trigger": "OnResolve",
+     "script": "BeamUp"
+    }
+   ]
+  },
+  {
+   "id": "3SO2",
+   "name": "Hijack",
+   "set": "Spacecraft",
+   "kind": "Order",
+   "orderType": "React",
+   "races": [
+    "Overmind"
+   ],
+   "text": "Gain control of a spacecraft as it is being Deployed. It is Deployed to one of your Empty Nodes instead.",
+   "flavor": "",
+   "image": "images/3SO2.jpg",
+   "effects": [
+    {
+     "trigger": "React",
+     "when": {
+      "event": "UnitDeploying",
+      "spacecraft": true
+     },
+     "script": "Hijack",
+     "note": "As Recolonize (ruling #55): you choose the node; it can't be issued with no legal node. A spacecraft being Deployed onto a Unit arrives uncrewed."
+    }
+   ]
+  },
+  {
+   "id": "4SL1",
+   "name": "Morphership",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Leader",
+   "baseRank": 0,
+   "spacecraft": true,
+   "races": [
+    "Blaarg"
+   ],
+   "text": "This spacecraft may enter as a copy of another spacecraft, except it is a Blaarg.",
+   "flavor": "",
+   "image": "images/4SL1.jpg",
+   "effects": [
+    {
+     "trigger": "AsEnters",
+     "script": "EnterAsCopy",
+     "optional": true,
+     "params": {
+      "setRaces": [
+       "Blaarg"
+      ]
+     },
+     "note": "As Mr Morph (rulings #24, #52): copies a spacecraft in play, printed values. A spacecraft only copies spacecraft."
+    }
+   ]
+  },
+  {
+   "id": "4SL2",
+   "name": "Distillator",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Champion",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "Blaarg"
+   ],
+   "text": "Spacecraft your Opponents control get -1 Rank.",
+   "flavor": "",
+   "image": "images/4SL2.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "do": [
+      {
+       "op": "ModifyRank",
+       "amount": -1,
+       "targets": {
+        "zone": "InPlay",
+        "kind": "Unit",
+        "spacecraft": true,
+        "controller": "Opponent"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "4SU1",
+   "name": "Stagnant Station",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 1,
+   "spacecraft": true,
+   "races": [
+    "Blaarg"
+   ],
+   "text": "You may play this spacecraft on an Opponent's Empty Unit Node. It cannot be crewed.",
+   "flavor": "",
+   "image": "images/4SU1.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "note": "On an Opponent's node it is theirs and scores for them (ruling #15).",
+     "do": [
+      {
+       "op": "PlacementOverride",
+       "targets": "Self",
+       "allowedNodes": [
+        "OpponentUnitEmpty"
+       ]
+      },
+      {
+       "op": "CannotBeCrewed",
+       "targets": "Self"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "4SU2",
+   "name": "Goo Bubble",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "Blaarg"
+   ],
+   "text": "This spacecraft's crew cannot be Nullified, but has no abilities.",
+   "flavor": "",
+   "image": "images/4SU2.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "do": [
+      {
+       "op": "CannotBeNullified",
+       "targets": "Crew"
+      },
+      {
+       "op": "Suppress",
+       "targets": "Crew",
+       "what": "AllAbilitiesAndEffects"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "4SU3",
+   "name": "Gelatinous Hull",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 1,
+   "spacecraft": true,
+   "races": [
+    "Blaarg"
+   ],
+   "text": "When this spacecraft becomes crewed, Manipulate 1. If its crew is a Blaarg, Manipulate 2 instead.",
+   "flavor": "",
+   "image": "images/4SU3.jpg",
+   "effects": [
+    {
+     "trigger": "OnCrewed",
+     "script": "GelatinousHull"
+    }
+   ]
+  },
+  {
+   "id": "4SO1",
+   "name": "Engulf",
+   "set": "Spacecraft",
+   "kind": "Order",
+   "orderType": "Action",
+   "races": [
+    "Blaarg"
+   ],
+   "text": "Nullify a spacecraft. Its crew stays on the Node and becomes a Blaarg.",
+   "flavor": "",
+   "image": "images/4SO1.jpg",
+   "effects": [
+    {
+     "trigger": "OnResolve",
+     "script": "Engulf",
+     "note": "The crew only becomes a Blaarg if the spacecraft is actually Nullified."
+    }
+   ]
+  },
+  {
+   "id": "4SO2",
+   "name": "Viscous Fog",
+   "set": "Spacecraft",
+   "kind": "Order",
+   "orderType": "Ongoing",
+   "races": [
+    "Blaarg"
+   ],
+   "text": "Units can't board or leave spacecraft.",
+   "flavor": "",
+   "image": "images/4SO2.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "note": "Blocks Deploys that would crew or be crewed, and every move into or out of a spacecraft (Beam Up, Mindscrambler, Abductor, Mothership, Chrome Steed...). If a spacecraft leaves play, its crew still drops to the ground.",
+     "do": [
+      {
+       "op": "RestrictBoarding"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "5SL1",
+   "name": "The Crucible",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Leader",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "Synthenoid"
+   ],
+   "text": "While this spacecraft is crewed, Rank you Assemble is doubled.",
+   "flavor": "",
+   "image": "images/5SL1.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "condition": {
+      "crewed": true
+     },
+     "do": [
+      {
+       "op": "ModifyAssembledRank",
+       "player": "You",
+       "multiplier": 2
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "5SL2",
+   "name": "Drone Hub",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Champion",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "Synthenoid"
+   ],
+   "text": "Uncrewed spacecraft you control get +2 Rank.",
+   "flavor": "",
+   "image": "images/5SL2.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "do": [
+      {
+       "op": "ModifyRank",
+       "amount": 2,
+       "targets": {
+        "zone": "InPlay",
+        "kind": "Unit",
+        "spacecraft": true,
+        "controller": "You",
+        "crewed": false
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "5SU1",
+   "name": "Exo-Frame",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "Synthenoid"
+   ],
+   "text": "If this spacecraft leaves play, Assemble its Rank onto its crew.",
+   "flavor": "",
+   "image": "images/5SU1.jpg",
+   "effects": [
+    {
+     "trigger": "OnLeavePlay",
+     "script": "ExoFrame",
+     "note": "Uses its Rank as it left. The crew must still be in play."
+    }
+   ]
+  },
+  {
+   "id": "5SU2",
+   "name": "Salvage Tug",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "Synthenoid"
+   ],
+   "text": "When you play this spacecraft, place a Retired spacecraft into your Standby Zone.",
+   "flavor": "",
+   "image": "images/5SU2.jpg",
+   "effects": [
+    {
+     "trigger": "OnPlay",
+     "note": "Leader spacecraft can't be chosen (ruling #36).",
+     "do": [
+      {
+       "op": "MoveToStandby",
+       "standbyOf": "You",
+       "gainControl": true,
+       "targets": {
+        "choose": "Card",
+        "filter": {
+         "zone": "RetiredPile",
+         "kind": "Unit",
+         "spacecraft": true
+        }
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "5SU3",
+   "name": "Auto-Turret",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 2,
+   "spacecraft": true,
+   "races": [
+    "Synthenoid"
+   ],
+   "text": "This spacecraft can't be crewed. When you play it, Nullify an opposing uncrewed spacecraft.",
+   "flavor": "",
+   "image": "images/5SU3.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "do": [
+      {
+       "op": "CannotBeCrewed",
+       "targets": "Self"
+      }
+     ]
+    },
+    {
+     "trigger": "OnPlay",
+     "do": [
+      {
+       "op": "Nullify",
+       "targets": {
+        "choose": "Unit",
+        "filter": {
+         "zone": "InPlay",
+         "kind": "Unit",
+         "spacecraft": true,
+         "controller": "Opponent",
+         "crewed": false
+        }
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "5SO1",
+   "name": "Refit",
+   "set": "Spacecraft",
+   "kind": "Order",
+   "orderType": "Action",
+   "races": [
+    "Synthenoid"
+   ],
+   "text": "Retire a spacecraft card from your Hand. A spacecraft in play gets +X Rank, where X is that card's Base Rank.",
+   "flavor": "",
+   "image": "images/5SO1.jpg",
+   "effects": [
+    {
+     "trigger": "OnResolve",
+     "script": "Refit"
+    }
+   ]
+  },
+  {
+   "id": "5SO2",
+   "name": "Self-Destruct",
+   "set": "Spacecraft",
+   "kind": "Order",
+   "orderType": "React",
+   "races": [
+    "Synthenoid"
+   ],
+   "text": "Issue this Order as a spacecraft is Nullified to Nullify the opposing spacecraft and its crew as well.",
+   "flavor": "",
+   "image": "images/5SO2.jpg",
+   "effects": [
+    {
+     "trigger": "React",
+     "when": {
+      "event": "UnitNullifying",
+      "spacecraft": true
+     },
+     "script": "SelfDestruct",
+     "note": "Spacecraft S18: any spacecraft, either side. Does nothing if no spacecraft is opposite."
+    }
+   ]
+  },
+  {
+   "id": "0ST1",
+   "name": "Fighter",
+   "set": "Spacecraft",
+   "kind": "Unit",
+   "unitClass": "Craft",
+   "baseRank": 1,
+   "spacecraft": true,
+   "races": [
+    "GalacticCouncil"
+   ],
+   "text": "",
+   "flavor": "",
+   "image": "images/0ST1.jpg",
+   "token": true,
+   "effects": []
+  },
+  {
+   "id": "6W03",
+   "name": "Asteroid Belt",
+   "set": "Spacecraft",
+   "kind": "Warzone",
+   "races": [
+    "Neutral"
+   ],
+   "text": "Spacecraft get -1 Rank.",
+   "flavor": "",
+   "image": "images/6W03.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "do": [
+      {
+       "op": "ModifyRank",
+       "amount": -1,
+       "targets": {
+        "zone": "InPlay",
+        "kind": "Unit",
+        "spacecraft": true
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "6W04",
+   "name": "Ion Storm",
+   "set": "Spacecraft",
+   "kind": "Warzone",
+   "races": [
+    "Neutral"
+   ],
+   "text": "Spacecraft have no abilities.",
+   "flavor": "",
+   "image": "images/6W04.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "do": [
+      {
+       "op": "Suppress",
+       "targets": {
+        "zone": "Any",
+        "kind": "Unit",
+        "spacecraft": true
+       },
+       "what": "AllAbilitiesAndEffects"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "6W05",
+   "name": "Vacuum",
+   "set": "Spacecraft",
+   "kind": "Warzone",
+   "races": [
+    "Neutral"
+   ],
+   "text": "Ground Units get -2 Rank.",
+   "flavor": "",
+   "image": "images/6W05.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "note": "Spacecraft S14. Hits every non-spacecraft Unit in play, crews included.",
+     "do": [
+      {
+       "op": "ModifyRank",
+       "amount": -2,
+       "targets": {
+        "zone": "InPlay",
+        "kind": "Unit",
+        "spacecraft": false
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "6W06",
+   "name": "Wreckfield",
+   "set": "Spacecraft",
+   "kind": "Warzone",
+   "races": [
+    "Neutral"
+   ],
+   "text": "Nullified spacecraft may be Deployed as if they were in Players' Hands.",
+   "flavor": "",
+   "image": "images/6W06.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "note": "Spacecraft S20, as Hills of Decay.",
+     "do": [
+      {
+       "op": "PlayFromZone",
+       "zone": "NullifiedPile",
+       "filter": {
+        "kind": "Unit",
+        "spacecraft": true
+       },
+       "player": "Each"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "6W07",
+   "name": "Gravity Well",
+   "set": "Spacecraft",
+   "kind": "Warzone",
+   "races": [
+    "Neutral"
+   ],
+   "text": "Spacecraft and their crews can be affected from the ground.",
+   "flavor": "",
+   "image": "images/6W07.jpg",
+   "effects": [
+    {
+     "trigger": "Static",
+     "note": "Spacecraft S19: elevation is off.",
+     "do": [
+      {
+       "op": "DisableElevation"
+      }
+     ]
+    }
+   ]
   }
  ]
 }
