@@ -15,6 +15,8 @@ public enum SfxKind
     Coins, Bullseye, Scalpel, Bubble, Prism, Suction,
     // Effects pass 3: board, atmosphere, big moments
     Riffle, Deal, Taunt, Cycle, Crack, SlowMo, LiftOff,
+    // Archons
+    ArchonInvoke, ArchonBell, ArchonBeam, ArchonQuake,
 }
 
 /// <summary>
@@ -305,6 +307,32 @@ public static class Sfx
             / 2 * Math.Sin(Math.PI * t / 1.4)),
 
         // Planet Earth / Cyber Moon / Galactic Capital: a rising sparkle.
+        // ---------------------------------------------------------------- Archons
+        // A deep, slowly swelling drone (root, fifth, octave, slightly detuned) with a rising shimmer on top.
+        SfxKind.ArchonInvoke => Render(2.2, (t, n) =>
+        {
+            double env = Math.Sin(Math.PI * Math.Min(1, t / 2.2)) * Math.Min(1, t / 0.15);
+            double drone = 0;
+            foreach (double f in new[] { 55.0, 55.6, 82.4, 110.0, 164.8, 220.3 })
+                drone += Math.Sin(2 * Math.PI * f * t) * (f < 100 ? 1 : 0.5);
+            drone /= 4;
+            double rise = Math.Sin(2 * Math.PI * (660 + 220 * t) * t) * 0.18 * (t / 2.2)
+                          + Math.Sin(2 * Math.PI * (990 + 330 * t) * t) * 0.1 * (t / 2.2);
+            return (drone * 0.75 + rise + n * 0.02) * env;
+        }),
+        // A crystal bell: inharmonic partials with long, staggered decays.
+        SfxKind.ArchonBell => Render(1.8, (t, _) =>
+            (Math.Sin(2 * Math.PI * 523 * t) * Math.Exp(-t * 2.2)
+             + Math.Sin(2 * Math.PI * 1318 * t) * 0.6 * Math.Exp(-t * 3.5)
+             + Math.Sin(2 * Math.PI * 2093 * t) * 0.35 * Math.Exp(-t * 5)
+             + Math.Sin(2 * Math.PI * 2794 * t) * 0.2 * Math.Exp(-t * 7)) * 0.45),
+        // A beam from orbit: a rising buzz with a crackle of noise.
+        SfxKind.ArchonBeam => Render(0.9, (t, n) =>
+            (Soft(Math.Sin(2 * Math.PI * (180 + 600 * t) * t), 0.3) * 0.6 + n * 0.35) * Math.Exp(-t * 2.5) * Math.Min(1, t / 0.03)),
+        // A ground-shaking rumble.
+        SfxKind.ArchonQuake => Lowpass(Render(1.5, (t, n) =>
+            (Math.Sin(2 * Math.PI * 38 * t) * 0.8 + Math.Sin(2 * Math.PI * 52 * t) * 0.5 + n * 0.45 * Math.Exp(-t * 3)) * Math.Exp(-t * 1.6)), 0.2),
+
         SfxKind.Shimmer => Render(1.2, (t, _) =>
         {
             double sum = 0;

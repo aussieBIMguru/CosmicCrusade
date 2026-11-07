@@ -32,6 +32,8 @@ public sealed partial class GameEngine
     private int? _forcedRoundWinner;
     private string? _forcedRoundReason;
     private bool _roundEndsNow;
+    /// <summary>Ceasefire: the Main Phase ends at once; the round is still scored normally (End of Main triggers fire).</summary>
+    private bool _mainEndsNow;
     private readonly HashSet<CardInstance> _remainInPlay = new();
 
     private void ResetRoundFlags()
@@ -39,6 +41,7 @@ public sealed partial class GameEngine
         _forcedRoundWinner = null;
         _forcedRoundReason = null;
         _roundEndsNow = false;
+        _mainEndsNow = false;
         _remainInPlay.Clear();
     }
 
@@ -71,6 +74,8 @@ public sealed partial class GameEngine
     internal static readonly HashSet<string> Scripts = new()
     {
         "Wormhole", "RearrangeAllNodes", "Terraform", "EnterAsCopy", "RetriggerAbilities",
+        // Archons
+        "Ceasefire", "Insurrection", "QuantumLeap",
     };
 
     internal async Task RunScriptAsync(string name, JsonElement effect, EffectContext ctx, CancellationToken ct)
@@ -91,6 +96,15 @@ public sealed partial class GameEngine
                 break;
             case "RetriggerAbilities":
                 await RetriggerAbilitiesAsync(ctx, ct);
+                break;
+            case "Ceasefire":
+                await CeasefireAsync(ctx, ct);
+                break;
+            case "Insurrection":
+                await InsurrectionAsync(ctx, ct);
+                break;
+            case "QuantumLeap":
+                await QuantumLeapAsync(ctx, ct);
                 break;
             default:
                 await EmitAsync(new LogEvent($"  {ctx.Source.Name}: this ability isn't implemented yet."), ct);

@@ -312,7 +312,7 @@ internal sealed class EffectRunner
 
             case "ChooseRace":
             {
-                var races = Enum.GetValues<Race>().Where(x => x != Race.Neutral).ToList();
+                var races = Enum.GetValues<Race>().Where(x => x != Race.Neutral && (x != Race.Archon || State.Options.Archons)).ToList();
                 var options = races.Select(x => new ChoiceOption(RaceName(x), Value: (int)x)).ToList();
                 var pick = await _engine.ChooseAsync(new ChoiceRequest(ctx.Controller, ctx.Source,
                     $"{ctx.Source.Name}: choose a Race", ChoiceKind.Options, options, 1, 1, "ChooseRace"), ct);

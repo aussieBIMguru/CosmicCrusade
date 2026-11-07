@@ -125,9 +125,14 @@ public sealed class HeuristicAi : IPlayerController
     {
         // M3.3: One of Us / Terraform when they swing the round clearly.
         if (BigAction(ctx) is { } big) return big;
+        // Archons: round-winning or round-ending plays first.
+        if (ArchonNow(ctx) is { } archonNow) return archonNow;
 
         var action = ChooseCore(ctx);
         if (action is not PassAction) return action;
+
+        // An Archon not played this round is lost: use it rather than pass, when it doesn't hurt us.
+        if (ArchonBeforePassing(ctx) is { } archonLast) return archonLast;
 
         var orders = ctx.Legal.OfType<IssueOrderAction>().ToList();
         if (orders.Count == 0) return action;
@@ -167,6 +172,77 @@ public sealed class HeuristicAi : IPlayerController
             {
                 var nodes = state.AllNodes.Where(n => n.IsScoring && state.OpposingNode(n) is not null).ToList();
                 if (nodes.Count > 0 && nodes.Max(n => TerraformGain(state, n, me)) >= 3) return o;
+            }
+        }
+        return null;
+    }
+
+    // ------------------------------------------------------------------ Archons
+
+    private static IEnumerable<GameAction> ArchonPlays(DecisionContext ctx) =>
+        ctx.Legal.Where(a => a switch
+        {
+            IssueOrderAction o => o.Card.PrintedDefinition.IsArchon,
+            DeployFromHandAction d => d.Card.PrintedDefinition.IsArchon,
+            DeployAtRandomAction r => r.Card.PrintedDefinition.IsArchon,
+            _ => false,
+        });
+
+    private static string ArchonName(GameAction a) => a switch
+    {
+        IssueOrderAction o => o.Card.Definition.Name,
+        DeployFromHandAction d => d.Card.Definition.Name,
+        DeployAtRandomAction r => r.Card.Definition.Name,
+        _ => "",
+    };
+
+    /// <summary>Insurrection when it wins; Ceasefire when we lead; Planetscape when far behind; Nebula Cannon on a big Unit.</summary>
+    private static GameAction? ArchonNow(DecisionContext ctx)
+    {
+        var s = ctx.State;
+        int me = ctx.Player, opp = GameState.Other(me);
+        int mine = RankCalculator.TotalRank(s, me), theirs = RankCalculator.TotalRank(s, opp);
+        foreach (var a in ArchonPlays(ctx))
+        {
+            switch (ArchonName(a))
+            {
+                case "Insurrection":
+                    if (s.Players[me].UnitsInPlay.SelectMany(u => StaticLayer.Races(s, u)).GroupBy(r => r).Any(g => g.Count() >= 3)) return a;
+                    break;
+                case "Ceasefire":
+                    if (mine > theirs && s.Players.All(p => p.UnitsInPlay.Any(u => u.Definition.IsLeader))) return a;
+                    break;
+                case "Planetscape":
+                    if (theirs - mine >= 4) return a;
+                    break;
+                case "Nebula Cannon":
+                    if (s.Players[opp].UnitNodes.Any(n => n.Card is { } c && !StaticLayer.PreventsNullify(s, c, null, out _)
+                                                          && RankCalculator.GetRank(s, c) >= 3)) return a;
+                    break;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>About to pass with an Archon still in the slot: play it unless it would backfire.</summary>
+    private static GameAction? ArchonBeforePassing(DecisionContext ctx)
+    {
+        var s = ctx.State;
+        int me = ctx.Player, opp = GameState.Other(me);
+        int mine = RankCalculator.TotalRank(s, me), theirs = RankCalculator.TotalRank(s, opp);
+        foreach (var a in ArchonPlays(ctx))
+        {
+            switch (ArchonName(a))
+            {
+                case "Planetscape" when mine >= theirs:
+                case "Ceasefire" when mine <= theirs:
+                case "Insurrection":
+                    continue;
+                case "Nebula Cannon" when !s.Players[opp].UnitNodes.Any(n => n.Card is not null):
+                    continue;
+                default:
+                    if (a is DeployFromHandAction d && d.Target.Side != me) continue;
+                    return a;
             }
         }
         return null;

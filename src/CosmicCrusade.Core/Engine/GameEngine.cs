@@ -79,9 +79,13 @@ public sealed partial class GameEngine
 
         await EmitAsync(new RoundStartedEvent(State.Round, State.FirstPlayer), ct);
 
-        // 1. Mandatory draw up to 5 Units and 3 Orders (ruling #10), in turn order.
+        // 1. Mandatory draw up to 5 Units and 3 Orders (ruling #10), in turn order. Archons module: each player who
+        // hasn't yet may first take their Archon draw (first player first), drawing one card fewer this round.
         foreach (int p in TurnOrder())
-            await DrawUpAsync(p, ct);
+        {
+            var skipped = await ArchonDrawAsync(p, ct);
+            await DrawUpAsync(p, ct, skipped);
+        }
 
         // 2. TODO(M3): carried-over effects, StartUp triggers.
 
@@ -101,13 +105,47 @@ public sealed partial class GameEngine
         yield return GameState.Other(State.FirstPlayer);
     }
 
-    private async Task DrawUpAsync(int player, CancellationToken ct)
+    private async Task DrawUpAsync(int player, CancellationToken ct, PileKind? skipOne = null)
     {
         var ps = State.Players[player];
-        while (ps.HandUnitCount < State.Options.HandUnitTarget)
+        int units = State.Options.HandUnitTarget - (skipOne == PileKind.UnitDeck ? 1 : 0);
+        int orders = State.Options.HandOrderTarget - (skipOne == PileKind.OrderDeck ? 1 : 0);
+        while (ps.HandUnitCount < units)
             if (await DrawAsync(player, PileKind.UnitDeck, ct) is null) break;
-        while (ps.HandOrderCount < State.Options.HandOrderTarget)
+        while (ps.HandOrderCount < orders)
             if (await DrawAsync(player, PileKind.OrderDeck, ct) is null) break;
+    }
+
+    /// <summary>
+    /// Archons module (A3–A5, A12): once per game a player may take their Archon draw at Start-up: choose which
+    /// card to give up (a Unit or an Order), see the top 3 Archons, keep 1 (revealed); the other 2 are shuffled back.
+    /// Returns the deck the player draws one fewer card from, or null.
+    /// </summary>
+    private async Task<PileKind?> ArchonDrawAsync(int player, CancellationToken ct)
+    {
+        var ps = State.Players[player];
+        if (!State.Options.Archons || ps.ArchonTaken || State.ArchonDeck.Count == 0) return null;
+
+        var take = await ChooseAsync(ChoiceRequest.YesNo(player, null,
+            "Take your Archon draw this round? Once per game: see 3 Archons, keep 1 (revealed) to play this round, and draw one card fewer.",
+            "ArchonDraw"), ct);
+        if (take.Count == 0 || take[0] != 0) return null;
+        ps.ArchonTaken = true;
+
+        var skipOptions = new[] { new ChoiceOption("Draw one fewer Unit", Value: 0), new ChoiceOption("Draw one fewer Order", Value: 1) };
+        var skip = await ChooseAsync(new ChoiceRequest(player, null, "Which card do you give up for your Archon?",
+            ChoiceKind.Options, skipOptions, 1, 1, "ArchonSkip"), ct);
+        var skipped = skip.Count > 0 && skip[0] == 1 ? PileKind.OrderDeck : PileKind.UnitDeck;
+
+        var deck = State.ArchonDeck;
+        var offered = deck.Skip(Math.Max(0, deck.Count - 3)).Reverse().ToList(); // top card first; only this player sees them
+        var pick = await ChooseAsync(new ChoiceRequest(player, null, "Choose your Archon (it is revealed, and must be played this round)",
+            ChoiceKind.Cards, offered.Select(c => new ChoiceOption(c.Name, c)).ToList(), 1, 1, "ArchonPick"), ct);
+        var chosen = offered[pick.Count > 0 ? pick[0] : 0];
+        State.MoveToArchonSlot(chosen, player);
+        State.Shuffle(deck);
+        await EmitAsync(new ArchonTakenEvent(player, chosen, skipped, offered.Count), ct);
+        return skipped;
     }
 
     /// <summary>Draws one card from a deck, applying the empty-deck rule. Null when nothing can be drawn.</summary>
@@ -154,13 +192,29 @@ public sealed partial class GameEngine
 
     // ================================================================== Main Phase (§5.2)
 
-    private async Task MainPhaseAsync(CancellationToken ct)
+    private Task MainPhaseAsync(CancellationToken ct)
     {
         State.Phase = GamePhase.Main;
-        int current = State.FirstPlayer;
-        int passesInRow = 0;
+        return MainLoopAsync(State.FirstPlayer, passesInRow: 0, ct);
+    }
+
+    /// <summary>
+    /// M4 (AI search): plays out the rest of the current round on this engine's state, starting with
+    /// <paramref name="current"/>'s Main Phase turn, then scores it (End of Main). No Clean-up.
+    /// The state must be at a Main Phase turn with an empty stack (a clone made while a controller is choosing a turn).
+    /// </summary>
+    public async Task<RoundResult> PlayOutRoundAsync(int current, bool opponentJustPassed, CancellationToken ct = default)
+    {
+        if (State.Phase != GamePhase.Main || _stack.Count > 0)
+            throw new InvalidOperationException("PlayOutRoundAsync needs a Main Phase turn with an empty stack.");
+        await MainLoopAsync(current, opponentJustPassed ? 1 : 0, ct);
+        return await EndOfMainAsync(ct);
+    }
+
+    private async Task MainLoopAsync(int current, int passesInRow, CancellationToken ct)
+    {
         int turns = 0;
-        _lastActionWasPass = false;
+        _lastActionWasPass = passesInRow > 0;
 
         while (passesInRow < 2 && turns++ < MaxTurnsPerRound)
         {
@@ -195,10 +249,42 @@ public sealed partial class GameEngine
                 _actionsThisRound++;
                 await ExecuteAsync(action, ct);
                 await CheckStateAsync(ct);
-                if (_roundEndsNow) break; // Senate Chambers: the round ends at once.
+                if (_roundEndsNow || _mainEndsNow) break; // Senate Chambers / Insurrection; Ceasefire.
+                await ExtraActionsAsync(current, ct);
+                if (_roundEndsNow || _mainEndsNow) break;
             }
 
             current = GameState.Other(current);
+        }
+    }
+
+    /// <summary>
+    /// Open Source: "You may take an additional Action each turn." After a turn's action the player may take more,
+    /// one per active source. Passing here only ends the turn (it doesn't count as a Pass).
+    /// </summary>
+    private async Task ExtraActionsAsync(int player, CancellationToken ct)
+    {
+        int used = 0;
+        while (used < StaticLayer.ExtraActions(State, player))
+        {
+            var legal = LegalActions.ForTurn(State, player);
+            if (legal.Count <= 1) return;
+            used++;
+            await EmitAsync(new LogEvent($"  {State.Players[player].Name} may take an additional action."), ct);
+            await EmitAsync(new TurnStartedEvent(player), ct);
+            var context = new DecisionContext(State, player, legal, OpponentJustPassed: false, ExtraAction: true);
+            var action = await _controllers[player].ChooseActionAsync(context, ct);
+            if (!legal.Contains(action))
+                throw new InvalidOperationException($"Controller for player {player} returned an illegal action: {action.Describe()}");
+            if (action is PassAction)
+            {
+                await EmitAsync(new LogEvent($"  {State.Players[player].Name} ends the turn."), ct);
+                return;
+            }
+            _actionsThisRound++;
+            await ExecuteAsync(action, ct);
+            await CheckStateAsync(ct);
+            if (_roundEndsNow || _mainEndsNow) return;
         }
     }
 
@@ -298,6 +384,9 @@ public sealed partial class GameEngine
         // M3.3: "Played as the chosen Unit" – Forced Mitosis' copy, or Mr Morph's own, before "When you play".
         await ApplyEntryAsync(item, card, target, ct);
 
+        // Archons: Androsiar – "You may have any Unit enter play as a copy of this Unit."
+        await OfferCopyOfSourceAsync(card, ct);
+
         // "When you play this Unit": the controller is the side it landed on (ruling #15).
         if (StaticLayer.IsTriggerSuppressed(State, card, "OnPlay"))
         {
@@ -309,6 +398,28 @@ public sealed partial class GameEngine
 
         // "Whenever a Unit / Card is played" (Xeno Laser hits after on-play abilities: ruling #21).
         await RaisePlayedAsync(item.Controller, card, fromHand: item.FromNode is null && item.FromPile is null, ct);
+    }
+
+    /// <summary>
+    /// Androsiar (Archons A10, P12): a Unit (either side's) being Played may enter as a copy of a Unit with this
+    /// ability; that Unit's controller decides. Copy rules as Mr Morph (printed values of what the source is now).
+    /// </summary>
+    private async Task OfferCopyOfSourceAsync(CardInstance card, CancellationToken ct)
+    {
+        foreach (var src in StaticLayer.CopyOfferSources(State, card))
+        {
+            int chooser = src.Location.Node!.Side;
+            var def = src.Definition;
+            // The entering Unit rides on "Yes" (the UI shows it there; the AI reads it).
+            var options = new[] { new ChoiceOption("Yes", card, Value: 1), new ChoiceOption("No", Value: 0) };
+            var pick = await ChooseAsync(new ChoiceRequest(chooser, src,
+                $"{src.Name}: have {card.Name} enter play as a copy of {def.Name} (Rank {def.BaseRank})?",
+                ChoiceKind.YesNo, options, 1, 1, "CopyOfSelf"), ct);
+            if (pick.Count == 0 || pick[0] != 0) continue;
+            card.BecomeCopy(def, def.Races);
+            await EmitAsync(new CardCopiedEvent(card, def, src), ct);
+            return;
+        }
     }
 
     /// <summary>Barkeep Bill & co.: pick the Unit from the pile, then its node, then Deploy it as usual.</summary>
@@ -632,7 +743,7 @@ public sealed partial class GameEngine
 
     // ================================================================== End of Main (§5.3)
 
-    private async Task EndOfMainAsync(CancellationToken ct)
+    private async Task<RoundResult> EndOfMainAsync(CancellationToken ct)
     {
         State.Phase = GamePhase.EndOfMain;
         // End of Main triggers (The Empress, High Noon, Weed out the Weak), skipped when Senate Chambers already
@@ -644,6 +755,7 @@ public sealed partial class GameEngine
         if (result.Winner is int w) State.Players[w].RoundsWon++;
         State.LastRoundWinner = result.Winner;
         await EmitAsync(new RoundScoredEvent(result), ct);
+        return result;
     }
 
     // ================================================================== Clean-up (§5.4)
@@ -671,11 +783,20 @@ public sealed partial class GameEngine
                 if (node.Card is null) continue;
                 var card = node.Card;
                 State.MoveToPile(card, PileKind.IssuedOrders);
-                await EmitAsync(new CardMovedToPileEvent(card, node, PileKind.IssuedOrders), ct);
+                await EmitAsync(new CardMovedToPileEvent(card, node, card.Location.Pile ?? PileKind.IssuedOrders), ct); // Archons go home
+
             }
         }
 
         foreach (var node in State.AllNodes) node.IsLocked = false;
+
+        // Archons (A8): an Archon not played this round is lost (the once-per-game draw stays used).
+        foreach (int p in TurnOrder())
+        {
+            if (State.Players[p].ArchonSlot is not { } archon) continue;
+            State.ReturnArchonToDeck(archon);
+            await EmitAsync(new ArchonLostEvent(p, archon), ct);
+        }
 
         // 5. Warzones: Active Warzones go to the bottom of the Warzone deck in random order.
         if (State.ActiveWarzones.Count > 0)

@@ -92,6 +92,35 @@ public static class AiChoices
             case "GainControlNode":
                 return new[] { IndexOfMax(r, o => o.Node is { } n ? (s.OpposingNode(n)?.Card is null ? 2 : 1) + (n.Kind == NodeKind.Leader ? 0.5 : 0) : 0) };
 
+            // ------------------------------------------------------------ Archons
+            case "ArchonDraw":
+                return new[] { WantsArchonDraw(s, me) ? 0 : 1 };
+
+            case "ArchonSkip":
+                // Units win rounds: give up an Order unless we hold none.
+                return new[] { s.Players[me].HandOrderCount == 0 ? 0 : 1 };
+
+            case "ArchonPick":
+                return new[] { IndexOfMax(r, o => o.Card is { } c ? ArchonValue(c, s, me) : 0) };
+
+            case "CopyOfSelf":
+            {
+                // Androsiar: our small Units become Rank-4 copies, the opponent's big ones shrink to Rank 4.
+                var entering = r.Options[0].Card;
+                var src = r.Source;
+                if (entering is null || src?.Definition.BaseRank is not int copyRank) return new[] { 1 };
+                int now = RankCalculator.GetRank(s, entering);
+                bool ours = SideOf(entering) == me;
+                return new[] { (ours ? copyRank > now : copyRank < now) ? 0 : 1 };
+            }
+
+            case "QuantumLeapDraw":
+                return new[] { IndexOfMax(r, o => o.Value) };
+
+            case "QuantumLeapIssue":
+                // Issue drawn Ongoings that help (they stay up for the round); Actions: the first one.
+                return r.Options.Count == 0 ? Array.Empty<int>() : new[] { 0 };
+
             case "CoercedUnit":
                 // Psychic Coercion chose the node (each option carries it): send the Unit that helps us most there.
                 return new[] { IndexOfMax(r, o => o.Card is { } c && o.Node is { } n ? AiVision.DeployGain(s, me, c, n) : 0) };
@@ -103,6 +132,38 @@ public static class AiChoices
         int take = scored.Count(x => x.score > 0);
         take = Math.Clamp(take, r.Min, r.Max);
         return scored.Take(take).Select(x => x.i).ToList();
+    }
+
+    /// <summary>
+    /// Archons: take the draw at the first chance (an unused Archon is wasted), except when we already lead on round
+    /// wins by 2 or more and can afford to wait for a more decisive round.
+    /// </summary>
+    private static bool WantsArchonDraw(GameState s, int me) =>
+        s.Players[me].RoundsWon - s.Players[GameState.Other(me)].RoundsWon < 2;
+
+    /// <summary>
+    /// Rough value of each Archon for the heuristic seat. Leaders need our Leader Node free; Ceasefire needs both
+    /// sides to field a Leader.
+    /// </summary>
+    private static double ArchonValue(CardInstance c, GameState s, int me)
+    {
+        bool leaderNodeFree = s.Players[me].LeaderNode is { Card: null };
+        return c.Definition.Name switch
+        {
+            "Archon Arsenal" => 9,
+            "Planetscape" => 7,
+            "The Unnameable" => leaderNodeFree ? 8 : 2,
+            "Deify" => s.Options.Leaders ? 6 : 0,
+            "Galactic Siege" => 6,
+            "Nebula Cannon" => 6,
+            "Unstoppable" => 5,
+            "Open Source" => 5,
+            "Quantum Leap" => 5,
+            "Androsiar" => leaderNodeFree ? 5 : 1,
+            "Insurrection" => 4,
+            "Ceasefire" => s.Options.Leaders ? 3 : 0,
+            _ => 1,
+        };
     }
 
     private static double Score(ChoiceOption o, string purpose, int me, GameState s)

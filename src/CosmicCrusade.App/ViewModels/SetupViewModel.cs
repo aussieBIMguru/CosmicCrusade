@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
 using CosmicCrusade.App.Rendering;
+using CosmicCrusade.Core.Ai;
 using CosmicCrusade.Core.Model;
 using CosmicCrusade.Core.Rules;
 
@@ -57,6 +58,8 @@ public sealed class SetupViewModel : ObservableObject
     private EmptyDeckRule _emptyDeck;
     private bool _leaders;
     private bool _warzones;
+    private AiDifficulty _aiDifficulty;
+    private bool _archons;
     private string _seed = "";
     private string _filter = "";
     private CardCountRow? _selectedCard;
@@ -70,6 +73,8 @@ public sealed class SetupViewModel : ObservableObject
         _emptyDeck = _defaults.EmptyDeck;
         _leaders = _defaults.Leaders;
         _warzones = _defaults.Warzones;
+        _aiDifficulty = _defaults.AiDifficulty;
+        _archons = _defaults.Archons;
 
         // Every card, Warzones included (their counts only matter while the Warzones expansion is on).
         foreach (var def in AppPaths.Database.All.OrderBy(d => d.Id, StringComparer.Ordinal))
@@ -97,12 +102,16 @@ public sealed class SetupViewModel : ObservableObject
 
     public IReadOnlyList<DeckMode> DeckModes { get; } = Enum.GetValues<DeckMode>();
     public IReadOnlyList<EmptyDeckRule> EmptyDeckRules { get; } = Enum.GetValues<EmptyDeckRule>();
+    public IReadOnlyList<AiDifficulty> AiDifficulties { get; } = Enum.GetValues<AiDifficulty>();
+
+    public AiDifficulty AiDifficulty { get => _aiDifficulty; set => Set(ref _aiDifficulty, value); }
 
     public int RoundsToWin { get => _roundsToWin; set => Set(ref _roundsToWin, Math.Clamp(value, 1, 9)); }
     public DeckMode DeckMode { get => _deckMode; set { if (Set(ref _deckMode, value)) UpdateTotals(); } }
     public EmptyDeckRule EmptyDeck { get => _emptyDeck; set => Set(ref _emptyDeck, value); }
     public bool Leaders { get => _leaders; set { if (Set(ref _leaders, value)) UpdateTotals(); } }
     public bool Warzones { get => _warzones; set { if (Set(ref _warzones, value)) UpdateTotals(); } }
+    public bool Archons { get => _archons; set { if (Set(ref _archons, value)) UpdateTotals(); } }
 
     /// <summary>Blank = random. Any integer replays the same shuffle.</summary>
     public string Seed { get => _seed; set => Set(ref _seed, value); }
@@ -125,6 +134,8 @@ public sealed class SetupViewModel : ObservableObject
         o.EmptyDeck = EmptyDeck;
         o.Leaders = Leaders;
         o.Warzones = Warzones;
+        o.AiDifficulty = AiDifficulty;
+        o.Archons = Archons;
         o.Seed = int.TryParse(Seed, out int s) ? s : Environment.TickCount;
         foreach (var row in Cards) o.CopyCounts[row.Id] = row.Copies;
         return o;
@@ -143,13 +154,14 @@ public sealed class SetupViewModel : ObservableObject
     {
         if (Cards.Count == 0) return;
         var o = BuildOptions();
-        int units = Cards.Where(r => r.Definition.IsUnit).Sum(r => DeckBuilder.CopiesOf(r.Definition, o));
-        int orders = Cards.Where(r => r.Definition.IsOrder).Sum(r => DeckBuilder.CopiesOf(r.Definition, o));
+        int units = Cards.Where(r => r.Definition.IsUnit && !r.Definition.IsArchon).Sum(r => DeckBuilder.CopiesOf(r.Definition, o));
+        int orders = Cards.Where(r => r.Definition.IsOrder && !r.Definition.IsArchon).Sum(r => DeckBuilder.CopiesOf(r.Definition, o));
         int warzones = Cards.Where(r => r.Definition.Kind == CardKind.Warzone).Sum(r => DeckBuilder.CopiesOf(r.Definition, o));
-        string wz = Warzones ? $" · Warzone deck {warzones}" : " · Warzones off";
+        int archons = Cards.Where(r => r.Definition.IsArchon).Sum(r => DeckBuilder.CopiesOf(r.Definition, o));
+        string wz = (Warzones ? $" · Warzone deck {warzones}" : " · Warzones off") + (Archons ? $" · Archon deck {archons}" : "");
         Totals = (DeckMode == DeckMode.RandomDraw
-            ? $"Random Draw: {Cards.Count(r => r.Definition.IsUnit && DeckBuilder.CopiesOf(r.Definition, o) > 0)} distinct units, " +
-              $"{Cards.Count(r => r.Definition.IsOrder && DeckBuilder.CopiesOf(r.Definition, o) > 0)} distinct orders (decks never run out)"
+            ? $"Random Draw: {Cards.Count(r => r.Definition.IsUnit && !r.Definition.IsArchon && DeckBuilder.CopiesOf(r.Definition, o) > 0)} distinct units, " +
+              $"{Cards.Count(r => r.Definition.IsOrder && !r.Definition.IsArchon && DeckBuilder.CopiesOf(r.Definition, o) > 0)} distinct orders (decks never run out)"
             : $"Unit deck {units} · Order deck {orders}") + wz;
     }
 }

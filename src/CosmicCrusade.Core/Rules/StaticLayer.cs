@@ -32,6 +32,8 @@ public static class StaticLayer
         InvertRankModifiers, InvertRoundWinner, RestrictPlay, RestrictDeploy, LimitTurns, PlayFromZone, HandledElsewhere,
         // M3.2c
         RevealHands, OverrideDecision, GrantAction, ReplaceRaceWords,
+        // Archons
+        ExtraAction, CountAsZero, OfferCopyOfSelf,
     }
 
     internal sealed class Filter
@@ -101,9 +103,72 @@ public static class StaticLayer
     /// <summary>Static effect entries this layer can't run yet (for coverage tests and logs).</summary>
     public static IReadOnlyList<string> InertStatics(CardDefinition def) => Compiled(def).Inert;
 
-    public static bool IsImmune(GameState s, CardInstance card) =>
-        card.Definition.IsUnit && IsUnitInPlay(card) && !card.AbilitiesSuppressed
-        && Compiled(card.Definition).Abilities.Any(a => a.Op == Op.Immunity);
+    public static bool IsImmune(GameState s, CardInstance card) => ImmunityGranter(s, card) is not null;
+
+    /// <summary>
+    /// The card that makes this Unit Immune: the Unit itself (Vigan) or another card granting it (Deify: "Your Leader
+    /// ... is Immune"). The granter's own effects still apply to it. Null when the Unit isn't Immune.
+    /// </summary>
+    internal static CardInstance? ImmunityGranter(GameState s, CardInstance card)
+    {
+        if (!card.Definition.IsUnit || !IsUnitInPlay(card)) return null;
+        if (!card.AbilitiesSuppressed && Compiled(card.Definition).Abilities.Any(a => a.Op == Op.Immunity && a.Targets is { Self: true }))
+            return card;
+        if (_inImmune) return null;
+        _inImmune = true;
+        try
+        {
+            foreach (var src in CandidateSources(s))
+            {
+                if (src.Card.AbilitiesSuppressed || ReferenceEquals(src.Card, card)) continue;
+                foreach (var ab in src.Abilities)
+                    if (ab.Op == Op.Immunity && ab.Targets is { Self: false } && CondOk(s, ab, src)
+                        && Matches(s, ab.Targets, card, src) && !IsSuppressed(s, src.Card))
+                        return src.Card;
+            }
+            return null;
+        }
+        finally { _inImmune = false; }
+    }
+
+    // ------------------------------------------------------------------ Archons
+
+    /// <summary>Open Source: how many additional actions <paramref name="player"/> may take each turn.</summary>
+    public static int ExtraActions(GameState s, int player)
+    {
+        int n = 0;
+        foreach (var src in ActiveSources(s))
+            foreach (var ab in src.Abilities)
+                if (ab.Op == Op.ExtraAction && src.Controller == player && CondOk(s, ab, src)) n += Math.Max(1, ab.Max);
+        return n;
+    }
+
+    /// <summary>The Unnameable: this Unit counts as 0 towards its controller's total Rank (Immune Units are unaffected).</summary>
+    public static bool CountsAsZero(GameState s, CardInstance card)
+    {
+        if (!IsUnitInPlay(card) || IsImmune(s, card)) return false;
+        foreach (var src in ActiveSources(s))
+            foreach (var ab in src.Abilities)
+                if (ab.Op == Op.CountAsZero && Applies(s, ab, src, card)) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Androsiar: Units in play that may have <paramref name="entering"/> enter play as a copy of themselves, in board
+    /// order. Their controller decides. Immune Units can't be made copies.
+    /// </summary>
+    public static List<CardInstance> CopyOfferSources(GameState s, CardInstance entering)
+    {
+        var list = new List<CardInstance>();
+        if (IsImmune(s, entering)) return list;
+        foreach (var src in ActiveSources(s))
+        {
+            if (ReferenceEquals(src.Card, entering) || !src.Card.Definition.IsUnit) continue;
+            if (src.Abilities.Any(ab => ab.Op == Op.OfferCopyOfSelf && Applies(s, ab, src, entering)))
+                list.Add(src.Card);
+        }
+        return list;
+    }
 
     /// <summary>All of the card's abilities and effects are ignored (Gloop!'s flag, Suppressing Goop...).</summary>
     public static bool IsSuppressed(GameState s, CardInstance card)
@@ -189,10 +254,10 @@ public static class StaticLayer
         int sum = 0;
         int? floor = null;
         if (!AnyOp(s, Op.ModifyRank)) return (0, null);
-        bool immune = IsImmune(s, card);
+        var granter = ImmunityGranter(s, card);
         foreach (var src in ActiveSources(s))
         {
-            if (immune && !ReferenceEquals(src.Card, card)) continue;
+            if (granter is not null && !ReferenceEquals(src.Card, card) && !ReferenceEquals(src.Card, granter)) continue;
             foreach (var ab in src.Abilities)
             {
                 if (ab.Op != Op.ModifyRank || !Applies(s, ab, src, card)) continue;
@@ -216,10 +281,11 @@ public static class StaticLayer
         if (ReplacementRace(s) is Race words)
             lines.Add(IsImmune(s, card) ? "Immune: keeps its Race and Race words" : $"Race words (and its Race) read as {words}");
         if (!IsUnitInPlay(card)) return lines;
-        bool immune = IsImmune(s, card);
+        var granter = ImmunityGranter(s, card);
+        if (CountsAsZero(s, card)) lines.Add("Counts as 0 towards its side's total Rank");
         foreach (var src in ActiveSources(s))
         {
-            if (immune && !ReferenceEquals(src.Card, card)) continue;
+            if (granter is not null && !ReferenceEquals(src.Card, card) && !ReferenceEquals(src.Card, granter)) continue;
             foreach (var ab in src.Abilities)
             {
                 if (!Applies(s, ab, src, card)) continue;
@@ -472,6 +538,7 @@ public static class StaticLayer
     [ThreadStatic] private static bool _inSuppress;
     [ThreadStatic] private static bool _inRaces;
     [ThreadStatic] private static bool _inWords;
+    [ThreadStatic] private static bool _inImmune;
 
     private static bool IsUnitInPlay(CardInstance c) =>
         c.Location.Kind == LocationKind.Node && c.Location.Node is { IsScoring: true };
@@ -484,7 +551,7 @@ public static class StaticLayer
     private static int ControllerOf(CardInstance c) => c.Location.Kind switch
     {
         LocationKind.Node => c.Location.Node!.Side,
-        LocationKind.Hand or LocationKind.Stack => c.Location.Player,
+        LocationKind.Hand or LocationKind.Stack or LocationKind.ArchonSlot => c.Location.Player,
         _ => -1,
     };
 
@@ -718,6 +785,10 @@ public static class StaticLayer
         ["OverrideDecision"] = new() { "op", "decision", "forPlayer", "decider", "timing", "note" },
         ["GrantAction"] = new() { "op", "player", "actionName", "countsAsTurn", "cost", "do", "note" },
         ["ReplaceRaceWords"] = new() { "op", "race", "scope", "note" },
+        // Archons
+        ["ExtraAction"] = new() { "op", "player", "count", "note" },
+        ["CountAsZero"] = new() { "op", "targets", "note" },
+        ["OfferCopyOfSelf"] = new() { "op", "targets", "note" },
     };
 
     private static List<Ability>? CompileEffect(JsonElement e, CardDefinition def)
@@ -779,8 +850,22 @@ public static class StaticLayer
                 return new Ability { Op = Op.SetRaces, Targets = targets, Races = races.ToArray(), Text = name };
             }
             case "Immunity":
-                if (targets is not { Self: true } || Str(op, "scope") != "AllOtherEffects") return null;
+                // Vigan: "Self". Deify: a filter ("Your Leader ... is Immune"), granted by the Order.
+                if (targets is null || Str(op, "scope") != "AllOtherEffects") return null;
                 return new Ability { Op = Op.Immunity, Targets = targets, Text = name };
+            case "ExtraAction":
+            {
+                if (Str(op, "player") != "You") return null;
+                int count = 1;
+                if (op.TryGetProperty("count", out var cn)) { if (cn.ValueKind != JsonValueKind.Number) return null; count = cn.GetInt32(); }
+                return new Ability { Op = Op.ExtraAction, Max = count, Text = name };
+            }
+            case "CountAsZero":
+                if (targets is null or { Self: true }) return null;
+                return new Ability { Op = Op.CountAsZero, Targets = targets, Text = name };
+            case "OfferCopyOfSelf":
+                if (targets is null or { Self: true }) return null;
+                return new Ability { Op = Op.OfferCopyOfSelf, Targets = targets, Text = name };
             case "CannotBeNullified":
                 if (targets is null) return null;
                 return new Ability { Op = Op.CannotBeNullified, Targets = targets, Text = name };

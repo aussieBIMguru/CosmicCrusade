@@ -14,11 +14,15 @@
 
             <!-- Title + options -->
             <StackPanel Grid.Column="0">
-                <TextBlock Text="COSMIC" FontFamily="{StaticResource DisplayFont}" FontSize="96" Foreground="White" Margin="0,-10,0,-30">
-                    <TextBlock.Effect>
-                        <DropShadowEffect Color="#7C3AED" BlurRadius="30" ShadowDepth="0" />
-                    </TextBlock.Effect>
-                </TextBlock>
+                <DockPanel Margin="0,-10,0,-30">
+                    <Image DockPanel.Dock="Right" Source="pack://application:,,,/Assets/CosmicCrusade-1024.png" Width="104" Height="104"
+                           VerticalAlignment="Center" Margin="0,8,0,0" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <TextBlock Text="COSMIC" FontFamily="{StaticResource DisplayFont}" FontSize="96" Foreground="White">
+                        <TextBlock.Effect>
+                            <DropShadowEffect Color="#7C3AED" BlurRadius="30" ShadowDepth="0" />
+                        </TextBlock.Effect>
+                    </TextBlock>
+                </DockPanel>
                 <TextBlock Text="CRUSADE" FontFamily="{StaticResource DisplayFont}" FontSize="96" Foreground="{StaticResource GoldBrush}">
                     <TextBlock.Effect>
                         <DropShadowEffect Color="#F59E0B" BlurRadius="30" ShadowDepth="0" />
@@ -36,6 +40,10 @@
                             <Slider Minimum="1" Maximum="9" IsSnapToTickEnabled="True" TickFrequency="1" Value="{Binding RoundsToWin}" />
                         </DockPanel>
 
+                        <TextBlock Text="AI difficulty" Style="{StaticResource Muted}"
+                                   ToolTip="Easy: rule-of-thumb play. Normal / Hard: the AI simulates its options before each turn (Hard thinks longer)." />
+                        <ComboBox ItemsSource="{Binding AiDifficulties}" SelectedItem="{Binding AiDifficulty}" Margin="0,2,0,10" />
+
                         <TextBlock Text="Deck mode" Style="{StaticResource Muted}" />
                         <ComboBox ItemsSource="{Binding DeckModes}" SelectedItem="{Binding DeckMode}" Margin="0,2,0,10" />
 
@@ -45,6 +53,8 @@
                         <CheckBox Content="Leaders (untick for No Leaders mode)" IsChecked="{Binding Leaders}" />
                         <CheckBox Content="Warzones expansion orders" IsChecked="{Binding Warzones}"
                                   ToolTip="Adds the Warzone deck (one Warzone revealed each round) and the Warzones Orders." />
+                        <CheckBox Content="Archons (once-per-game power cards)" IsChecked="{Binding Archons}"
+                                  ToolTip="Optional module. Once per game, at a round's Start-up, each player may take an Archon draw: see 3 Archons, keep 1 (revealed) to play that round, and draw one card fewer." />
 
                         <TextBlock Text="Seed (blank = random)" Style="{StaticResource Muted}" Margin="0,8,0,0" />
                         <TextBox Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8" />

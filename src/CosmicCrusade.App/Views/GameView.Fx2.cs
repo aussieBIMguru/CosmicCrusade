@@ -114,14 +114,59 @@ public partial class GameView
         _ => null,
     };
 
-    /// <summary>Removes a set of elements (their looping animations die with them) and stops timers.</summary>
+    /// <summary>Fades out and removes a set of elements, stops their looping animations, and stops timers.</summary>
     private Action StopWith(IEnumerable<UIElement> elements, params DispatcherTimer[] timers) => () =>
     {
         foreach (var t in timers) t.Stop();
         foreach (var e in elements.ToList())
-            _ = Anim.To(e, OpacityProperty, 0, 500, Anim.In).ContinueWith(_ => BoardCanvas.Children.Remove(e),
-                TaskScheduler.FromCurrentSynchronizationContext());
+            _ = Anim.To(e, OpacityProperty, 0, 500, Anim.In).ContinueWith(_ =>
+            {
+                BoardCanvas.Children.Remove(e);
+                StopAnimationsDeep(e);
+            }, TaskScheduler.FromCurrentSynchronizationContext());
     };
+
+    /// <summary>
+    /// Stops every animation on an element, its transforms and its children. A Forever animation does NOT die with its
+    /// element: WPF keeps ticking it after the element is removed, so long games piled them up and slowed down.
+    /// </summary>
+    private static void StopAnimationsDeep(DependencyObject root)
+    {
+        if (root is UIElement el)
+        {
+            el.BeginAnimation(UIElement.OpacityProperty, null);
+            StopTransformAnimations(el.RenderTransform);
+            if (el is Shape shape) shape.BeginAnimation(Shape.StrokeDashOffsetProperty, null);
+        }
+        int n = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < n; i++) StopAnimationsDeep(VisualTreeHelper.GetChild(root, i));
+    }
+
+    private static void StopTransformAnimations(Transform? t)
+    {
+        if (t is null || t.IsFrozen) return;
+        switch (t)
+        {
+            case TransformGroup g:
+                foreach (var c in g.Children) StopTransformAnimations(c);
+                break;
+            case TranslateTransform tt:
+                tt.BeginAnimation(TranslateTransform.XProperty, null);
+                tt.BeginAnimation(TranslateTransform.YProperty, null);
+                break;
+            case ScaleTransform s:
+                s.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                s.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                break;
+            case RotateTransform r:
+                r.BeginAnimation(RotateTransform.AngleProperty, null);
+                break;
+            case SkewTransform k:
+                k.BeginAnimation(SkewTransform.AngleXProperty, null);
+                k.BeginAnimation(SkewTransform.AngleYProperty, null);
+                break;
+        }
+    }
 
     private static DoubleAnimation Loop(double from, double to, double seconds, bool reverse = false, double beginSeconds = 0) => new(from, to,
         TimeSpan.FromSeconds(seconds))

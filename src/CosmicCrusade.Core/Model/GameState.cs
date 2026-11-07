@@ -20,6 +20,19 @@ public sealed class GameState
         };
     }
 
+    /// <summary>Copy constructor for <see cref="Clone"/>: same database and options, fresh players and RNG.</summary>
+    private GameState(GameState source, int seed)
+    {
+        Database = source.Database;
+        Options = source.Options;
+        Rng = new Random(seed);
+        Players = new[]
+        {
+            new PlayerState(0, source.Players[0].Name, source.Players[0].LeaderNode is not null),
+            new PlayerState(1, source.Players[1].Name, source.Players[1].LeaderNode is not null),
+        };
+    }
+
     public CardDatabase Database { get; }
     public GameOptions Options { get; }
     public Random Rng { get; }
@@ -35,6 +48,9 @@ public sealed class GameState
     /// <summary>Warzones expansion: the Warzone deck (last = top) and the Active Warzone(s).</summary>
     public List<CardInstance> WarzoneDeck { get; } = new();
     public List<CardInstance> ActiveWarzones { get; } = new();
+
+    /// <summary>Archons module: the shared Archon deck (last = top).</summary>
+    public List<CardInstance> ArchonDeck { get; } = new();
 
     /// <summary>RandomDraw mode: enabled definitions per deck type (uniform per distinct card).</summary>
     public List<CardDefinition> RandomDrawUnits { get; } = new();
@@ -82,6 +98,7 @@ public sealed class GameState
         PileKind.IssuedOrders => IssuedOrders,
         PileKind.WarzoneDeck => WarzoneDeck,
         PileKind.ActiveWarzone => ActiveWarzones,
+        PileKind.ArchonDeck => ArchonDeck,
         _ => throw new ArgumentOutOfRangeException(nameof(pile)),
     };
 
@@ -101,12 +118,21 @@ public sealed class GameState
             case LocationKind.Pile:
                 GetPile(loc.Pile!.Value).Remove(card);
                 break;
+            case LocationKind.ArchonSlot:
+                if (ReferenceEquals(Players[loc.Player].ArchonSlot, card)) Players[loc.Player].ArchonSlot = null;
+                break;
         }
         card.Location = CardLocation.None;
     }
 
     public void MoveToHand(CardInstance card, int player)
     {
+        // Archons never join a hand (e.g. "return it to its owner's hand"): back to the Archon deck.
+        if (card.PrintedDefinition.IsArchon)
+        {
+            ReturnArchonToDeck(card);
+            return;
+        }
         RemoveFromCurrentLocation(card);
         Players[player].Hand.Add(card);
         card.Location = CardLocation.InHand(player);
@@ -123,11 +149,36 @@ public sealed class GameState
     /// <summary>Puts the card on top of a pile. Leaving play resets in-play state (rank modifiers, race changes).</summary>
     public void MoveToPile(CardInstance card, PileKind pile)
     {
+        // Archons rule P2: an Archon leaving play (Nullified, Retired, Issued...) goes back into the Archon deck.
+        if (card.PrintedDefinition.IsArchon && pile != PileKind.ArchonDeck)
+        {
+            ReturnArchonToDeck(card);
+            return;
+        }
         bool wasInPlay = card.Location.Kind == LocationKind.Node;
         RemoveFromCurrentLocation(card);
         if (wasInPlay) card.ResetInPlayState();
         GetPile(pile).Add(card);
         card.Location = CardLocation.InPile(pile);
+    }
+
+    /// <summary>Archons: shuffles the card into the Archon deck at a random position (spec: Archons P2, A8).</summary>
+    public void ReturnArchonToDeck(CardInstance card)
+    {
+        bool wasInPlay = card.Location.Kind == LocationKind.Node;
+        RemoveFromCurrentLocation(card);
+        if (wasInPlay) card.ResetInPlayState();
+        ArchonDeck.Insert(Rng.Next(ArchonDeck.Count + 1), card);
+        card.Location = CardLocation.InPile(PileKind.ArchonDeck);
+    }
+
+    /// <summary>Archons: the picked Archon goes to the player's (revealed) Archon slot.</summary>
+    public void MoveToArchonSlot(CardInstance card, int player)
+    {
+        if (Players[player].ArchonSlot is { } old && !ReferenceEquals(old, card)) ReturnArchonToDeck(old);
+        RemoveFromCurrentLocation(card);
+        Players[player].ArchonSlot = card;
+        card.Location = CardLocation.InArchonSlot(player);
     }
 
     /// <summary>Card leaves hand/standby and waits on the stack while priority passes.</summary>
@@ -159,7 +210,8 @@ public sealed class GameState
             LocationKind.Pile => GetPile(loc.Pile!.Value).IndexOf(card),
             _ => -1,
         };
-        if (node.Card is not null || loc.Kind is not (LocationKind.Hand or LocationKind.Node or LocationKind.Pile)) return eval();
+        if (node.Card is not null || loc.Kind is not (LocationKind.Hand or LocationKind.Node or LocationKind.Pile or LocationKind.ArchonSlot))
+            return eval();
 
         MoveToNode(card, node);
         try
@@ -179,12 +231,124 @@ public sealed class GameState
                 GetPile(loc.Pile!.Value).Insert(index, card);
                 card.Location = loc;
             }
+            else if (loc.Kind == LocationKind.ArchonSlot)
+            {
+                Players[loc.Player].ArchonSlot = card;
+                card.Location = loc;
+            }
             else
             {
                 MoveToNode(card, loc.Node!);
             }
         }
     }
+
+    // ---------------------------------------------------------------- cloning (M4: AI search)
+
+    /// <summary>
+    /// A deep copy for AI simulations. Every card instance, node, hand and pile is copied (instance ids are kept, so
+    /// actions can be matched between the copies); card definitions and options are shared (they never change during
+    /// a game). The copy gets its own RNG seeded with <paramref name="seed"/>.
+    /// Only cards in hands, piles and on nodes are copied: call it when the stack is empty (a Main Phase turn).
+    /// </summary>
+    public GameState Clone(int seed)
+    {
+        var c = new GameState(this, seed)
+        {
+            _nextInstanceId = _nextInstanceId,
+            Round = Round,
+            Phase = Phase,
+            FirstPlayer = FirstPlayer,
+            ActivePlayer = ActivePlayer,
+            LastRoundWinner = LastRoundWinner,
+            EndAfterThisRound = EndAfterThisRound,
+        };
+        c.RandomDrawUnits.AddRange(RandomDrawUnits);
+        c.RandomDrawOrders.AddRange(RandomDrawOrders);
+
+        var map = new Dictionary<CardInstance, CardInstance>(ReferenceEqualityComparer.Instance);
+        CardInstance Map(CardInstance x)
+        {
+            if (!map.TryGetValue(x, out var y)) map[x] = y = x.CloneCore();
+            return y;
+        }
+
+        foreach (PileKind kind in Enum.GetValues<PileKind>())
+            foreach (var card in GetPile(kind))
+            {
+                var copy = Map(card);
+                c.GetPile(kind).Add(copy);
+                copy.Location = CardLocation.InPile(kind);
+            }
+
+        for (int p = 0; p < Players.Length; p++)
+        {
+            var src = Players[p];
+            var dst = c.Players[p];
+            dst.RoundsWon = src.RoundsWon;
+            dst.DeployTurnsThisRound = src.DeployTurnsThisRound;
+            dst.ArchonTaken = src.ArchonTaken;
+            if (src.ArchonSlot is { } archon)
+            {
+                var copy = Map(archon);
+                dst.ArchonSlot = copy;
+                copy.Location = CardLocation.InArchonSlot(p);
+            }
+            foreach (var card in src.Hand)
+            {
+                var copy = Map(card);
+                dst.Hand.Add(copy);
+                copy.Location = CardLocation.InHand(p);
+            }
+        }
+
+        foreach (var node in AllNodes)
+        {
+            var n = c.CorrespondingNode(node);
+            n.IsLocked = node.IsLocked;
+            if (node.Card is { } card)
+            {
+                var copy = Map(card);
+                n.Card = copy;
+                copy.Location = CardLocation.OnNode(n);
+            }
+        }
+
+        // Remembered values (Roundup Gang's node, Extreme Sanctions' race, once-per-round latches...).
+        object MapValue(object v) => v switch
+        {
+            Node n => c.CorrespondingNode(n),
+            CardInstance ci => Map(ci),
+            List<object> list => list.Select(MapValue).ToList(),
+            _ => v, // ints, strings, Races: immutable
+        };
+        foreach (var (orig, copy) in map.ToList())
+            foreach (var (key, value) in orig.Memory)
+                copy.Memory[key] = MapValue(value);
+
+        return c;
+    }
+
+    /// <summary>This state's node with the same side, kind and index as <paramref name="node"/> (from any state).</summary>
+    public Node CorrespondingNode(Node node)
+    {
+        var ps = Players[node.Side];
+        return node.Kind switch
+        {
+            NodeKind.Unit => ps.UnitNodes[node.Index],
+            NodeKind.Leader => ps.LeaderNode ?? throw new InvalidOperationException("No Leader Node in this game."),
+            NodeKind.Standby => ps.StandbyNodes[node.Index],
+            NodeKind.Order => ps.OrderNodes[node.Index],
+            _ => throw new ArgumentOutOfRangeException(nameof(node)),
+        };
+    }
+
+    /// <summary>Every card instance in a hand, pile or on a node.</summary>
+    public IEnumerable<CardInstance> AllCards =>
+        Enum.GetValues<PileKind>().SelectMany(k => GetPile(k))
+            .Concat(Players.SelectMany(p => p.Hand))
+            .Concat(Players.Where(p => p.ArchonSlot is not null).Select(p => p.ArchonSlot!))
+            .Concat(AllNodes.Where(n => n.Card is not null).Select(n => n.Card!));
 
     public void Shuffle<T>(IList<T> list)
     {

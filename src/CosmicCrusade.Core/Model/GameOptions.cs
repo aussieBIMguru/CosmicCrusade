@@ -8,6 +8,9 @@ public sealed class GameOptions
     public int RoundsToWin { get; set; } = 3;
     public EmptyDeckRule EmptyDeck { get; set; } = EmptyDeckRule.Reshuffle;
     public bool Warzones { get; set; }
+
+    /// <summary>Archons module (optional, off by default): once per game each player may take an Archon.</summary>
+    public bool Archons { get; set; }
     public bool Leaders { get; set; } = true;
     public DeckMode DeckMode { get; set; } = DeckMode.Standard;
 
@@ -19,6 +22,9 @@ public sealed class GameOptions
 
     /// <summary>Card ids removed in No Leaders mode (besides Leader-class units).</summary>
     public HashSet<string> LeaderRelatedCards { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>M4: how strong the AI seat plays (Easy = heuristic, Normal/Hard = Monte Carlo search).</summary>
+    public CosmicCrusade.Core.Ai.AiDifficulty AiDifficulty { get; set; } = CosmicCrusade.Core.Ai.AiDifficulty.Normal;
 
     public int HandUnitTarget { get; set; } = 5;
     public int HandOrderTarget { get; set; } = 3;
@@ -50,6 +56,7 @@ public sealed class GameOptions
                 if (d.TryGetProperty("roundsToWin", out var r)) options.RoundsToWin = r.GetInt32();
                 if (d.TryGetProperty("emptyDeck", out var e)) options.EmptyDeck = CardDatabase.ParseEnum<EmptyDeckRule>(e.GetString()!);
                 if (d.TryGetProperty("warzones", out var w)) options.Warzones = w.GetBoolean();
+                if (d.TryGetProperty("archons", out var ar)) options.Archons = ar.GetBoolean();
                 if (d.TryGetProperty("leaders", out var l)) options.Leaders = l.GetBoolean();
                 if (d.TryGetProperty("deckMode", out var m)) options.DeckMode = CardDatabase.ParseEnum<DeckMode>(m.GetString()!);
             }
@@ -59,6 +66,7 @@ public sealed class GameOptions
 
         var pool = PoolDefinition.Load(Path.Combine(dataDir, poolRel));
         options.CopyCounts = pool.MergedCounts(includeWarzones: true);
+        foreach (var kv in pool.Archons) options.CopyCounts[kv.Key] = kv.Value;
         return options;
     }
 }
@@ -69,6 +77,7 @@ public sealed class PoolDefinition
     public string Name { get; init; } = "";
     public Dictionary<string, int> Base { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, int> Warzones { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> Archons { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 
     public Dictionary<string, int> MergedCounts(bool includeWarzones)
     {
@@ -87,6 +96,8 @@ public sealed class PoolDefinition
             foreach (var p in b.EnumerateObject()) pool.Base[p.Name] = p.Value.GetInt32();
         if (root.TryGetProperty("warzones", out var w))
             foreach (var p in w.EnumerateObject()) pool.Warzones[p.Name] = p.Value.GetInt32();
+        if (root.TryGetProperty("archons", out var a))
+            foreach (var p in a.EnumerateObject()) pool.Archons[p.Name] = p.Value.GetInt32();
         return pool;
     }
 }

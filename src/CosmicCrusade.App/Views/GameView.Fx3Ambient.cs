@@ -60,8 +60,11 @@ public partial class GameView
     {
         foreach (var t in timers) t.Stop();
         foreach (var e in elements.ToList())
-            _ = Anim.To(e, OpacityProperty, 0, 600, Anim.In).ContinueWith(_ => (VisualTreeHelper.GetParent(e) as Panel)?.Children.Remove(e),
-                TaskScheduler.FromCurrentSynchronizationContext());
+            _ = Anim.To(e, OpacityProperty, 0, 600, Anim.In).ContinueWith(_ =>
+            {
+                (VisualTreeHelper.GetParent(e) as Panel)?.Children.Remove(e);
+                StopAnimationsDeep(e);
+            }, TaskScheduler.FromCurrentSynchronizationContext());
     };
 
     private T FadeIn<T>(T element, double ms = 1000, double to = 1) where T : UIElement
@@ -392,9 +395,10 @@ public partial class GameView
     private Action AmbientSwarm()
     {
         int alive = 0;
-        var spawner = Every(0.35, 1.1, () =>
+        var spawner = Every(0.8, 1.8, () =>
         {
-            if (alive >= FxSettings.Count(14)) return;
+            // Keep the swarm small: everything animating on the board makes the 3D board texture redraw.
+            if (alive >= FxSettings.Count(6)) return;
             alive++;
             SpawnBug(() => alive--);
         }, startNow: true);
@@ -451,15 +455,19 @@ public partial class GameView
         };
         move.Completed += (_, _) =>
         {
+            // Stop the leg twitch: a Forever animation keeps ticking after its element is removed, so without this
+            // every bug that ever crossed the board kept running (the game slowed down the longer Swarm Warrens was up).
+            flutter.BeginAnimation(ScaleTransform.ScaleYProperty, null);
             RemoveFx(bug);
             onGone();
         };
         mt.BeginAnimation(MatrixTransform.MatrixProperty, move);
-        flutter.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(1, -0.6, TimeSpan.FromMilliseconds(70))
-        {
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-        });
+        if (FxSettings.HighQuality)
+            flutter.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(1, -0.6, TimeSpan.FromMilliseconds(140))
+            {
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+            });
     }
 
     // =================================================================== Central Hive
@@ -473,6 +481,8 @@ public partial class GameView
             Stroke = Solid(Amber, 90),
             StrokeThickness = 2,
             Fill = Solid(Amber, 10),
+            // The honeycomb is thousands of hexagons: render it once to a bitmap so its opacity pulse is cheap.
+            CacheMode = new BitmapCache(1),
         };
         AddFx(FadeIn(comb, 1500, 0.8), 0, 0, 2);
         comb.BeginAnimation(OpacityProperty, Loop(0.45, 0.9, 1.8, reverse: true, beginSeconds: 1.5));
@@ -480,13 +490,19 @@ public partial class GameView
         var els = new List<UIElement> { comb };
         var pulse = Every(2.6, 3.4, () =>
         {
+            // A soft ring from a gradient rather than a blur effect (a blur on an element growing to 2000 px is
+            // very expensive inside the 3D board).
             var ring = new Ellipse
             {
                 Width = 400,
                 Height = 400,
-                Stroke = Solid(Amber, 120),
-                StrokeThickness = 30,
-                Effect = SoftBlur(20),
+                Fill = new RadialGradientBrush(
+                    new GradientStopCollection
+                    {
+                        new(Color.FromArgb(0, Amber.R, Amber.G, Amber.B), 0.78),
+                        new(Color.FromArgb(110, Amber.R, Amber.G, Amber.B), 0.9),
+                        new(Color.FromArgb(0, Amber.R, Amber.G, Amber.B), 1),
+                    }),
                 RenderTransformOrigin = new Point(0.5, 0.5),
             };
             var s = new ScaleTransform(0.1, 0.1);

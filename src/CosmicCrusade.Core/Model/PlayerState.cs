@@ -29,6 +29,15 @@ public sealed class PlayerState
 
     public int RoundsWon { get; set; }
 
+    /// <summary>Archons module: this player has used their once-per-game Archon draw.</summary>
+    public bool ArchonTaken { get; set; }
+
+    /// <summary>Archons module: the revealed Archon this player may play this round (lost at Clean-up).</summary>
+    public CardInstance? ArchonSlot { get; internal set; }
+
+    /// <summary>Cards that can be played as if from hand: the hand plus the Archon in the slot.</summary>
+    public IEnumerable<CardInstance> PlayableCards => ArchonSlot is { } archon ? Hand.Append(archon) : Hand;
+
     /// <summary>Deploy turns taken this round (Military Academy). Reset at Start-up.</summary>
     public int DeployTurnsThisRound { get; set; }
 

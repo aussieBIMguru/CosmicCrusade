@@ -33,6 +33,9 @@ public sealed class CardDefinition
     public bool IsLeader => UnitClass == Model.UnitClass.Leader;
     public bool IsChampion => UnitClass == Model.UnitClass.Champion;
 
+    /// <summary>Archons module card (set "Archons"): lives in the Archon deck, never in the normal decks or piles.</summary>
+    public bool IsArchon => Set.Equals("Archons", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>True when the card has no effects at all (e.g. Brutes). Useful while the effect engine is incomplete.</summary>
     public bool IsVanilla => Effects.ValueKind != JsonValueKind.Array || Effects.GetArrayLength() == 0;
 

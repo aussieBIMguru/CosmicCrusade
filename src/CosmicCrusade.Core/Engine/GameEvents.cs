@@ -155,6 +155,12 @@ public sealed record WarzoneRevealedEvent(CardInstance Warzone) : GameEvent;
 /// <summary>Warzones: an Active Warzone went to the bottom of the Warzone deck (Clean-up step 5).</summary>
 public sealed record WarzoneReturnedEvent(CardInstance Warzone) : GameEvent;
 
+/// <summary>Archons: a player took their Archon draw and picked <paramref name="Archon"/> (revealed), giving up one card from <paramref name="Skipped"/>.</summary>
+public sealed record ArchonTakenEvent(int Player, CardInstance Archon, PileKind Skipped, int Offered) : GameEvent;
+
+/// <summary>Archons: an unplayed Archon is lost at Clean-up and shuffled back into the Archon deck.</summary>
+public sealed record ArchonLostEvent(int Player, CardInstance Archon) : GameEvent;
+
 public sealed record RoundEndedEvent(int Round, int RoundsWon0, int RoundsWon1) : GameEvent;
 public sealed record GameEndedEvent(GameOutcome Outcome) : GameEvent;
 public sealed record LogEvent(string Message) : GameEvent;

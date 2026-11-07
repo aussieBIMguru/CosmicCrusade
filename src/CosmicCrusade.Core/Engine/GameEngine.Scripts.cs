@@ -338,4 +338,76 @@ public sealed partial class GameEngine
 
     private static string NodeLabel(Node n, int viewer) =>
         $"{(n.Side == viewer ? "Your" : "Opponent's")} {n.Label}{(n.Card is null ? "" : $" ({n.Card.Name})")}{(n.IsLocked ? " [locked]" : "")}";
+
+    // ================================================================== Archons
+
+    /// <summary>Ceasefire (P5): if both players control a Leader, the Main Phase ends at once; the round is scored normally.</summary>
+    private async Task CeasefireAsync(EffectContext ctx, CancellationToken ct)
+    {
+        bool both = State.Players.All(p => p.UnitsInPlay.Any(u => u.Definition.IsLeader));
+        if (!both)
+        {
+            await EmitAsync(new LogEvent($"  {ctx.Source.Name}: both players must control a Leader – no effect."), ct);
+            return;
+        }
+        _mainEndsNow = true;
+        await EmitAsync(new LogEvent($"  {ctx.Source.Name}: the guns fall silent – the round ends now."), ct);
+    }
+
+    /// <summary>Insurrection (P6): if you control at least 3 Units that share a Race, you win the round at once.</summary>
+    private async Task InsurrectionAsync(EffectContext ctx, CancellationToken ct)
+    {
+        var units = State.Players[ctx.Controller].UnitsInPlay.ToList();
+        var race = units.SelectMany(u => StaticLayer.Races(State, u)).GroupBy(r => r)
+            .Where(g => g.Count() >= 3).Select(g => (Race?)g.Key).FirstOrDefault();
+        if (race is null)
+        {
+            await EmitAsync(new LogEvent($"  {ctx.Source.Name}: you don't control 3 Units that share a Race – no effect."), ct);
+            return;
+        }
+        await WinRoundAsync(ctx.Controller, ctx.Source, ct);
+        _roundEndsNow = true;
+    }
+
+    /// <summary>
+    /// Quantum Leap (P10): draw up to 3 Orders, then issue any of them as additional actions (each still opens a
+    /// priority window; Reacts can't be issued this way), then Retire the rest of them (to the Issued pile).
+    /// </summary>
+    private async Task QuantumLeapAsync(EffectContext ctx, CancellationToken ct)
+    {
+        int player = ctx.Controller;
+        var source = ctx.Source;
+        var counts = Enumerable.Range(0, 4).Select(i => new ChoiceOption(i == 0 ? "None" : $"{i} Order{(i == 1 ? "" : "s")}", Value: i)).ToList();
+        var n = await ChooseAsync(new ChoiceRequest(player, source, $"{source.Name}: draw how many Orders?",
+            ChoiceKind.Number, counts, 1, 1, "QuantumLeapDraw"), ct);
+        int count = n.Count > 0 ? counts[n[0]].Value : 0;
+
+        var drawn = new List<CardInstance>();
+        for (int i = 0; i < count; i++)
+        {
+            if (await DrawAsync(player, PileKind.OrderDeck, ct, source) is not { } card) break;
+            drawn.Add(card);
+        }
+
+        while (true)
+        {
+            var issues = LegalActions.ForTurn(State, player).OfType<IssueOrderAction>()
+                .Where(a => drawn.Contains(a.Card) && a.Card.Location.Kind == LocationKind.Hand).ToList();
+            if (issues.Count == 0) break;
+            var pick = await ChooseAsync(new ChoiceRequest(player, source, $"{source.Name}: issue one of the drawn Orders as an additional action?",
+                ChoiceKind.Options, issues.Select(a => new ChoiceOption(a.Describe(), a.Card, a.OrderNode)).ToList(), 0, 1, "QuantumLeapIssue"), ct);
+            if (pick.Count == 0) break;
+            var action = issues[pick[0]];
+            var item = await AnnounceOrderAsync(player, action.Card, action.OrderNode, respondingTo: null, ct);
+            await RunPriorityAsync(item, player, ct);
+            await CheckStateAsync(ct);
+            if (_roundEndsNow || _mainEndsNow) break;
+        }
+
+        foreach (var card in drawn.Where(c => c.Location.Kind == LocationKind.Hand && c.Location.Player == player).ToList())
+        {
+            State.MoveToPile(card, PileKind.IssuedOrders);
+            await EmitAsync(new CardRetiredFromHandEvent(card, player), ct);
+        }
+    }
 }

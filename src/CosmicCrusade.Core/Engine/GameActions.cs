@@ -89,13 +89,15 @@ public sealed record AssembleAction(int Player, CardInstance Card, CardInstance 
 /// <param name="OpponentJustPassed">True when the opponent's last Main Phase turn was a Pass (passing again ends the phase).</param>
 /// <param name="Stack">The priority stack, top first (empty on a Main Phase turn).</param>
 /// <param name="IsResponse">True for a priority window: Legal holds Reacts plus a Pass ("OK, no response").</param>
+/// <param name="ExtraAction">Open Source: an additional action in the same turn. Pass here only ends the turn.</param>
 public sealed record DecisionContext(
     GameState State,
     int Player,
     IReadOnlyList<GameAction> Legal,
     bool OpponentJustPassed,
     IReadOnlyList<StackItem>? Stack = null,
-    bool IsResponse = false)
+    bool IsResponse = false,
+    bool ExtraAction = false)
 {
     public IReadOnlyList<StackItem> StackTopFirst => Stack ?? Array.Empty<StackItem>();
 }
@@ -132,7 +134,7 @@ public static class LegalActions
                 list.Add(new DeployFromPileAction(player, pile));
 
         // Temporal Stasis / Extreme Sanctions: some Orders can't be Issued.
-        foreach (var card in ps.Hand.Where(c => c.Definition.IsOrder && CanIssue(state, player, c)))
+        foreach (var card in ps.PlayableCards.Where(c => c.Definition.IsOrder && CanIssue(state, player, c)))
         {
             switch (card.Definition.OrderType)
             {
@@ -170,7 +172,7 @@ public static class LegalActions
     {
         var ps = state.Players[player];
         var hand = new List<DeployFromHandAction>();
-        foreach (var card in ps.Hand.Where(c => c.Definition.IsUnit))
+        foreach (var card in ps.PlayableCards.Where(c => c.Definition.IsUnit))
             foreach (var node in Placement.LegalDeployNodes(state, player, card))
                 hand.Add(new DeployFromHandAction(player, card, node));
 

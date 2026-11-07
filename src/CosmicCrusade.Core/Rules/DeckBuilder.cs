@@ -10,6 +10,7 @@ public static class DeckBuilder
     {
         if (def.Kind == CardKind.Warzone && !options.Warzones) return false;
         if (def.Set.Equals("Warzones", StringComparison.OrdinalIgnoreCase) && !options.Warzones) return false;
+        if (def.IsArchon && !options.Archons) return false;
         if (!options.Leaders)
         {
             if (def.IsLeader) return false;
@@ -33,6 +34,7 @@ public static class DeckBuilder
         state.OrderDeck.Clear();
         state.WarzoneDeck.Clear();
         state.ActiveWarzones.Clear();
+        state.ArchonDeck.Clear();
         state.RandomDrawUnits.Clear();
         state.RandomDrawOrders.Clear();
 
@@ -41,6 +43,18 @@ public static class DeckBuilder
         {
             int copies = CopiesOf(def, options);
             if (copies == 0) continue;
+
+            // Archons always form their own real deck, whatever the deck mode (Archons P14).
+            if (def.IsArchon)
+            {
+                for (int i = 0; i < copies; i++)
+                {
+                    var a = state.CreateInstance(def);
+                    state.ArchonDeck.Add(a);
+                    a.Location = CardLocation.InPile(PileKind.ArchonDeck);
+                }
+                continue;
+            }
 
             // Warzones always form a real (cycling) deck, whatever the deck mode.
             if (def.Kind == CardKind.Warzone)
@@ -72,5 +86,6 @@ public static class DeckBuilder
         state.Shuffle(state.UnitDeck);
         state.Shuffle(state.OrderDeck);
         state.Shuffle(state.WarzoneDeck);
+        state.Shuffle(state.ArchonDeck);
     }
 }

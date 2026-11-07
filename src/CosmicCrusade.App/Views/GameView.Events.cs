@@ -78,11 +78,21 @@ public partial class GameView
                 break;
 
             case UnitDeployAnnouncedEvent e:
+                if (IsArchon(e.Card)) await ArchonInvocationAsync(e.Card, e.Player); // Archons: ancient power
                 await OnDeployAnnouncedAsync(e);
                 break;
 
             case UnitPlayedEvent e:
                 await OnUnitPlayedAsync(e);
+                if (IsArchon(e.Card) && e.Card.IsCopy == false) await ArchonArrivalFlourishAsync(e.Card, e.Node.Side, e.Node);
+                break;
+
+            case ArchonTakenEvent e:
+                await OnArchonTakenAsync(e);
+                break;
+
+            case ArchonLostEvent e:
+                await OnArchonLostAsync(e);
                 break;
 
             case DeployCancelledEvent e:
@@ -110,11 +120,14 @@ public partial class GameView
                 break;
 
             case OrderIssueAnnouncedEvent e:
+                if (IsArchon(e.Card)) await ArchonInvocationAsync(e.Card, e.Player); // Archons: ancient power
                 OnOrderAnnounced(e);
                 break;
 
             case OrderResolvedEvent e:
                 await OnOrderResolvedAsync(e);
+                if (IsArchon(e.Card) && e.OrderNode is not null && e.EffectApplied)
+                    await ArchonArrivalFlourishAsync(e.Card, e.Player, e.OrderNode);
                 break;
 
             case CardNullifiedOnStackEvent e:
@@ -130,6 +143,7 @@ public partial class GameView
                 break;
 
             case AbilityTriggeredEvent e:
+                if (IsArchon(e.Source) && e.Trigger == "OnResolve") await ArchonActionFlourishAsync(e.Source, e.Controller);
                 await OnAbilityTriggeredAsync(e);
                 break;
 
@@ -138,10 +152,14 @@ public partial class GameView
                 break;
 
             case CardNullifiedEvent e:
+                if (e.Source?.PrintedDefinition.Name == "Nebula Cannon" && e.FromNode is { } struck)
+                    await NebulaBeamAsync(BoardLayout.Center(struck));
                 await OnCardNullifiedAsync(e);
                 break;
 
             case NodeLockChangedEvent e:
+                if (e.Locked && e.Source?.PrintedDefinition.Name == "Nebula Cannon")
+                    await NebulaBeamAsync(BoardLayout.Center(e.Node), small: true);
                 await OnNodeLockChangedAsync(e);
                 break;
 
@@ -279,7 +297,8 @@ public partial class GameView
         if (gameEvent is OrderResolvedEvent or CardNullifiedEvent or CardMovedToPileEvent or CardMovedToStandbyEvent
             or CardReturnedToHandEvent or CardRetiredFromHandEvent or CardDrawnEvent or WarzoneRevealedEvent or WarzonesAddedEvent
             or WarzoneReturnedEvent or AbilitiesSuppressedEvent or ChoiceMadeEvent or NullifyPreventedEvent
-            or NodesSwappedEvent or RankChangedEvent or CardNullifiedFromHandEvent or CardCopiedEvent or UnitControlGainedEvent or RacesChangedEvent)
+            or NodesSwappedEvent or RankChangedEvent or CardNullifiedFromHandEvent or CardCopiedEvent or UnitControlGainedEvent or RacesChangedEvent
+            or ArchonTakenEvent or ArchonLostEvent)
             RefreshScores();
     }
 

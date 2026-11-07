@@ -92,7 +92,10 @@ public partial class GameView : UserControl, IGameEventSink
         BuildBoardReadout();
         BuildAiEye();
 
-        var ai = new PacedController(new HeuristicAi(_options.Seed ^ 0x5EED));
+        // M4: Easy = heuristic; Normal/Hard search before each turn, so the pacing delay is shorter (the search takes time).
+        var difficulty = _options.AiDifficulty;
+        var ai = new PacedController(MonteCarloAi.Create(difficulty, _options.Seed ^ 0x5EED),
+            thinkMs: difficulty == AiDifficulty.Easy ? 650 : 250);
         ai.ThinkingChanged += SetAiThinking;
         var engine = new GameEngine(_state, _human, ai, this);
 
@@ -133,6 +136,7 @@ public partial class GameView : UserControl, IGameEventSink
         {
             bool warzonePile = pile is PileKind.WarzoneDeck or PileKind.ActiveWarzone;
             if (warzonePile && !State.Options.Warzones) continue;
+            if (pile == PileKind.ArchonDeck && !State.Options.Archons) continue;
 
             var view = new PileView(pile);
             var c = BoardLayout.PileCenter(pile);
@@ -142,7 +146,7 @@ public partial class GameView : UserControl, IGameEventSink
             view.MouseEnter += (_, _) =>
             {
                 // Inspect the top card of face-up piles (Active Warzone, Retired, Nullified, Issued).
-                if (kind is PileKind.UnitDeck or PileKind.OrderDeck or PileKind.WarzoneDeck) return;
+                if (kind is PileKind.UnitDeck or PileKind.OrderDeck or PileKind.WarzoneDeck or PileKind.ArchonDeck) return;
                 var list = State.GetPile(kind);
                 if (list.Count > 0) ShowZoom(list[^1]);
             };
@@ -151,7 +155,7 @@ public partial class GameView : UserControl, IGameEventSink
             {
                 // Right-click a face-up pile to enlarge its top card. Several Active Warzones: each right-click
                 // shows the next one.
-                if (kind is PileKind.UnitDeck or PileKind.OrderDeck or PileKind.WarzoneDeck) return;
+                if (kind is PileKind.UnitDeck or PileKind.OrderDeck or PileKind.WarzoneDeck or PileKind.ArchonDeck) return;
                 var list = State.GetPile(kind);
                 if (list.Count == 0) return;
                 e.Handled = true;
@@ -394,16 +398,21 @@ public partial class GameView : UserControl, IGameEventSink
         _hud.HandRevealNote = youRevealed ? "Your hand is revealed to the AI" : "";
 
         var hand = State.Players[1].Hand;
+        // Archons: the AI's Archon sits face up in its hand row (it is revealed). A view whose Archon has just left
+        // the slot is removed by the play / loss animation, not here.
+        var archon = State.Players[1].ArchonSlot;
+        var handViews = _oppHandViews.Where(v => !IsArchon(v.Card)).ToList();
         bool inSync = aiRevealed
-            ? _oppHandViews.Select(v => v.Card).SequenceEqual(hand)
-            : _oppHandViews.All(v => v.Card is null);
+            ? handViews.Select(v => v.Card).SequenceEqual(hand)
+            : handViews.All(v => v.Card is null);
+        if (archon is not null && !_oppHandViews.Any(v => v.Card == archon)) inSync = false;
         if (inSync) return;
 
         foreach (var v in _oppHandViews) OpponentHandCanvas.Children.Remove(v);
         _oppHandViews.Clear();
-        foreach (var card in hand)
+        foreach (var card in hand.Append(archon).OfType<CardInstance>())
         {
-            var v = CreateOpponentHandCard(aiRevealed ? card : null);
+            var v = CreateOpponentHandCard(aiRevealed || IsArchon(card) ? card : null);
             _oppHandViews.Add(v);
             OpponentHandCanvas.Children.Add(v);
         }
@@ -533,9 +542,10 @@ public partial class GameView : UserControl, IGameEventSink
             return;
         }
 
-        _hud.Status = "Your turn";
-        _hud.PassText = "PASS";
-        _hud.Hint = ctx.OpponentJustPassed ? "The AI passed – if you pass too, the round is scored." : TurnHint;
+        _hud.Status = ctx.ExtraAction ? "Additional action" : "Your turn";
+        _hud.PassText = ctx.ExtraAction ? "END TURN" : "PASS";
+        _hud.Hint = ctx.ExtraAction ? "Open Source: take an additional action, or END TURN (Space) – that isn't a pass."
+            : ctx.OpponentJustPassed ? "The AI passed – if you pass too, the round is scored." : TurnHint;
 
         var playable = PlayableCards(ctx);
         foreach (var v in _handViews)

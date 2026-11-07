@@ -199,9 +199,10 @@ public sealed class PileView : Grid
     public PileView(PileKind pile)
     {
         Pile = pile;
-        _isDeck = pile is PileKind.UnitDeck or PileKind.OrderDeck or PileKind.WarzoneDeck;
+        _isDeck = pile is PileKind.UnitDeck or PileKind.OrderDeck or PileKind.WarzoneDeck or PileKind.ArchonDeck;
         bool isWarzone = pile is PileKind.WarzoneDeck or PileKind.ActiveWarzone;
-        var frameColor = isWarzone ? Color.FromArgb(150, 192, 132, 252) : Color.FromArgb(110, 200, 170, 255);
+        var frameColor = pile == PileKind.ArchonDeck ? Color.FromArgb(200, 60, 160, 255)
+            : isWarzone ? Color.FromArgb(150, 192, 132, 252) : Color.FromArgb(110, 200, 170, 255);
         Width = BoardLayout.SlotW;
         Height = BoardLayout.SlotH + 30;
 

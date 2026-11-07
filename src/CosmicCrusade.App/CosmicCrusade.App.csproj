@@ -7,7 +7,14 @@
     <RootNamespace>CosmicCrusade.App</RootNamespace>
     <AssemblyName>CosmicCrusade</AssemblyName>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- The exe / taskbar icon. The window title bar uses the same file (MainWindow Icon). -->
+    <ApplicationIcon>Assets\CosmicCrusade.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\CosmicCrusade.ico" />
+    <Resource Include="Assets\CosmicCrusade-1024.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\CosmicCrusade.Core\CosmicCrusade.Core.csproj" />

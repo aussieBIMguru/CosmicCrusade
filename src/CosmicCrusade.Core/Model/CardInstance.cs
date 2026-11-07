@@ -76,6 +76,24 @@ public sealed class CardInstance
         AbilitiesSuppressed = false;
     }
 
+    /// <summary>
+    /// A copy with the same id and per-instance state (for <see cref="GameState.Clone"/>). Location and Memory are
+    /// filled in by the caller, which re-points them at the cloned nodes and cards.
+    /// </summary>
+    internal CardInstance CloneCore()
+    {
+        var c = new CardInstance(InstanceId, PrintedDefinition)
+        {
+            Definition = Definition,
+            BaseRankOverride = BaseRankOverride,
+            AbilitiesSuppressed = AbilitiesSuppressed,
+        };
+        c.Races.Clear();
+        foreach (var r in Races) c.Races.Add(r);
+        c.PersistentModifiers.AddRange(PersistentModifiers);
+        return c;
+    }
+
     public override string ToString() => $"{Definition.Name}#{InstanceId}";
 }
 
@@ -87,6 +105,7 @@ public readonly record struct CardLocation(LocationKind Kind, int Player, Node? 
     public static CardLocation OnNode(Node node) => new(LocationKind.Node, node.Side, node, null);
     public static CardLocation InPile(PileKind pile) => new(LocationKind.Pile, -1, null, pile);
     public static CardLocation OnStack(int player) => new(LocationKind.Stack, player, null, null);
+    public static CardLocation InArchonSlot(int player) => new(LocationKind.ArchonSlot, player, null, null);
 }
 
 public enum LocationKind
@@ -96,4 +115,6 @@ public enum LocationKind
     Node,
     Pile,
     Stack,
+    /// <summary>Archons module: the player's revealed Archon, waiting to be played this round.</summary>
+    ArchonSlot,
 }

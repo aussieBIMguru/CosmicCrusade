@@ -1,0 +1,191 @@
+{
+  "$comment": "Card template measured from the original 780x1075 px (300 dpi) card images. The app draws cards from this plus art/<id>.jpg, frames/strip_<style>.png and cards.json. Coordinates are px in the 780x1075 canvas; scale uniformly.",
+  "canvas": {
+    "width": 780,
+    "height": 1075,
+    "dpi": 300,
+    "background": "#FFFFFF"
+  },
+  "fonts": {
+    "display": {
+      "family": "Haettenschweiler",
+      "fallback": [
+        "Impact",
+        "Arial Narrow"
+      ],
+      "note": "Name, header lines and ability text. Ships with Windows/Office."
+    },
+    "flavor": {
+      "family": "Calibri",
+      "style": "Italic",
+      "fallback": [
+        "Segoe UI"
+      ]
+    }
+  },
+  "strip": {
+    "rect": [
+      0,
+      0,
+      190,
+      1075
+    ],
+    "image": "frames/strip_{style}.png",
+    "styleFromRace": {
+      "GalacticCouncil": "GalacticCouncil",
+      "SpaceCowboy": "SpaceCowboy",
+      "Necrolite": "Necrolite",
+      "Overmind": "Overmind",
+      "Blaarg": "Blaarg",
+      "Synthenoid": "Synthenoid",
+      "Neutral": "Neutral",
+      "Archon": "Archon"
+    },
+    "warzoneStyle": "Warzone"
+  },
+  "name": {
+    "rotation": -90,
+    "readsBottomToTop": true,
+    "centerX": 112,
+    "centerY": 540,
+    "maxLength": 700,
+    "fontSize": 92,
+    "shrinkToFit": true,
+    "fill": "#FFFFFF",
+    "shadow": {
+      "color": "#000000",
+      "offsetX": 5,
+      "offsetY": 5,
+      "note": "Offset is in the card's frame (down/right), giving the printed drop-shadow look."
+    },
+    "outline": {
+      "color": "#000000",
+      "width": 2
+    }
+  },
+  "art": {
+    "rect": [
+      200,
+      77,
+      503,
+      441
+    ],
+    "image": "art/{id}.jpg",
+    "cornerRadii": {
+      "topLeft": 0,
+      "topRight": 56,
+      "bottomRight": 0,
+      "bottomLeft": 0
+    },
+    "note": "Crops include the white outside the rounded corner; clip with the radius above."
+  },
+  "header": {
+    "labelX": 201,
+    "valueX": 372,
+    "line1Top": 545,
+    "line2Top": 616,
+    "fontSize": 58,
+    "labelColor": "#000000",
+    "subtypeColor": "#4B4B4B",
+    "rows": {
+      "Unit": [
+        [
+          "Race:",
+          "{race}"
+        ],
+        [
+          "Rank:",
+          "{rank}  ({class})"
+        ]
+      ],
+      "Order": [
+        [
+          "Race:",
+          "{race}"
+        ],
+        [
+          "Type:",
+          "Order  ({orderType})"
+        ]
+      ],
+      "Warzone": [
+        [
+          "Type:",
+          "Warzone"
+        ],
+        [
+          "Race:",
+          "{race}"
+        ]
+      ]
+    },
+    "coloring": "Race name, rank number and the word 'Order' use the race's textColor; the bracketed class/subtype uses subtypeColor; Leaders print as (*Leader*); 'Warzone' is black."
+  },
+  "ability": {
+    "x": 200,
+    "top": 706,
+    "width": 560,
+    "fontSize": 50,
+    "lineHeight": 64,
+    "minFontSize": 38,
+    "bottomLimit": 1050,
+    "fit": "Shrink font (and line height proportionally) until ability text + 40 px gap + flavour fit above bottomLimit.",
+    "color": "#000000",
+    "highlight": "Race words use that race's textColor; signed numbers (+2, -1, X) and plain numbers use the card's own race textColor."
+  },
+  "flavor": {
+    "x": 200,
+    "width": 470,
+    "fontSize": 30,
+    "lineHeight": 37,
+    "color": "#7E7E7E",
+    "placement": "Below the ability text with at least 40 px gap, bottom-aligned at y=1010 when space allows; never above y=780."
+  },
+  "races": {
+    "GalacticCouncil": {
+      "display": "Galactic Council",
+      "stripColor": "#C86500",
+      "textColor": "#C86400"
+    },
+    "SpaceCowboy": {
+      "display": "Space Cowboy",
+      "stripColor": "#FE0000",
+      "textColor": "#FE0101"
+    },
+    "Necrolite": {
+      "display": "Necrolite",
+      "stripColor": "#006401",
+      "textColor": "#007D01"
+    },
+    "Overmind": {
+      "display": "Overmind",
+      "stripColor": "#0000FE",
+      "textColor": "#0101FE"
+    },
+    "Blaarg": {
+      "display": "Blaarg",
+      "stripColor": "#AFAF01",
+      "textColor": "#7D7E01"
+    },
+    "Synthenoid": {
+      "display": "Synthenoid",
+      "stripColor": "#7D7D7D",
+      "textColor": "#4B4B4B"
+    },
+    "Neutral": {
+      "display": "Neutral",
+      "stripColor": "#321A1A",
+      "textColor": "#4B4B4B"
+    },
+    "Warzone": {
+      "display": "Warzone",
+      "stripColor": "#321A1A",
+      "textColor": "#000000"
+    },
+    "Archon": {
+      "display": "Archon",
+      "stripColor": "#017EFF",
+      "textColor": "#017DFD"
+    }
+  }
+}

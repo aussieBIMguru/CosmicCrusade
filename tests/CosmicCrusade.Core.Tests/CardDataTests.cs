@@ -7,12 +7,14 @@ namespace CosmicCrusade.Core.Tests;
 public class CardDataTests
 {
     [Fact]
-    public void Loads_all_177_cards()
+    public void Loads_all_189_cards()
     {
-        Assert.Equal(177, TestData.Db.All.Count);
-        Assert.Equal(87, TestData.Db.All.Count(c => c.IsUnit));
-        Assert.Equal(63, TestData.Db.All.Count(c => c.IsOrder));
+        // 177 base + Warzones cards, plus the 12 Archons (2 Leader Units, 10 Orders).
+        Assert.Equal(189, TestData.Db.All.Count);
+        Assert.Equal(89, TestData.Db.All.Count(c => c.IsUnit));
+        Assert.Equal(73, TestData.Db.All.Count(c => c.IsOrder));
         Assert.Equal(27, TestData.Db.All.Count(c => c.Kind == CardKind.Warzone));
+        Assert.Equal(12, TestData.Db.All.Count(c => c.IsArchon));
     }
 
     [Fact]

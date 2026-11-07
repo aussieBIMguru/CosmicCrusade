@@ -53,7 +53,7 @@ public static class RankCalculator
     }
 
     public static int TotalRank(GameState state, int player) =>
-        state.Players[player].UnitsInPlay.Sum(u => GetRank(state, u));
+        state.Players[player].UnitsInPlay.Sum(u => StaticLayer.CountsAsZero(state, u) ? 0 : GetRank(state, u)); // The Unnameable
 
     private static bool InPlay(CardInstance c) =>
         c.Definition.IsUnit && c.Location.Kind == LocationKind.Node && c.Location.Node is { IsScoring: true };

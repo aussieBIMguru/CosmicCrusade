@@ -9,7 +9,7 @@ namespace CosmicCrusade.App.Board;
 /// Player 0 (human) is the bottom half, player 1 (AI) the top half; the control line is y = 500.
 ///
 ///   x:  O-col 120 | L 340 | U1/S1 560 | U2/S2 760 | U3/S3 960 | piles 1290 / 1470
-///   Warzones (top right): Active Warzone 1290,140 · Warzone deck 1470,140
+///   Warzones (top right): Active Warzone 1290,140 · Warzone deck 1470,140 · Archon deck 1470,860 (beside Issued)
 ///   y:  AI back 130, AI front 360 | line 500 | you front 640, you back 870
 /// </summary>
 public static class BoardLayout
@@ -49,6 +49,7 @@ public static class BoardLayout
         PileKind.IssuedOrders => new Point(1290, 860),
         PileKind.ActiveWarzone => new Point(1290, 140),
         PileKind.WarzoneDeck => new Point(1470, 140),
+        PileKind.ArchonDeck => new Point(1470, 860),
         _ => new Point(Width / 2, ControlLineY),
     };
 
@@ -64,6 +65,7 @@ public static class BoardLayout
         PileKind.IssuedOrders => "ISSUED",
         PileKind.WarzoneDeck => "WARZONES",
         PileKind.ActiveWarzone => "ACTIVE WARZONE",
+        PileKind.ArchonDeck => "ARCHONS",
         _ => "",
     };
 }

@@ -9,6 +9,8 @@ public enum Race
     Blaarg,
     Synthenoid,
     Neutral,
+    /// <summary>Archons module: neutral in the weakness cycle.</summary>
+    Archon,
 }
 
 public enum CardKind
@@ -53,6 +55,8 @@ public enum PileKind
     WarzoneDeck,
     /// <summary>The Active Warzone slot (a "pile" of 0..n cards; usually one).</summary>
     ActiveWarzone,
+    /// <summary>Archons module: the shared Archon deck (last = top).</summary>
+    ArchonDeck,
 }
 
 public enum GamePhase
