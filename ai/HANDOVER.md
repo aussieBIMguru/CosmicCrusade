@@ -1,10 +1,16 @@
-# Cosmic Crusade: Handoff (updated 8 Nov 2026: player guides, licence, LAN Server, installer)
+# Cosmic Crusade: Handover to the next chat
+
+**Updated:** 8 Nov 2026 (README split; `ai/` folder created). Latest work: player guides, licence, LAN Server, installer.
 
 Cosmic Crusade is Gavin's own physical card game. It's being built as a **Windows standalone app** (C#, .NET 8, WPF/MVVM, Visual Studio) where one human plays an AI **or another human online**, with a fixed rules engine and configurable card pools.
 
 The in-game AI is plain C# that runs locally: no network, API or LLM, so it's free and works offline.
 
 ## Status
+- **8 Nov 2026: repo tidy.**
+  - The README is now short and player-facing, with a placeholder hero image at `docs/images/hero.png` (to be replaced by a screenshot; see `docs/images/README.md`).
+  - Build and architecture notes moved to `docs/developing.md`.
+  - This handover moved from `docs/claude/README-HANDOFF.md` to `ai/HANDOVER.md`; the old README milestone notes are in `ai/MILESTONES.md`.
 - **8 Nov 2026: docs, licence, LAN Server in the installer** (not yet built):
   - **Player guides** in `docs/players/`: HOW-TO-PLAY, RULEBOOK (player-facing rules incl. all modules), GLOSSARY, PLAYING-ONLINE, LAN-GUIDE, HOST-YOUR-OWN-SERVER. They ship in `{app}\docs`, are linked from the main menu ("New to Cosmic Crusade?", via `AppPaths.PlayerDoc`), and get a Start menu shortcut.
   - `docs/multiplayer/SETUP-GUIDE.md` is now the developer testing guide.
@@ -139,4 +145,4 @@ Each new module needs design + rulings before code, the same way the base game, 
 - `PoolDefinition` and `GameOptions` ignore pool sections / game-mode keys they don't know, so new modules can land in the data before the code.
 
 ## Prompt to start the next chat
-> Here's my Cosmic Crusade code (zip) and data folder. Read claude/README-HANDOFF.md. Multiplayer is in: here are the build errors / test results / how an online game went: ...
+> Here's my Cosmic Crusade code (zip; data/art left empty). Read ai/README.md, then ai/HANDOVER.md. Here are the build errors / test results / what I want next: ...
