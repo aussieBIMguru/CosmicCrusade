@@ -126,7 +126,8 @@ public sealed partial class GameEngine
             }
             else
             {
-                string why = Placement.CanEnterStandby(unit) ? "there is no room in Standby" : "a Leader can't go into Standby";
+                string why = Placement.CanEnterStandby(unit) ? "there is no room in Standby"
+                    : Placement.InLeaderSlot(unit) ? "nothing in the Leader slot can go into Standby" : "a Leader can't go into Standby";
                 await EmitAsync(new LogEvent($"  {unit.Name} can't go to Standby ({why})."), ct);
             }
 

@@ -1,6 +1,10 @@
 # Cosmic Crusade
 
-A Windows standalone version of the Cosmic Crusade card game, with a human player against an AI.
+A Windows standalone version of the Cosmic Crusade card game: play against an AI, or against a friend online.
+
+**Online play:** fill in your name and the server on the menu, click HOST GAME and give your friend the code, or type their code and click JOIN. Player guides: [How to play](docs/players/HOW-TO-PLAY.md), [Rulebook](docs/players/RULEBOOK.md), [Glossary](docs/players/GLOSSARY.md), [Playing online](docs/players/PLAYING-ONLINE.md), [LAN guide](docs/players/LAN-GUIDE.md), [Host your own server](docs/players/HOST-YOUR-OWN-SERVER.md). Testing multiplayer from Visual Studio: [`docs/multiplayer/SETUP-GUIDE.md`](docs/multiplayer/SETUP-GUIDE.md). Design: [`docs/design/multiplayer.md`](docs/design/multiplayer.md).
+
+**Installer:** double-click `publish.bat` (needs Inno Setup 6) to get `artifacts\CosmicCrusade-Setup-<version>.exe`: per user, no admin rights, nothing else to install. Steps: [`docs/release/INSTALLER.md`](docs/release/INSTALLER.md). The version lives in `Directory.Build.props`.
 
 The app uses C#, .NET 8 and WPF. The rules engine is UI-free, deterministic, and has its own tests.
 
@@ -18,6 +22,8 @@ The `data/` folder (cards, art, strips and layout) is copied next to the exe aut
 |---|---|
 | `src/CosmicCrusade.Core` | Rules engine with no UI. `Model/` holds cards, instances, nodes, state and options. `Rules/` holds deck building, rank layers, placement, scoring and duels. `Engine/` holds the round loop, the priority stack, actions, events and controllers. `Ai/` holds the heuristic and random bots. |
 | `tests/CosmicCrusade.Core.Tests` | xUnit tests: card data, deck modes, placement, scoring tie-breaks, duels, determinism, empty-deck rules, and a 200-game soak test. |
+| `src/CosmicCrusade.Relay` | Local multiplayer relay (ASP.NET Core) for testing on one PC or playing on a LAN. |
+| `server/cloudflare` | The same relay as a free Cloudflare Worker, for online play. |
 | `src/CosmicCrusade.App` | WPF front end: the setup screen (modes and per-card copy counts), the 3D board, the hand, animations and the side panel. |
 
 ### How the engine and UI connect

@@ -4,3 +4,11 @@ obj/
 *.user
 *.suo
 TestResults/
+
+# Cloudflare relay tooling
+server/cloudflare/node_modules/
+server/cloudflare/.wrangler/
+publish/
+
+# Release builds (build\publish.ps1)
+artifacts/

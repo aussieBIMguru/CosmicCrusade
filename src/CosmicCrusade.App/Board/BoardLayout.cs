@@ -6,7 +6,7 @@ namespace CosmicCrusade.App.Board;
 
 /// <summary>
 /// Positions on the 1600×1000 board surface (the texture of the tilted 3D plane).
-/// Player 0 (human) is the bottom half, player 1 (AI) the top half; the control line is y = 500.
+/// The local player (<see cref="Perspective.Me"/>) is the bottom half, the opponent the top half; the control line is y = 500.
 ///
 ///   x:  O-col 120 | L 340 | U1/S1 560 | U2/S2 760 | U3/S3 960 | piles 1290 / 1470
 ///   Warzones (top right): Active Warzone 1290,140 · Warzone deck 1470,140 · Archon deck 1470,860 (beside Issued)
@@ -27,7 +27,7 @@ public static class BoardLayout
 
     public static Point Center(Node node)
     {
-        bool me = node.Side == 0;
+        bool me = node.Side == Perspective.Me; // online, the guest (player 1) sits at the bottom of their own screen
         double front = me ? FrontYMe : FrontYOpp;
         double back = me ? BackYMe : BackYOpp;
         return node.Kind switch

@@ -15,7 +15,7 @@ public partial class GameView
 {
     private static readonly Color LockColor = Color.FromRgb(226, 232, 240);
 
-    private string Who(int player) => player == 0 ? "You" : "AI";
+    private string Who(int player) => player == Me ? "You" : OppName;
 
     private async Task OnAbilityTriggeredAsync(AbilityTriggeredEvent e)
     {
@@ -105,7 +105,7 @@ public partial class GameView
 
     private async Task OnNodeLockChangedAsync(NodeLockChangedEvent e)
     {
-        string side = e.Node.Side == 0 ? "your" : "the AI's";
+        string side = e.Node.Side == Me ? "your" : OppPossessive;
         _hud.AddLog($"  {side} {e.Node.Label} is {(e.Locked ? "Locked" : "Unlocked")}{(e.Source is null ? "" : $" ({e.Source.Name})")}.");
         if (_slots.TryGetValue(e.Node, out var slot)) slot.Refresh();
         var center = BoardLayout.Center(e.Node);
@@ -143,7 +143,7 @@ public partial class GameView
     private async Task OnCardMovedToStandbyAsync(CardMovedToStandbyEvent e)
     {
         var to = ProjectRect(BoardLayout.CardRectAt(BoardLayout.Center(e.To)));
-        _hud.AddLog($"  {e.Card.Name} goes to {(e.To.Side == 0 ? "your" : "the AI's")} Standby {e.To.Label}.");
+        _hud.AddLog($"  {e.Card.Name} goes to {(e.To.Side == Me ? "your" : OppPossessive)} Standby {e.To.Label}.");
 
         if (e.FromStack)
         {
@@ -168,6 +168,9 @@ public partial class GameView
         else if (e.FromPile is { } pile)
         {
             UpdatePiles();
+            // A card back from a pile (Salvage Tug, Shipwreck, Shallow Grave) may still have a stale view from its last
+            // time on the board: drop it, so the fresh one below is the only one.
+            if (_boardCards.Remove(e.Card.InstanceId, out var stale)) BoardCanvas.Children.Remove(stale);
             await FlyAsync(e.Card, PileCardRect(pile), to, false, false, 460, pile == PileKind.NullifiedUnits ? DecayGreen : Purple);
             var risen = AddBoardCard(e.Card, e.To);
             // Back from the dead (Shallow Grave, Grim Angler, Reaper of Rot).
@@ -178,7 +181,7 @@ public partial class GameView
 
     private async Task OnCardReturnedToHandAsync(CardReturnedToHandEvent e)
     {
-        _hud.AddLog($"  {e.Card.Name} returns to {(e.Player == 0 ? "your" : "the AI's")} hand.");
+        _hud.AddLog($"  {e.Card.Name} returns to {(e.Player == Me ? "your" : OppPossessive)} hand.");
         Rect start;
         if (e.FromNode is not null && _boardCards.Remove(e.Card.InstanceId, out var v))
         {
@@ -192,7 +195,7 @@ public partial class GameView
         UpdatePiles();
         RefreshScores();
 
-        if (e.Player == 0)
+        if (e.Player == Me)
         {
             await FlyAsync(e.Card, start, new Rect(FxCanvas.ActualWidth / 2 - HandCardW / 2, FxCanvas.ActualHeight - 120,
                 HandCardW, HandCardW / CardFaceFactory.Aspect), false, false, 420, Cyan);
@@ -214,7 +217,7 @@ public partial class GameView
 
     private async Task OnCardRetiredFromHandAsync(CardRetiredFromHandEvent e)
     {
-        _hud.AddLog($"  {Who(e.Player)} Retire{(e.Player == 0 ? "" : "s")} {e.Card.Name} from hand.");
+        _hud.AddLog($"  {Who(e.Player)} Retire{(e.Player == Me ? "" : "s")} {e.Card.Name} from hand.");
         var (start, faceDown) = TakeFromHand(e.Player, e.Card);
         var pile = e.Card.Definition.IsOrder ? PileKind.IssuedOrders : PileKind.RetiredUnits;
         await FlyAsync(e.Card, start, PileCardRect(pile), faceDown, flipToFaceUp: faceDown, ms: 380, glow: Gold);
@@ -225,7 +228,7 @@ public partial class GameView
     /// <summary>Abominations' cost: a card Nullified straight from a hand flies to its pile with a red glow.</summary>
     private async Task OnCardNullifiedFromHandAsync(CardNullifiedFromHandEvent e)
     {
-        _hud.AddLog($"  {Who(e.Player)} Nullif{(e.Player == 0 ? "y" : "ies")} {e.Card.Name} from hand{(e.Source is { } s ? $" ({s.Name})" : "")}.");
+        _hud.AddLog($"  {Who(e.Player)} Nullif{(e.Player == Me ? "y" : "ies")} {e.Card.Name} from hand{(e.Source is { } s ? $" ({s.Name})" : "")}.");
         var (start, faceDown) = TakeFromHand(e.Player, e.Card);
         await FlyAsync(e.Card, start, PileCardRect(e.To), faceDown, flipToFaceUp: faceDown, ms: 380, glow: Red);
         UpdatePiles();
@@ -243,7 +246,7 @@ public partial class GameView
 
         // Effects pass 3: a tie decided by weakness shows the race cycle; an AI win may earn a taunt.
         if (WeaknessDecider(e) is { } decided) await RaceCycleAsync(decided.Winner, decided.Loser);
-        if (e.Losers.Count > 0 && e.Losers.All(l => l.Location.Node?.Side == 0)) MaybeTaunt(DuelTaunts, 0.6);
+        if (e.Losers.Count > 0 && e.Losers.All(l => l.Location.Node?.Side == Me)) MaybeTaunt(DuelTaunts, 0.6);
 
         if (va is not null && vb is not null && e.A.Location.Node is { } nodeA && e.B.Location.Node is { } nodeB)
         {
@@ -291,7 +294,7 @@ public partial class GameView
 
     private async Task OnNodesSwappedAsync(NodesSwappedEvent e)
     {
-        _hud.AddLog($"  Switched {(e.A.Side == 0 ? "your" : "the AI's")} {e.A.Label} and {(e.B.Side == 0 ? "your" : "the AI's")} {e.B.Label}.");
+        _hud.AddLog($"  Switched {(e.A.Side == Me ? "your" : OppPossessive)} {e.A.Label} and {(e.B.Side == Me ? "your" : OppPossessive)} {e.B.Label}.");
         if (e.A.Side != e.B.Side) TractorBeam(BoardLayout.Center(e.A), BoardLayout.Center(e.B), 520); // Arganium
         var tasks = new List<Task>();
         foreach (var (card, node) in new[] { (e.CardNowOnA, e.A), (e.CardNowOnB, e.B) })
@@ -344,7 +347,7 @@ public partial class GameView
     /// <summary>Recolonize: the hovering Unit (or the Standby Unit sliding forward) heads for its new node.</summary>
     private async Task OnDeployRedirectedAsync(DeployRedirectedEvent e)
     {
-        string where = e.To.Side == e.Item.Controller ? e.To.Label : $"{(e.To.Side == 0 ? "your" : "the AI's")} {e.To.Label}";
+        string where = e.To.Side == e.Item.Controller ? e.To.Label : $"{(e.To.Side == Me ? "your" : OppPossessive)} {e.To.Label}";
         _hud.AddLog($"  {e.Source?.Name ?? "Redirect"}: {e.Item.Card.Name} is Deployed to {where} instead.");
         RebuildStackEntry(e.Item);
 
@@ -380,8 +383,8 @@ public partial class GameView
         if (e.OldController != e.NewController)
         {
             await ClawAsync(e.Item, e.NewController);
-            _hud.AddLog($"  {Who(e.NewController)} take{(e.NewController == 0 ? "" : "s")} control of {e.Item.Card.Name}{(e.Source is null ? "" : $" ({e.Source.Name})")}!");
-            await ShowBannerAsync("COMMANDEERED", $"{e.Item.Card.Name.ToUpperInvariant()}  ·  NOW {(e.NewController == 0 ? "YOURS" : "THE AI'S")}", Purple, 900);
+            _hud.AddLog($"  {Who(e.NewController)} take{(e.NewController == Me ? "" : "s")} control of {e.Item.Card.Name}{(e.Source is null ? "" : $" ({e.Source.Name})")}!");
+            await ShowBannerAsync("COMMANDEERED", $"{e.Item.Card.Name.ToUpperInvariant()}  ·  NOW {(e.NewController == Me ? "YOURS" : OppPossessive.ToUpperInvariant())}", Purple, 900);
         }
         RebuildStackEntry(e.Item);
     }
@@ -389,8 +392,8 @@ public partial class GameView
     /// <summary>One of Us: the Unit crosses the control line to its new controller's node.</summary>
     private async Task OnUnitControlGainedAsync(UnitControlGainedEvent e)
     {
-        string to = e.To.Side == 0 ? "your" : "the AI's";
-        _hud.AddLog($"  {Who(e.NewController)} take{(e.NewController == 0 ? "" : "s")} control of {e.Card.Name}: it moves to {to} {e.To.Label}.");
+        string to = e.To.Side == Me ? "your" : OppPossessive;
+        _hud.AddLog($"  {Who(e.NewController)} take{(e.NewController == Me ? "" : "s")} control of {e.Card.Name}: it moves to {to} {e.To.Label}.");
         if (_boardCards.TryGetValue(e.Card.InstanceId, out var v))
         {
             v.SetGlow(Purple, pulse: true);

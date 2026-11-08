@@ -381,7 +381,7 @@ public sealed partial class GameEngine
         if (!card.Definition.IsUnit) return false;
         if (!Placement.CanEnterStandby(card))
         {
-            await EmitAsync(new LogEvent($"  {card.Name} is a Leader: Leaders can never go into a Standby zone."), ct);
+            await EmitAsync(new LogEvent($"  {Placement.StandbyRefusal(card)}."), ct);
             return false;
         }
         if (await BlackHoleReplacesAsync(card, ct)) return true;
@@ -410,7 +410,11 @@ public sealed partial class GameEngine
 
         if (dest is null)
         {
-            if (!retireIfNoRoom) return false;
+            if (!retireIfNoRoom)
+            {
+                await EmitAsync(new LogEvent($"  {card.Name} can't go into Standby: there's no room."), ct);
+                return false;
+            }
             await RetireAsync(card, ct);
             return true;
         }

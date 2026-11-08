@@ -33,9 +33,19 @@ public static class Placement
     /// <summary>
     /// Ruling #36 for a card instance: a copy has to be a non-Leader both as the copy and as printed, because it
     /// turns back into its printed self the moment it leaves play (Mr Morph copying a Minion is still a Leader card).
+    /// Ruling #57: nothing in the Leader slot goes into Standby either, so a Champion on the Leader Node (or a
+    /// spacecraft there and its crew) stays put; Champions elsewhere can go into Standby as normal.
     /// </summary>
     public static bool CanEnterStandby(CardInstance card) =>
-        CanEnterStandby(card.Definition) && CanEnterStandby(card.PrintedDefinition);
+        CanEnterStandby(card.Definition) && CanEnterStandby(card.PrintedDefinition) && !InLeaderSlot(card);
+
+    /// <summary>Ruling #57: is the card on a Leader Node?</summary>
+    public static bool InLeaderSlot(CardInstance card) => card.Location.Node is { Kind: NodeKind.Leader };
+
+    /// <summary>Why <see cref="CanEnterStandby(CardInstance)"/> said no, for the log.</summary>
+    public static string StandbyRefusal(CardInstance card) => InLeaderSlot(card)
+        ? $"{card.Name} is in the Leader slot: nothing there can go into a Standby zone"
+        : $"{card.Name} is a Leader: Leaders can never go into a Standby zone";
 
     /// <summary>Can <paramref name="player"/> deploy this unit from hand to <paramref name="node"/> right now?</summary>
     public static bool CanDeploy(GameState state, int player, CardInstance card, Node node)

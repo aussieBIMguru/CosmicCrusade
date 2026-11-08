@@ -30,12 +30,12 @@ public partial class GameView
     private async Task OnArchonTakenAsync(ArchonTakenEvent e)
     {
         string fewer = e.Skipped == PileKind.UnitDeck ? "Unit" : "Order";
-        _hud.AddLog($"{Who(e.Player)} take{(e.Player == 0 ? "" : "s")} the Archon draw: {e.Archon.Name} (one fewer {fewer} this round).");
+        _hud.AddLog($"{Who(e.Player)} take{(e.Player == Me ? "" : "s")} the Archon draw: {e.Archon.Name} (one fewer {fewer} this round).");
         UpdatePiles();
         Sfx.Play(SfxKind.ArchonBell, 0.8);
 
         var deckCenter = ProjectToFx(BoardLayout.PileCenter(PileKind.ArchonDeck));
-        if (e.Player == 0)
+        if (e.Player == Me)
         {
             var v = CreateHandCard(e.Archon);
             _handViews.Add(v);
@@ -58,13 +58,13 @@ public partial class GameView
             LayoutOpponentHand();
             GlowBriefly(v, ArchonGlow, 1600);
         }
-        await ShowBannerAsync("ARCHON", $"{(e.Player == 0 ? "You hold" : "The AI holds")} {e.Archon.Name}", ArchonGlow, 900);
+        await ShowBannerAsync("ARCHON", $"{(e.Player == Me ? "You hold" : TheOppCap + " holds")} {e.Archon.Name}", ArchonGlow, 900);
     }
 
     private async Task OnArchonLostAsync(ArchonLostEvent e)
     {
         _hud.AddLog($"  {e.Archon.Name} fades unplayed and returns to the Archon deck.");
-        var views = e.Player == 0 ? _handViews : _oppHandViews;
+        var views = e.Player == Me ? _handViews : _oppHandViews;
         var view = views.FirstOrDefault(v => v.Card == e.Archon);
         if (view is null)
         {
@@ -73,8 +73,8 @@ public partial class GameView
         }
         var from = FxBounds(view);
         views.Remove(view);
-        (e.Player == 0 ? HandCanvas : OpponentHandCanvas).Children.Remove(view);
-        if (e.Player == 0) LayoutHand(); else LayoutOpponentHand();
+        (e.Player == Me ? HandCanvas : OpponentHandCanvas).Children.Remove(view);
+        if (e.Player == Me) LayoutHand(); else LayoutOpponentHand();
         await FlyAsync(e.Archon, from, PileCardRect(PileKind.ArchonDeck), startFaceDown: false, flipToFaceUp: false, ms: 520,
             glow: ArchonGlow, fadeOut: true);
         UpdatePiles();
@@ -88,7 +88,7 @@ public partial class GameView
     /// </summary>
     private async Task ArchonInvocationAsync(CardInstance card, int player)
     {
-        _hud.AddLog($"{(player == 0 ? "You invoke" : "The AI invokes")} the Archon {card.Name}.");
+        _hud.AddLog($"{(player == Me ? "You invoke" : TheOppCap + " invokes")} the Archon {card.Name}.");
         Sfx.Play(SfxKind.ArchonInvoke, 0.9);
         bool reduced = FxSettings.ReduceEffects;
         double w = Math.Max(1, FxCanvas.ActualWidth), h = Math.Max(1, FxCanvas.ActualHeight);
@@ -555,7 +555,7 @@ public partial class GameView
     {
         Sfx.Play(SfxKind.ArchonQuake, 0.6);
         int opp = 1 - controller;
-        double y = opp == 0 ? 760 : 240;
+        double y = opp == Me ? 760 : 240;
         var shadow = new Ellipse
         {
             Width = 1500,
@@ -584,7 +584,7 @@ public partial class GameView
     private async Task DataRainAsync(int controller)
     {
         Sfx.Play(SfxKind.Tick, 0.6);
-        double top = controller == 0 ? 520 : 0;
+        double top = controller == Me ? 520 : 0;
         int columns = FxSettings.Count(22);
         var tasks = new List<Task>();
         for (int i = 0; i < columns; i++)

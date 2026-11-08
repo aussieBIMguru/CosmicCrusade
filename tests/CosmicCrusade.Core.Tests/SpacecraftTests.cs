@@ -488,4 +488,57 @@ public class SpacecraftTests
         var outcome = await new GameEngine(s, mc, new HeuristicAi(4)).RunAsync();
         Assert.True(outcome.RoundsPlayed > 0);
     }
+
+    // ------------------------------------------------------------------ 8 Nov 2026: Salvage Tug report, ruling #57
+
+    [Fact]
+    public async Task Salvage_Tug_places_a_retired_spacecraft_into_Standby()
+    {
+        var s = Board();
+        var wreck = s.CreateInstance(Def("Blazing Saddle"));
+        s.MoveToPile(wreck, PileKind.RetiredUnits);
+        var tug = Hand(s, 0, "Salvage Tug");
+        var node = s.Players[0].UnitNodes[1];
+
+        var p0 = new ScriptedController().Turn(ctx => ctx.Legal.OfType<DeployFromHandAction>().Single(d => d.Card == tug && d.Target == node));
+        var sink = await OrderReactAssembleTests.Run(s, p0, ScriptedController.PassForever());
+
+        Assert.Same(tug, node.Card);
+        Assert.DoesNotContain(wreck, s.RetiredUnits);
+        Assert.Contains(s.Players[0].StandbyNodes, n => n.Card == wreck);
+        Assert.Contains(sink.Events, ev => ev is CardMovedToStandbyEvent m && m.Card == wreck && m.FromPile == PileKind.RetiredUnits);
+    }
+
+    [Fact]
+    public async Task Salvage_Tug_skips_Leader_spacecraft_and_says_when_there_is_nothing_to_salvage()
+    {
+        var s = Board();
+        var dread = s.CreateInstance(Def("Dreadnought")); // a Leader spacecraft: never into Standby (ruling #36)
+        s.MoveToPile(dread, PileKind.RetiredUnits);
+        var tug = Hand(s, 0, "Salvage Tug");
+        var node = s.Players[0].UnitNodes[0];
+
+        var p0 = new ScriptedController().Turn(ctx => ctx.Legal.OfType<DeployFromHandAction>().Single(d => d.Card == tug && d.Target == node));
+        var sink = await OrderReactAssembleTests.Run(s, p0, ScriptedController.PassForever());
+
+        Assert.Contains(dread, s.RetiredUnits);
+        Assert.Contains(sink.Events, ev => ev is LogEvent l && l.Message.Contains("nothing it can place in Standby"));
+    }
+
+    [Fact]
+    public void Ruling57_a_Champion_in_the_Leader_slot_cant_go_to_Standby_but_elsewhere_it_can()
+    {
+        var s = Board();
+        var champDef = TestData.Db.All.First(c => c.UnitClass == UnitClass.Champion && !c.IsSpacecraft);
+        var onUnitNode = TestData.Place(s, champDef, s.Players[0].UnitNodes[0]);
+        var inLeaderSlot = TestData.Place(s, champDef, s.Players[1].LeaderNode!);
+        var shipInLeaderSlot = Place(s, "Drone Hub", s.Players[0].LeaderNode!); // a Champion spacecraft
+
+        Assert.True(Placement.CanEnterStandby(onUnitNode));
+        Assert.False(Placement.CanEnterStandby(inLeaderSlot));
+        Assert.False(Placement.CanEnterStandby(shipInLeaderSlot));
+        Assert.True(Rearrange.Fits(onUnitNode, s.Players[0].StandbyNodes[0]));     // Ace may still send it to Standby
+        Assert.False(Rearrange.Fits(inLeaderSlot, s.Players[1].StandbyNodes[0]));  // ... but not from the Leader slot
+        Assert.Contains("Leader slot", Placement.StandbyRefusal(inLeaderSlot));
+    }
 }

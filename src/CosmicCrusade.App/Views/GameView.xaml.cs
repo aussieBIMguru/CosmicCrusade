@@ -10,6 +10,7 @@ using CosmicCrusade.App.ViewModels;
 using CosmicCrusade.Core.Ai;
 using CosmicCrusade.Core.Engine;
 using CosmicCrusade.Core.Model;
+using CosmicCrusade.Core.Net;
 using CosmicCrusade.Core.Rules;
 
 namespace CosmicCrusade.App.Views;
@@ -41,12 +42,23 @@ public partial class GameView : UserControl, IGameEventSink
     private CardView? _selected;
     private CardView? _zoomed;
 
-    public GameView(GameOptions options)
+    /// <param name="online">Null against the AI; otherwise the connection and the agreed setup of an online game.</param>
+    public GameView(GameOptions options, OnlineSession? online = null)
     {
         InitializeComponent();
         _options = options;
+        _online = online;
+        // Whose side is drawn at the bottom (online, the guest is player 1) and what the opponent is called.
+        if (online is null) Perspective.SetLocal();
+        else Perspective.SetOnline(online.Setup.MySeat, online.Setup.OpponentName);
         InitFxSettings();
-        _hud = new GameHudViewModel { PlayerName = "You", AiName = "AI", RoundsToWin = options.RoundsToWin };
+        _hud = new GameHudViewModel
+        {
+            PlayerName = online?.Setup.MyName ?? AppSettings.Current.DisplayName,
+            AiName = OppName,
+            RoundsToWin = options.RoundsToWin,
+            IsOnline = online is not null,
+        };
         DataContext = _hud;
 
         _human.DecisionRequested += OnHumanDecisionRequested;
@@ -59,6 +71,7 @@ public partial class GameView : UserControl, IGameEventSink
         Unloaded += (_, _) =>
         {
             _cts.Cancel();
+            LeaveOnlineGame();
             Sfx.SetMusic(false);
             _heartbeat?.Stop();
             StopAllAmbient();
@@ -69,6 +82,8 @@ public partial class GameView : UserControl, IGameEventSink
         PreviewKeyDown += OnKeyDown;
         ZoomHost.MouseRightButtonDown += ZoomHost_MouseRightButtonDown;
         SizeChanged += (_, _) => { HideMagnifier(); CloseInspect(); };
+        // Clicking the table takes the keyboard back from the chat box (Space = pass, Enter = confirm).
+        PlayArea.PreviewMouseDown += (_, _) => { if (ChatInput.IsKeyboardFocusWithin) Focus(); };
     }
 
     /// <summary>Raised by the Menu button.</summary>
@@ -79,6 +94,16 @@ public partial class GameView : UserControl, IGameEventSink
 
     private GameState State => _state ?? throw new InvalidOperationException("Game not started.");
 
+    /// <summary>The AI seat: Easy = heuristic; Normal/Hard search before each turn (so the pacing delay is shorter).</summary>
+    private GameEngine CreateAiGame()
+    {
+        var difficulty = _options.AiDifficulty;
+        var ai = new PacedController(MonteCarloAi.Create(difficulty, _options.Seed ^ 0x5EED),
+            thinkMs: difficulty == AiDifficulty.Easy ? 650 : 250);
+        ai.ThinkingChanged += SetAiThinking;
+        return new GameEngine(State, _human, ai, this);
+    }
+
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         Loaded -= OnLoaded;
@@ -86,18 +111,16 @@ public partial class GameView : UserControl, IGameEventSink
         UpdateCamera();
         Anim.SpeedFactor = SpeedSlider.Value;
 
-        _state = GameEngine.CreateGame(AppPaths.Database, _options, "You", "AI");
+        // Online, both apps build the same game from the same options: host = player 0, guest = player 1.
+        _state = _online is null
+            ? GameEngine.CreateGame(AppPaths.Database, _options, _hud.PlayerName, "AI")
+            : GameEngine.CreateGame(AppPaths.Database, _options, _online.Setup.HostName, _online.Setup.GuestName);
         BuildBoard();
 
         BuildBoardReadout();
-        BuildAiEye();
+        BuildAiEye(); // online it shows when the opponent is deciding
 
-        // M4: Easy = heuristic; Normal/Hard search before each turn, so the pacing delay is shorter (the search takes time).
-        var difficulty = _options.AiDifficulty;
-        var ai = new PacedController(MonteCarloAi.Create(difficulty, _options.Seed ^ 0x5EED),
-            thinkMs: difficulty == AiDifficulty.Easy ? 650 : 250);
-        ai.ThinkingChanged += SetAiThinking;
-        var engine = new GameEngine(_state, _human, ai, this);
+        var engine = _online is null ? CreateAiGame() : CreateOnlineGame(_online);
 
         try
         {
@@ -105,7 +128,15 @@ public partial class GameView : UserControl, IGameEventSink
         }
         catch (OperationCanceledException)
         {
-            // Left the table.
+            // Left the table (or the online game ended: OnlineEnded already says why).
+        }
+        catch (OpponentLeftException ex)
+        {
+            OnlineEnded("GAME ABANDONED", ex.Message);
+        }
+        catch (DesyncException ex)
+        {
+            OnlineEnded("OUT OF SYNC", ex.Message);
         }
         catch (Exception ex)
         {
@@ -122,7 +153,7 @@ public partial class GameView : UserControl, IGameEventSink
 
         foreach (var node in State.AllNodes)
         {
-            var color = node.Side == 0 ? BoardSurface.PlayerColor : BoardSurface.OpponentColor;
+            var color = node.Side == Me ? BoardSurface.PlayerColor : BoardSurface.OpponentColor;
             var slot = new NodeSlot(node, color);
             var c = BoardLayout.Center(node);
             Canvas.SetLeft(slot, c.X - slot.Width / 2);
@@ -147,7 +178,7 @@ public partial class GameView : UserControl, IGameEventSink
             {
                 // Inspect the top card of face-up piles (Active Warzone, Retired, Nullified, Issued).
                 // Spacecraft: Research Vessel lets you look at the top card of each deck while it is crewed.
-                bool peek = kind is PileKind.UnitDeck or PileKind.OrderDeck && StaticLayer.CanSeeTopOfDecks(State, 0)
+                bool peek = kind is PileKind.UnitDeck or PileKind.OrderDeck && StaticLayer.CanSeeTopOfDecks(State, Me)
                             && State.Options.DeckMode != DeckMode.RandomDraw;
                 if (!peek && kind is PileKind.UnitDeck or PileKind.OrderDeck or PileKind.WarzoneDeck or PileKind.ArchonDeck) return;
                 var list = State.GetPile(kind);
@@ -390,20 +421,20 @@ public partial class GameView : UserControl, IGameEventSink
     private void SyncRevealedHands()
     {
         if (_state is null) return;
-        bool aiRevealed = StaticLayer.IsHandRevealed(State, 1);
-        bool youRevealed = StaticLayer.IsHandRevealed(State, 0);
+        bool aiRevealed = StaticLayer.IsHandRevealed(State, Opp);
+        bool youRevealed = StaticLayer.IsHandRevealed(State, Me);
         if (aiRevealed != _aiHandRevealed)
-            _hud.AddLog(aiRevealed ? "The AI's hand is revealed – hover its cards to read them." : "The AI's hand is hidden again.");
+            _hud.AddLog(aiRevealed ? $"{OppPossessiveCap} hand is revealed – hover its cards to read them." : $"{OppPossessiveCap} hand is hidden again.");
         if (youRevealed != _yourHandRevealed)
-            _hud.AddLog(youRevealed ? "Your hand is revealed: the AI can see it." : "Your hand is hidden again.");
+            _hud.AddLog(youRevealed ? $"Your hand is revealed: {TheOpp} can see it." : "Your hand is hidden again.");
         _aiHandRevealed = aiRevealed;
         _yourHandRevealed = youRevealed;
-        _hud.HandRevealNote = youRevealed ? "Your hand is revealed to the AI" : "";
+        _hud.HandRevealNote = youRevealed ? $"Your hand is revealed to {TheOpp}" : "";
 
-        var hand = State.Players[1].Hand;
+        var hand = State.Players[Opp].Hand;
         // Archons: the AI's Archon sits face up in its hand row (it is revealed). A view whose Archon has just left
         // the slot is removed by the play / loss animation, not here.
-        var archon = State.Players[1].ArchonSlot;
+        var archon = State.Players[Opp].ArchonSlot;
         var handViews = _oppHandViews.Where(v => !IsArchon(v.Card)).ToList();
         bool inSync = aiRevealed
             ? handViews.Select(v => v.Card).SequenceEqual(hand)
@@ -548,7 +579,7 @@ public partial class GameView : UserControl, IGameEventSink
         _hud.Status = ctx.ExtraAction ? "Additional action" : "Your turn";
         _hud.PassText = ctx.ExtraAction ? "END TURN" : "PASS";
         _hud.Hint = ctx.ExtraAction ? "Open Source: take an additional action, or END TURN (Space) – that isn't a pass."
-            : ctx.OpponentJustPassed ? "The AI passed – if you pass too, the round is scored." : TurnHint;
+            : ctx.OpponentJustPassed ? $"{TheOppCap} passed – if you pass too, the round is scored." : TurnHint;
 
         var playable = PlayableCards(ctx);
         foreach (var v in _handViews)
@@ -581,10 +612,10 @@ public partial class GameView : UserControl, IGameEventSink
 
     private static string DescribeForPrompt(StackItem item)
     {
-        string who = item.Controller == 0 ? "You are" : "The AI is";
+        string who = item.Controller == Me ? "You are" : TheOppCap + " is";
         return item.Kind switch
         {
-            StackItemKind.DeployUnit => $"{who} deploying {item.Card.Name} to {NodeText(item.TargetNode!, 0)}.",
+            StackItemKind.DeployUnit => $"{who} deploying {item.Card.Name} to {NodeText(item.TargetNode!, Me)}.",
             StackItemKind.Assemble => $"{who} assembling {item.Card.Name} onto {item.AssembleTarget!.Name}.",
             StackItemKind.UnitNullifying => $"{item.Card.Name} is about to be Nullified{(item.NullifySource is { } src ? $" by {src.Name}" : "")}.",
             _ when item.IsReact => $"{who} reacting with {item.Card.Name} (against {item.RespondingTo?.Card.Name}).",
@@ -719,10 +750,10 @@ public partial class GameView : UserControl, IGameEventSink
         if (deployOverride is DeployAtRandomAction)
             parts.Add("any glowing node to deploy – Shoot First, Think Second picks one of them at random");
         else if (deployOverride is CoercedDeployAction)
-            parts.Add("any glowing node to deploy – Psychic Coercion: the AI picks the node, then you choose the Unit");
+            parts.Add($"any glowing node to deploy – Psychic Coercion: {TheOpp} picks the node, then you choose the Unit");
         else if (deployTargets.Count > 0)
-            parts.Add(deployTargets.Any(n => n.Side != 0)
-                ? "a glowing node (it may also go on the AI's side, where it scores for the AI)"
+            parts.Add(deployTargets.Any(n => n.Side != Me)
+                ? $"a glowing node (it may also go on {OppPossessive} side, where it scores for {TheOpp})"
                 : "a glowing node to deploy");
         if (assembles.Count > 0) parts.Add("a green unit to Assemble onto (+" + AssembleRules.AssembledRank(card) + " Rank)");
         if (ongoingTargets.Count > 0) parts.Add("a glowing Order Node");
@@ -889,6 +920,7 @@ public partial class GameView : UserControl, IGameEventSink
 
     private void OnKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.OriginalSource is TextBox) return; // typing in the chat box
         if (e.Key == Key.Space)
         {
             TryPass();
@@ -920,7 +952,11 @@ public partial class GameView : UserControl, IGameEventSink
         if (pass is not null) _human.Submit(pass);
     }
 
-    private void PlayAgain_Click(object sender, RoutedEventArgs e) => RestartRequested?.Invoke();
+    private void PlayAgain_Click(object sender, RoutedEventArgs e)
+    {
+        if (_online is not null) { Menu_Click(sender, e); return; } // online: host a new game from the menu
+        RestartRequested?.Invoke();
+    }
 
     private void Menu_Click(object sender, RoutedEventArgs e)
     {

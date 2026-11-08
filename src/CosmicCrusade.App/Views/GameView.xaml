@@ -128,6 +128,24 @@
                            HorizontalAlignment="Center" Margin="0,0,0,10" />
             </Grid>
 
+            <!-- Online: the opponent dropped (or our own link is reconnecting). The game waits; you can leave. -->
+            <Border x:Name="OnlineWaitPanel" Visibility="Collapsed" Background="#A0000000">
+                <Border HorizontalAlignment="Center" VerticalAlignment="Center" Padding="36,24" CornerRadius="18"
+                        Background="#EE0A0D24" BorderBrush="#CCFFC94A" BorderThickness="2">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#FFC94A" BlurRadius="30" ShadowDepth="0" Opacity="0.6" />
+                    </Border.Effect>
+                    <StackPanel MaxWidth="520">
+                        <TextBlock x:Name="OnlineWaitTitle" FontFamily="{StaticResource DisplayFont}" FontSize="44"
+                                   Foreground="{StaticResource GoldBrush}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                        <TextBlock x:Name="OnlineWaitText" FontSize="16" Foreground="#FFC8D2F0" HorizontalAlignment="Center"
+                                   TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,16" />
+                        <Button x:Name="OnlineWaitLeave" Content="LEAVE GAME" Style="{StaticResource SmallButton}" HorizontalAlignment="Center"
+                                Click="Menu_Click" />
+                    </StackPanel>
+                </Border>
+            </Border>
+
             <!-- Game over overlay -->
             <Border x:Name="GameOverPanel" Visibility="Collapsed" Background="#B0000000">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -139,7 +157,7 @@
                     </TextBlock>
                     <TextBlock x:Name="GameOverSubtitle" FontSize="22" HorizontalAlignment="Center" Margin="0,0,0,24" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Content="PLAY AGAIN" Style="{StaticResource GlowButton}" Click="PlayAgain_Click" Margin="8" />
+                        <Button x:Name="PlayAgainButton" Content="PLAY AGAIN" Style="{StaticResource GlowButton}" Click="PlayAgain_Click" Margin="8" />
                         <Button Content="MENU" Style="{StaticResource GlowButton}" Click="Menu_Click" Margin="8" />
                     </StackPanel>
                 </StackPanel>
@@ -156,6 +174,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
@@ -280,8 +299,56 @@
                 </ListBox>
                 </Border>
 
-                <Button Grid.Row="5" Content="MENU" Style="{StaticResource SmallButton}" Click="Menu_Click"
-                        HorizontalAlignment="Right" Margin="0,8,0,0" />
+                <!-- Online: chat with your opponent -->
+                <Border x:Name="ChatPanel" Grid.Row="5" Background="#30000000" CornerRadius="10" Padding="6" Margin="0,8,0,0"
+                        Visibility="Collapsed">
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
+                            <Button DockPanel.Dock="Right" Content="SEND" Style="{StaticResource SmallButton}" Margin="6,0,0,0"
+                                    Click="ChatSend_Click" />
+                            <TextBox x:Name="ChatInput" MaxLength="300" KeyDown="ChatInput_KeyDown"
+                                     ToolTip="Type a message and press Enter (Esc returns to the game)" />
+                        </DockPanel>
+                        <ListBox x:Name="ChatList" ItemsSource="{Binding Chat}" FontSize="13" Height="110">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Display}" TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="#FFFCA5A5" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Mine}" Value="True">
+                                                        <Setter Property="Foreground" Value="#FF93C5FD" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Notice}" Value="True">
+                                                        <Setter Property="Foreground" Value="#FF94A3B8" />
+                                                        <Setter Property="FontStyle" Value="Italic" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </Border>
+
+                <DockPanel Grid.Row="6" Margin="0,8,0,0">
+                    <Button DockPanel.Dock="Right" Content="MENU" Style="{StaticResource SmallButton}" Click="Menu_Click" />
+                    <TextBlock Text="{Binding NetStatus}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,8,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#FF86EFAC" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding NetOk}" Value="False">
+                                        <Setter Property="Foreground" Value="#FFFFC94A" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </DockPanel>
             </Grid>
         </Border>
     </Grid>

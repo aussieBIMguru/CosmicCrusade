@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CosmicCrusade.App", "src\Co
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CosmicCrusade.Core.Tests", "tests\CosmicCrusade.Core.Tests\CosmicCrusade.Core.Tests.csproj", "{6B1E2C3A-1F0D-4C55-9C1A-2E6A7B1C0D03}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CosmicCrusade.Relay", "src\CosmicCrusade.Relay\CosmicCrusade.Relay.csproj", "{6B1E2C3A-1F0D-4C55-9C1A-2E6A7B1C0D04}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{6B1E2C3A-1F0D-4C55-9C1A-2E6A7B1C0D03}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6B1E2C3A-1F0D-4C55-9C1A-2E6A7B1C0D03}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6B1E2C3A-1F0D-4C55-9C1A-2E6A7B1C0D03}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6B1E2C3A-1F0D-4C55-9C1A-2E6A7B1C0D04}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6B1E2C3A-1F0D-4C55-9C1A-2E6A7B1C0D04}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6B1E2C3A-1F0D-4C55-9C1A-2E6A7B1C0D04}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6B1E2C3A-1F0D-4C55-9C1A-2E6A7B1C0D04}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

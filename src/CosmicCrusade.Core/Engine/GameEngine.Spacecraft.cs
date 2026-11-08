@@ -43,7 +43,7 @@ public sealed partial class GameEngine
 
     private string CardLabel(CardInstance c) =>
         $"{c.Name} (Rank {(UnitInPlay(c) ? RankCalculator.GetRank(State, c) : RankCalculator.BaseRank(c))})"
-        + (c.Location.Node is { } n ? $" – {(n.Side == 0 ? "P0" : "P1")} {n.Label}{(Spacecraft.IsCrew(c) ? " (crew)" : "")}" : "");
+        + (c.Location.Node is { } n ? $" – {State.Players[n.Side].Name}'s {n.Label}{(Spacecraft.IsCrew(c) ? " (crew)" : "")}" : "");
 
     private async Task<CardInstance?> PickCardAsync(int player, CardInstance source, IReadOnlyList<CardInstance> cards,
         string prompt, string purpose, CancellationToken ct, int min = 1)

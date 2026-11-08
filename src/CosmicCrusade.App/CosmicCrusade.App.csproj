@@ -25,4 +25,15 @@
     <None Include="..\..\data\**\*" LinkBase="data" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- The licence (MIT for the software; the game content is all rights reserved) and third-party notices ship with the app -->
+  <ItemGroup>
+    <None Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Player guides (How to play, Rulebook, Glossary, online guides) ship next to the exe under docs\ -->
+  <ItemGroup>
+    <None Include="..\..\docs\players\*.md" LinkBase="docs" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

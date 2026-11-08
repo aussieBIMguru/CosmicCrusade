@@ -11,9 +11,14 @@ public partial class MainWindow : Window
 {
     private SetupViewModel? _setup;
 
+    /// <summary>"1.0.0", from &lt;Version&gt; in Directory.Build.props (online, both players should be on the same one).</summary>
+    public static string AppVersion { get; } =
+        typeof(MainWindow).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "dev";
+
     public MainWindow()
     {
         InitializeComponent();
+        Title = $"Cosmic Crusade {AppVersion}";
         ShowSetup();
     }
 
@@ -40,11 +45,19 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Closing the window mid-game online: tell the opponent you left (instead of looking like a drop).</summary>
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        (Host.Content as GameView)?.LeaveOnlineForShutdown();
+        base.OnClosing(e);
+    }
+
     private void ShowSetup()
     {
         _setup ??= new SetupViewModel(); // Keeps the player's choices between games.
         var view = new SetupView(_setup);
         view.StartRequested += StartGame;
+        view.OnlineStartRequested += StartOnlineGame;
         Host.Content = view;
     }
 
@@ -58,6 +71,14 @@ public partial class MainWindow : Window
             again.Seed = Environment.TickCount;
             StartGame(again);
         };
+        Host.Content = game;
+    }
+
+    /// <summary>Online: the options came from the host; Menu (or Back to Menu) returns to the setup screen.</summary>
+    private void StartOnlineGame(OnlineSession session)
+    {
+        var game = new GameView(session.Setup.Options, session);
+        game.ExitRequested += ShowSetup;
         Host.Content = game;
     }
 }

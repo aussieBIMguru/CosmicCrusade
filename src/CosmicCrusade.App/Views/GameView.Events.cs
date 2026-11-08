@@ -42,8 +42,8 @@ public partial class GameView
                 _sweepShown = false;
                 EndSunset();
                 _hud.RoundText = $"ROUND {e.Round}";
-                _hud.AddLog($"— Round {e.Round} — {(e.FirstPlayer == 0 ? "you go" : "the AI goes")} first.");
-                await ShowBannerAsync($"ROUND {e.Round}", e.FirstPlayer == 0 ? "You go first" : "AI goes first", Cyan, 900);
+                _hud.AddLog($"— Round {e.Round} — {(e.FirstPlayer == Me ? "you go" : TheOpp + " goes")} first.");
+                await ShowBannerAsync($"ROUND {e.Round}", e.FirstPlayer == Me ? "You go first" : $"{OppName} goes first", Cyan, 900);
                 await DealFanAsync(); // effects pass 3: the decks fan out, then the Start-up draws twirl in
                 break;
 
@@ -61,9 +61,9 @@ public partial class GameView
             case TurnStartedEvent e:
                 _dealing = false;
                 HideTacticalGrid();
-                if (e.Player == 1)
+                if (e.Player == Opp)
                 {
-                    _hud.Status = "AI is thinking…";
+                    _hud.Status = $"{OppName} is thinking…";
                     _hud.Hint = "";
                 }
                 break;
@@ -71,10 +71,10 @@ public partial class GameView
             case PassedEvent e:
                 _someonePassed = true;
                 HideTacticalGrid();
-                _hud.AddLog(e.Player == 0 ? "You passed." : "AI passed.");
-                if (e.Player == 1) _hud.Status = "AI passed";
-                await FloatTextAsync(e.Player == 0 ? "PASS" : "AI PASSES", e.Player);
-                if (e.Player == 0) MaybeTaunt(PassTaunts, 0.35);
+                _hud.AddLog(e.Player == Me ? "You passed." : $"{OppName} passed.");
+                if (e.Player == Opp) _hud.Status = $"{OppName} passed";
+                await FloatTextAsync(e.Player == Me ? "PASS" : $"{OppName.ToUpperInvariant()} PASSES", e.Player);
+                if (e.Player == Me) MaybeTaunt(PassTaunts, 0.35);
                 break;
 
             case UnitDeployAnnouncedEvent e:
@@ -116,7 +116,7 @@ public partial class GameView
                 break;
 
             case PriorityEvent e:
-                if (e.Player == 1) _hud.Status = "AI may respond…";
+                if (e.Player == Opp) _hud.Status = $"{OppName} may respond…";
                 break;
 
             case OrderIssueAnnouncedEvent e:
@@ -330,7 +330,7 @@ public partial class GameView
             PsionicAura(at, src.InstanceId);
         }
 
-        if (e.Player == 0)
+        if (e.Player == Me)
         {
             var v = CreateHandCard(e.Card);
             _handViews.Add(v);
@@ -350,7 +350,7 @@ public partial class GameView
         }
         else
         {
-            var v = CreateOpponentHandCard(StaticLayer.IsHandRevealed(State, 1) ? e.Card : null);
+            var v = CreateOpponentHandCard(StaticLayer.IsHandRevealed(State, Opp) ? e.Card : null);
             _oppHandViews.Add(v);
             OpponentHandCanvas.Children.Add(v);
             var start = FxCanvas.TranslatePoint(deckCenter, OpponentHandCanvas);
@@ -368,8 +368,8 @@ public partial class GameView
     {
         var targetRect = ProjectRect(BoardLayout.CardRectAt(BoardLayout.Center(e.Target)));
         if (e.FromPile == PileKind.NullifiedUnits) _reanimating.Add(e.Card.InstanceId); // Galactomancer, Hills of Decay
-        string side = e.Target.Side == e.Player ? "" : (e.Target.Side == 0 ? "your " : "the AI's ");
-        _hud.AddLog($"{(e.Player == 0 ? "You" : "AI")} deploy{(e.Player == 0 ? "" : "s")} {e.Card.Name} → {side}{e.Target.Label}");
+        string side = e.Target.Side == e.Player ? "" : (e.Target.Side == Me ? "your " : OppPossessive + " ");
+        _hud.AddLog($"{(e.Player == Me ? "You" : OppName)} deploy{(e.Player == Me ? "" : "s")} {e.Card.Name} → {side}{e.Target.Label}");
 
         if (e.FromNode is not null)
         {
@@ -514,7 +514,7 @@ public partial class GameView
 
         RefreshScores();
         int rank = RankCalculator.GetRank(State, e.Card);
-        string where = e.Node.Side == e.Player ? e.Node.Label : $"{(e.Node.Side == 0 ? "your" : "the AI's")} {e.Node.Label}";
+        string where = e.Node.Side == e.Player ? e.Node.Label : $"{(e.Node.Side == Me ? "your" : OppPossessive)} {e.Node.Label}";
         _hud.AddLog($"  {e.Card.Name} lands on {where} (Rank {rank}). Score {_hud.MyTotal}–{_hud.AiTotal}.");
         await Anim.Delay(220);
         if (_reanimating.Remove(e.Card.InstanceId)) await DecayAsync(view, "RISEN");
@@ -553,8 +553,8 @@ public partial class GameView
 
     private void RefreshScores()
     {
-        _hud.MyTotal = RankCalculator.TotalRank(State, 0);
-        _hud.AiTotal = RankCalculator.TotalRank(State, 1);
+        _hud.MyTotal = RankCalculator.TotalRank(State, Me);
+        _hud.AiTotal = RankCalculator.TotalRank(State, Opp);
         foreach (var v in _boardCards.Values) v.ShowRankIfInPlay(State);
         foreach (var s in _slots.Values) s.Refresh();
         UpdateBoardReadout(); // effects pass 3: pair chevrons, rolling totals, tug-of-war, lighting
@@ -564,8 +564,8 @@ public partial class GameView
 
     private async Task OnRoundScoredAsync(RoundResult r)
     {
-        _hud.MyRounds = State.Players[0].RoundsWon;
-        _hud.AiRounds = State.Players[1].RoundsWon;
+        _hud.MyRounds = State.Players[Me].RoundsWon;
+        _hud.AiRounds = State.Players[Opp].RoundsWon;
 
         // Light up the cards on the winning side.
         if (r.Winner is int w)
@@ -575,25 +575,23 @@ public partial class GameView
                     v.SetGlow(Gold, pulse: true);
         }
 
-        string title = r.Winner switch
-        {
-            0 => "ROUND WON!",
-            1 => "ROUND LOST",
-            _ => "ROUND DRAWN",
-        };
-        string sub = $"{r.Total0} – {r.Total1}";
+        string title = r.Winner is int rw ? (rw == Me ? "ROUND WON!" : "ROUND LOST") : "ROUND DRAWN";
+        // Your number first (online, the guest is player 1).
+        var (myTotal, oppTotal) = Me == 0 ? (r.Total0, r.Total1) : (r.Total1, r.Total0);
+        var (myPairs, oppPairs) = Me == 0 ? (r.PairsWon0, r.PairsWon1) : (r.PairsWon1, r.PairsWon0);
+        string sub = $"{myTotal} – {oppTotal}";
         if (r.DecidedByTiebreak)
             sub += r.Winner is null
-                ? $"  ·  totals and opposed nodes tied ({r.PairsWon0}–{r.PairsWon1})"
-                : $"  ·  tie broken on opposed nodes {r.PairsWon0}–{r.PairsWon1}";
+                ? $"  ·  totals and opposed nodes tied ({myPairs}–{oppPairs})"
+                : $"  ·  tie broken on opposed nodes {myPairs}–{oppPairs}";
         if (r.WonBy is { } by) sub += $"  ·  won by {by}";
 
         _hud.AddLog($"Round {r.Round}: {title.ToLowerInvariant()} {sub}.");
         _hud.Status = title;
-        var color = r.Winner switch { 0 => BoardSurface.PlayerColor, 1 => BoardSurface.OpponentColor, _ => Colors.Gray };
+        var color = r.Winner is int cw ? (cw == Me ? BoardSurface.PlayerColor : BoardSurface.OpponentColor) : Colors.Gray;
         if (r.WonBy is { } wonBy) await GavelAsync(wonBy); // The Empress, Senate Chambers
-        if (r.Winner == 0) Fireworks(4, color); // you took the round
-        if (r.Winner == 1) MaybeTaunt(RoundTaunts, 0.5);
+        if (r.Winner == Me) Fireworks(4, color); // you took the round
+        if (r.Winner == Opp) MaybeTaunt(RoundTaunts, 0.5);
         await FinaleAsync(r); // effects pass 3: victory lift-off / defeat crack on the game's last round
         await ShowBannerAsync(title, sub, color, 1500);
     }
@@ -703,13 +701,13 @@ public partial class GameView
 
     private async Task FloatTextAsync(string text, int player)
     {
-        var anchor = ProjectToFx(new Point(760, player == 0 ? 640 : 360));
+        var anchor = ProjectToFx(new Point(760, player == Me ? 640 : 360));
         var tb = new TextBlock
         {
             Text = text,
             FontFamily = new FontFamily("Haettenschweiler, Impact"),
             FontSize = 54,
-            Foreground = new SolidColorBrush(player == 0 ? Color.FromRgb(147, 197, 253) : Color.FromRgb(252, 165, 165)),
+            Foreground = new SolidColorBrush(player == Me ? Color.FromRgb(147, 197, 253) : Color.FromRgb(252, 165, 165)),
             Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 12, ShadowDepth = 0 },
         };
         tb.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
@@ -740,12 +738,14 @@ public partial class GameView
     {
         _hud.CanPass = false;
         _hud.Status = "Game over";
-        GameOverTitle.Text = o.Winner switch { 0 => "VICTORY", 1 => "DEFEAT", _ => "DRAW" };
-        GameOverSubtitle.Text = $"Rounds {o.RoundsWon0} – {o.RoundsWon1}   ·   {o.Reason}";
-        _hud.AddLog($"Game over: {GameOverTitle.Text} ({o.RoundsWon0}–{o.RoundsWon1}).");
+        GameOverTitle.Text = o.Winner is int gw ? (gw == Me ? "VICTORY" : "DEFEAT") : "DRAW";
+        var (myRounds, oppRounds) = Me == 0 ? (o.RoundsWon0, o.RoundsWon1) : (o.RoundsWon1, o.RoundsWon0);
+        GameOverSubtitle.Text = $"Rounds {myRounds} – {oppRounds}   ·   {o.Reason}";
+        _hud.AddLog($"Game over: {GameOverTitle.Text} ({myRounds}–{oppRounds}).");
+        OnlineGameOver();
         GameOverPanel.Opacity = 0;
         GameOverPanel.Visibility = Visibility.Visible;
-        if (o.Winner == 0) Fireworks(9, BoardSurface.PlayerColor);
+        if (o.Winner == Me) Fireworks(9, BoardSurface.PlayerColor);
         _ = GameOverMomentAsync(o); // effects pass 3: victory lift-off / defeat crack
         _ = Anim.To(GameOverPanel, OpacityProperty, 1, 600, Anim.Out);
     }

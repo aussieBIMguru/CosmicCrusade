@@ -281,8 +281,8 @@ public partial class GameView
     {
         var pa = BoardCenterOf(a);
         var pb = BoardCenterOf(b);
-        var colorA = sideA == 0 ? PlayerBolt : OpponentBolt;
-        var colorB = sideB == 0 ? PlayerBolt : OpponentBolt;
+        var colorA = sideA == Me ? PlayerBolt : OpponentBolt;
+        var colorB = sideB == Me ? PlayerBolt : OpponentBolt;
         if (sideA == sideB) colorB = Gold;
 
         // Four volleys, alternating, slightly overlapping.

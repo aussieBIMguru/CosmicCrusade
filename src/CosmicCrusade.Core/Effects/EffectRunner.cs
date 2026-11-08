@@ -138,6 +138,8 @@ internal sealed class EffectRunner
             case "MoveToStandby":
             {
                 var targets = await SelectAsync(op.GetProperty("targets"), ctx, "MoveToStandby", ct);
+                if (targets.Count == 0 && op.GetProperty("targets") is { ValueKind: JsonValueKind.Object } ts && ts.TryGetProperty("choose", out _))
+                    await _engine.EmitAsync(new LogEvent($"  {ctx.Source.Name}: there's nothing it can place in Standby."), ct);
                 bool toController = Str(op, "standbyOf") == "Controller";
                 bool retire = Str(op, "ifNoRoom") == "Retire";
                 bool assembleToHand = op.TryGetProperty("ifHasKeyword", out _);

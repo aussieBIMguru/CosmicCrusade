@@ -17,6 +17,8 @@ public sealed class GameHudViewModel : ObservableObject
     private bool _isMyTurn;
     private string _passText = "PASS";
     private string _handRevealNote = "";
+    private string _netStatus = "";
+    private bool _netOk = true;
 
     public string PlayerName { get; init; } = "You";
     public string AiName { get; init; } = "AI";
@@ -53,6 +55,26 @@ public sealed class GameHudViewModel : ObservableObject
 
     public ObservableCollection<string> Log { get; } = new();
 
+    // ------------------------------------------------------------------ online play
+
+    /// <summary>True in an online game: shows the chat box and the connection line.</summary>
+    public bool IsOnline { get; init; }
+
+    /// <summary>"Connected to Sam" / "Sam's connection lost – waiting…" / "Reconnecting to the server…".</summary>
+    public string NetStatus { get => _netStatus; set => Set(ref _netStatus, value); }
+
+    /// <summary>False while something is wrong with the connection (the status line turns amber).</summary>
+    public bool NetOk { get => _netOk; set => Set(ref _netOk, value); }
+
+    /// <summary>Chat lines, oldest first ("Sam: gg").</summary>
+    public ObservableCollection<ChatLine> Chat { get; } = new();
+
+    public void AddChat(string name, string text, bool mine)
+    {
+        Chat.Add(new ChatLine(name, text, mine));
+        while (Chat.Count > 100) Chat.RemoveAt(0);
+    }
+
     public void AddLog(string line)
     {
         Log.Insert(0, line);
@@ -61,4 +83,10 @@ public sealed class GameHudViewModel : ObservableObject
 
     private string Pips(int won) =>
         new string('★', Math.Min(won, RoundsToWin)) + new string('☆', Math.Max(0, RoundsToWin - won));
+}
+
+/// <summary>One chat line. <see cref="Mine"/> picks the colour (blue for you, red for the opponent, grey for notices).</summary>
+public sealed record ChatLine(string Name, string Text, bool Mine, bool Notice = false)
+{
+    public string Display => Notice ? Text : $"{Name}: {Text}";
 }

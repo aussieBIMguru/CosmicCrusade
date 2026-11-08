@@ -830,8 +830,8 @@ public partial class GameView
         if (!_stackEntries.TryGetValue(item.Id, out var entry) || !entry.Root.IsLoaded) return;
         Sfx.Play(SfxKind.Claw);
         var target = entry.Root.TranslatePoint(new Point(entry.Root.ActualWidth / 2, entry.Root.ActualHeight / 2), FxCanvas);
-        var from = new Point(FxCanvas.ActualWidth * 0.45, newController == 0 ? FxCanvas.ActualHeight + 20 : -20);
-        var color = newController == 0 ? PlayerBolt : OpponentBolt;
+        var from = new Point(FxCanvas.ActualWidth * 0.45, newController == Me ? FxCanvas.ActualHeight + 20 : -20);
+        var color = newController == Me ? PlayerBolt : OpponentBolt;
         var cable = new Line { X1 = from.X, Y1 = from.Y, X2 = from.X, Y2 = from.Y, Stroke = Solid(Chrome), StrokeThickness = 3,
             Effect = new DropShadowEffect { Color = color, BlurRadius = 10, ShadowDepth = 0 } };
         AddScreenFx(cable, 0, 0);
@@ -894,14 +894,14 @@ public partial class GameView
     {
         Sfx.Play(SfxKind.PsiHum);
         var to = BoardLayout.Center(node);
-        var from = new Point(BoardLayout.Width / 2, coercer == 0 ? BoardLayout.Height + 60 : -60);
+        var from = new Point(BoardLayout.Width / 2, coercer == Me ? BoardLayout.Height + 60 : -60);
         for (int i = 0; i < 3; i++)
         {
             var geo = new PathGeometry();
             var fig = new PathFigure { StartPoint = new Point(from.X + (i - 1) * 120, from.Y) };
             fig.Segments.Add(new BezierSegment(
                 new Point(from.X + Rand(-300, 300), (from.Y + to.Y) / 2 + Rand(-120, 120)),
-                new Point(to.X + Rand(-200, 200), to.Y + (coercer == 0 ? 160 : -160)),
+                new Point(to.X + Rand(-200, 200), to.Y + (coercer == Me ? 160 : -160)),
                 new Point(to.X + (i - 1) * 25, to.Y), true));
             geo.Figures.Add(fig);
             var tendril = new Path

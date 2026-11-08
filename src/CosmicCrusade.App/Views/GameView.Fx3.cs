@@ -94,8 +94,8 @@ public partial class GameView
         AddFx(_leanRed, 0, 0, 1);
 
         // B. One chevron per opposed pair, on the control line.
-        var p0 = State.Players[0];
-        var p1 = State.Players[1];
+        var p0 = State.Players[Me];
+        var p1 = State.Players[Opp];
         var mine = p0.UnitNodes.ToList();
         if (p0.LeaderNode is not null && p1.LeaderNode is not null) mine.Add(p0.LeaderNode);
         foreach (var node in mine)
@@ -143,12 +143,12 @@ public partial class GameView
             var pair = result.Pairs.FirstOrDefault(p => p.Label == m.Mine.Label);
             int? w = pair?.Winner;
             if (w is int pw && inverted) w = GameState.Other(pw);
-            var color = w switch { 0 => PlayerBolt, 1 => OpponentBolt, _ => Colors.Gray };
+            var color = w is int pc ? (pc == Me ? PlayerBolt : OpponentBolt) : Colors.Gray;
             m.Arrow.Fill = Solid(color, 230);
             m.Element.Effect = w is null
                 ? new DropShadowEffect { Color = Colors.Black, BlurRadius = 8, ShadowDepth = 0 }
                 : new DropShadowEffect { Color = color, BlurRadius = tied ? 22 : 12, ShadowDepth = 0 };
-            _ = Anim.To(m.Turn, RotateTransform.AngleProperty, w == 1 ? 180 : 0, 300, Anim.InOut);
+            _ = Anim.To(m.Turn, RotateTransform.AngleProperty, w == Opp ? 180 : 0, 300, Anim.InOut);
             _ = Anim.To(m.Squash, ScaleTransform.ScaleYProperty, w is null ? 0.35 : 1, 300, Anim.InOut);
             // The pairs only decide a tied round: then they light up.
             double opacity = !anyUnits ? 0 : tied ? 1 : 0.5;
@@ -159,9 +159,9 @@ public partial class GameView
         double lean = 0;
         if (anyUnits && _roundLive)
         {
-            int d = result.Total0 - result.Total1;
+            int d = Me == 0 ? result.Total0 - result.Total1 : result.Total1 - result.Total0;
             if (inverted) d = -d;
-            lean = d != 0 ? Math.Tanh(d / 5.0) : result.Winner switch { 0 => 0.12, 1 => -0.12, _ => 0 };
+            lean = d != 0 ? Math.Tanh(d / 5.0) : (result.Winner is int lw ? (lw == Me ? 0.12 : -0.12) : 0);
         }
         UpdateTug(lean);
         if (_leanBlue is not null && _leanRed is not null)
@@ -509,7 +509,7 @@ public partial class GameView
         var pulse = new ScaleTransform(1, 1);
         host.RenderTransform = pulse;
         host.Opacity = 0.45;
-        host.ToolTip = "The AI";
+        host.ToolTip = TheOppCap;
         AddScreenFx(host, 0, 0, 190);
         _aiEye = host;
         _aiPupil = pupil;
@@ -589,7 +589,7 @@ public partial class GameView
     /// <summary>Now and then (never more than every 15 s) the AI says something smug in a hologram bubble.</summary>
     private void MaybeTaunt(string[] lines, double chance)
     {
-        if (_aiEye is null || _fxRng.NextDouble() > chance || (DateTime.UtcNow - _lastTaunt).TotalSeconds < 15) return;
+        if (Perspective.Online || _aiEye is null || _fxRng.NextDouble() > chance || (DateTime.UtcNow - _lastTaunt).TotalSeconds < 15) return;
         _lastTaunt = DateTime.UtcNow;
         string line = lines[_fxRng.Next(lines.Length)];
         _hud.AddLog($"AI: “{line}”");
@@ -712,15 +712,15 @@ public partial class GameView
     private async Task FinaleAsync(RoundResult r)
     {
         int need = State.Options.RoundsToWin;
-        if (r.Winner == 0 && State.Players[0].RoundsWon >= need) await LiftOffAsync();
-        else if (r.Winner == 1 && State.Players[1].RoundsWon >= need) await DefeatCrackAsync();
+        if (r.Winner == Me && State.Players[Me].RoundsWon >= need) await LiftOffAsync();
+        else if (r.Winner == Opp && State.Players[Opp].RoundsWon >= need) await DefeatCrackAsync();
     }
 
     /// <summary>Game over: shows the defeat moment if the game ended some other way (e.g. "end after round").</summary>
     private async Task GameOverMomentAsync(GameOutcome o)
     {
         if (_finaleShown) return;
-        if (o.Winner == 1) await DefeatCrackAsync();
+        if (o.Winner == Opp) await DefeatCrackAsync();
     }
 
     /// <summary>Victory: your Units lift off the board, spinning up into the fireworks.</summary>
@@ -730,7 +730,7 @@ public partial class GameView
         Sfx.Play(SfxKind.LiftOff);
         var tasks = new List<Task>();
         int i = 0;
-        foreach (var node in State.Players[0].ScoringNodes)
+        foreach (var node in State.Players[Me].ScoringNodes)
         {
             if (node.Card is not { } card || !_boardCards.TryGetValue(card.InstanceId, out var v)) continue;
             var rect = ProjectRect(BoardRectOf(v));

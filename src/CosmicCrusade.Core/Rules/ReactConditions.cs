@@ -63,7 +63,8 @@ public static class ReactConditions
             case "UnitDeploying":
                 if (item.Kind != StackItemKind.DeployUnit || item.TargetNode is null) return false;
                 if (c.TargetNodeOpposed && state.OpposingNode(item.TargetNode)?.Card is null) return false;
-                if (c.MovesUnitToStandby && !Placement.CanEnterStandby(item.Card)) return false;
+                // Rulings #36 / #57: a Leader, or anything being deployed to the Leader slot, can't be sent to Standby.
+                if (c.MovesUnitToStandby && (!Placement.CanEnterStandby(item.Card) || item.TargetNode.Kind == NodeKind.Leader)) return false;
                 if (c.NeedsCopySource && !state.AllUnitsInPlay.Any(u => u.Definition.IsSpacecraft == item.Card.PrintedDefinition.IsSpacecraft))
                     return false;
                 if (c.NeedsOwnNode)

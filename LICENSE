@@ -1,0 +1,59 @@
+Cosmic Crusade
+Copyright (c) 2026 Gavin Nicholls
+
+This file has two parts. The software is open source under the MIT License (Part 1). The game itself
+(its concepts, rules, theme and content) is not: it remains the property of Gavin Nicholls (Part 2).
+
+===============================================================================
+Part 1. The software: MIT License
+===============================================================================
+
+"The Software" means the source code, build scripts and compiled programs in this repository and in the
+Cosmic Crusade installer: the game engine, the Windows app, the multiplayer relays (the LAN server and the
+Cloudflare Worker) and the tests. It does not include the game content described in Part 2.
+
+MIT License
+
+Copyright (c) 2026 Gavin Nicholls
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the Software without restriction, including without
+limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
+Software, and to permit persons to whom the Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+===============================================================================
+Part 2. The game: all rights reserved
+===============================================================================
+
+Cosmic Crusade, the game: its core concepts, rules and mechanics as designed, theme, setting, story, races
+and factions (Galactic Council, Space Cowboys, Necrolites, Overmind, Blaarg, Synthenoids, Archons and
+others), card names, card text and flavour text, and the "Cosmic Crusade" name, are
+
+    Copyright (c) 2026 Gavin Nicholls. All rights reserved.
+
+They are not licensed under the MIT License. You may play the game with this software and share unmodified
+copies of the software and its card data for playing it. Any other use of the game content, such as
+publishing or selling the game, its cards or a derived game, needs the written permission of Gavin Nicholls.
+
+The card data files (data\cards.json and the other files in data\) carry this game content. They are
+included so the software can be played, under the terms of this Part.
+
+===============================================================================
+Credits
+===============================================================================
+
+Game design, concepts and theme   Gavin Nicholls
+Card art                          Generated with Google Gemini, directed by Gavin Nicholls
+Game engine and app               Developed by Gavin Nicholls with Claude (Anthropic)
+
+Third-party components shipped with the app are listed in THIRD-PARTY-NOTICES.md.

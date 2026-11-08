@@ -1102,8 +1102,8 @@ public partial class GameView
                     Effect = Glow(Gold, 12),
                     RenderTransformOrigin = new Point(0.5, 0.5),
                 };
-                if (side == 1) chev.RenderTransform = new ScaleTransform(1, -1);
-                double yy = side == 0 ? 560 + i * 34 : 410 - i * 34;
+                if (side == Opp) chev.RenderTransform = new ScaleTransform(1, -1);
+                double yy = side == Me ? 560 + i * 34 : 410 - i * 34;
                 AddFx(FadeIn(chev, 600 + i * 200), 1095, yy, 4);
                 list.Add(chev);
                 els.Add(chev);

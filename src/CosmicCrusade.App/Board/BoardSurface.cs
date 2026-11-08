@@ -401,7 +401,7 @@ public static class BoardSurface
             EasingFunction = new SineEase(),
         });
 
-        AddSideLabel(canvas, "AI", OpponentColor, BoardLayout.ControlLineY - 62);
+        AddSideLabel(canvas, Perspective.OppName.ToUpperInvariant(), OpponentColor, BoardLayout.ControlLineY - 62);
         AddSideLabel(canvas, "YOU", PlayerColor, BoardLayout.ControlLineY + 10);
     }
 

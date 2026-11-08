@@ -84,7 +84,7 @@ public partial class GameView
             Text = StackCaption(item),
             TextWrapping = TextWrapping.Wrap,
             FontSize = 12,
-            Foreground = new SolidColorBrush(item.Controller == 0 ? Color.FromRgb(191, 219, 254) : Color.FromRgb(254, 202, 202)),
+            Foreground = new SolidColorBrush(item.Controller == Me ? Color.FromRgb(191, 219, 254) : Color.FromRgb(254, 202, 202)),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(8, 0, 0, 0),
         };
@@ -96,7 +96,7 @@ public partial class GameView
         Grid.SetColumn(caption, 1);
         grid.Children.Add(caption);
 
-        var side = item.Controller == 0 ? BoardSurface.PlayerColor : BoardSurface.OpponentColor;
+        var side = item.Controller == Me ? BoardSurface.PlayerColor : BoardSurface.OpponentColor;
         var root = new Border
         {
             Child = grid,
@@ -112,16 +112,16 @@ public partial class GameView
 
     private static string StackCaption(StackItem item)
     {
-        string who = item.Controller == 0 ? "You" : "AI";
+        string who = item.Controller == Me ? "You" : OppName;
         string what = item.Kind switch
         {
-            StackItemKind.DeployUnit => $"deploy{(item.Controller == 0 ? "" : "s")} {item.Card.Name} → {NodeText(item.TargetNode!, item.Controller)}",
-            StackItemKind.Assemble => $"assemble{(item.Controller == 0 ? "" : "s")} {item.Card.Name} onto {item.AssembleTarget!.Name}",
+            StackItemKind.DeployUnit => $"deploy{(item.Controller == Me ? "" : "s")} {item.Card.Name} → {NodeText(item.TargetNode!, item.Controller)}",
+            StackItemKind.Assemble => $"assemble{(item.Controller == Me ? "" : "s")} {item.Card.Name} onto {item.AssembleTarget!.Name}",
             StackItemKind.UnitNullifying => $"Nullify {item.Card.Name}{(item.NullifySource is { } src ? $" ({src.Name})" : "")}",
             _ when item.IsReact => $"React: {item.Card.Name} → {item.RespondingTo?.Card.Name}",
             _ => item.OrderNode is null
-                ? $"issue{(item.Controller == 0 ? "" : "s")} {item.Card.Name}"
-                : $"issue{(item.Controller == 0 ? "" : "s")} {item.Card.Name} → {item.OrderNode.Label}",
+                ? $"issue{(item.Controller == Me ? "" : "s")} {item.Card.Name}"
+                : $"issue{(item.Controller == Me ? "" : "s")} {item.Card.Name} → {item.OrderNode.Label}",
         };
         return $"{who} {what}";
     }
@@ -154,17 +154,17 @@ public partial class GameView
     }
 
     private static string NodeText(Node node, int actor) =>
-        node.Side == actor ? node.Label : $"{(node.Side == 0 ? "your" : "the AI's")} {node.Label}";
+        node.Side == actor ? node.Label : $"{(node.Side == Me ? "your" : OppPossessive)} {node.Label}";
 
     // =================================================================== orders
 
     private void OnOrderAnnounced(OrderIssueAnnouncedEvent e)
     {
-        string who = e.Player == 0 ? "You" : "AI";
+        string who = e.Player == Me ? "You" : OppName;
         if (e.Item.IsReact)
-            _hud.AddLog($"{who} React{(e.Player == 0 ? "" : "s")} with {e.Card.Name} → {e.Item.RespondingTo?.Card.Name}!");
+            _hud.AddLog($"{who} React{(e.Player == Me ? "" : "s")} with {e.Card.Name} → {e.Item.RespondingTo?.Card.Name}!");
         else
-            _hud.AddLog($"{who} issue{(e.Player == 0 ? "" : "s")} {e.Card.Name}{(e.OrderNode is null ? "" : $" → {e.OrderNode.Label}")}.");
+            _hud.AddLog($"{who} issue{(e.Player == Me ? "" : "s")} {e.Card.Name}{(e.OrderNode is null ? "" : $" → {e.OrderNode.Label}")}.");
     }
 
     private async Task OnOrderResolvedAsync(OrderResolvedEvent e)
@@ -258,7 +258,7 @@ public partial class GameView
     // =================================================================== assemble
 
     private void OnAssembleAnnounced(AssembleAnnouncedEvent e) =>
-        _hud.AddLog($"{(e.Player == 0 ? "You" : "AI")} assemble{(e.Player == 0 ? "" : "s")} {e.Card.Name} onto {e.Target.Name}.");
+        _hud.AddLog($"{(e.Player == Me ? "You" : OppName)} assemble{(e.Player == Me ? "" : "s")} {e.Card.Name} onto {e.Target.Name}.");
 
     private async Task OnAssembledAsync(AssembledEvent e)
     {
@@ -304,7 +304,7 @@ public partial class GameView
     /// </summary>
     private (Rect Start, bool FaceDown) TakeFromHand(int player, CardInstance card)
     {
-        if (player == 0)
+        if (player == Me)
         {
             var handView = _handViews.FirstOrDefault(v => v.Card == card);
             if (handView is null)

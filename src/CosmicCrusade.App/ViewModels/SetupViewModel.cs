@@ -70,6 +70,12 @@ public sealed class SetupViewModel : ObservableObject
     private string _filter = "";
     private CardCountRow? _selectedCard;
     private string _totals = "";
+    private string _playerName = AppSettings.Current.PlayerName;
+    private string _serverAddress = AppSettings.Current.ServerAddress;
+    private string _joinCode = "";
+    private string _onlineStatus = "";
+    private string _hostCode = "";
+    private bool _onlineBusy;
 
     public SetupViewModel()
     {
@@ -134,6 +140,47 @@ public sealed class SetupViewModel : ObservableObject
     public CardCountRow? SelectedCard { get => _selectedCard; set => Set(ref _selectedCard, value); }
 
     public string Totals { get => _totals; private set => Set(ref _totals, value); }
+
+    // ------------------------------------------------------------------ player + online
+
+    /// <summary>Your name: shown to your opponent online and on the score panel. Saved between runs.</summary>
+    public string PlayerName { get => _playerName; set => Set(ref _playerName, value); }
+
+    /// <summary>The relay address (your Cloudflare Worker, or ws://localhost:5080). Saved between runs.</summary>
+    public string ServerAddress { get => _serverAddress; set => Set(ref _serverAddress, value); }
+
+    /// <summary>The code typed by a player joining a game.</summary>
+    public string JoinCode { get => _joinCode; set => Set(ref _joinCode, value); }
+
+    /// <summary>What the online panel is doing ("Connecting…", "Waiting for your opponent…", an error).</summary>
+    public string OnlineStatus { get => _onlineStatus; set => Set(ref _onlineStatus, value); }
+
+    /// <summary>The room code while hosting (shown big, for reading out to your opponent).</summary>
+    public string HostCode
+    {
+        get => _hostCode;
+        set { if (Set(ref _hostCode, value)) Raise(nameof(IsHosting)); }
+    }
+
+    public bool IsHosting => HostCode.Length > 0;
+
+    /// <summary>True while hosting or joining: the buttons that would start something else are disabled.</summary>
+    public bool OnlineBusy
+    {
+        get => _onlineBusy;
+        set { if (Set(ref _onlineBusy, value)) Raise(nameof(IsIdle)); }
+    }
+
+    public bool IsIdle => !OnlineBusy;
+
+    /// <summary>Saves the name and server address for next time.</summary>
+    public void SaveSettings()
+    {
+        var s = AppSettings.Current;
+        s.PlayerName = PlayerName.Trim();
+        s.ServerAddress = ServerAddress.Trim();
+        s.Save();
+    }
 
     public GameOptions BuildOptions()
     {

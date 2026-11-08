@@ -17,4 +17,25 @@ public static class AppPaths
 
     private static CardDatabase? _db;
     public static CardDatabase Database => _db ??= CardDatabase.Load(CardsJson);
+
+    /// <summary>
+    /// A player guide (HOW-TO-PLAY.md, RULEBOOK.md...): the docs folder next to the exe, or docs\players in the source
+    /// tree when running from Visual Studio. Null if it can't be found.
+    /// </summary>
+    public static string? PlayerDoc(string file)
+    {
+        string installed = Path.Combine(AppContext.BaseDirectory, "docs", file);
+        if (File.Exists(installed)) return installed;
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        {
+            string source = Path.Combine(dir.FullName, "docs", "players", file);
+            if (File.Exists(source)) return source;
+        }
+        return null;
+    }
+
+    private static string? _fingerprint;
+
+    /// <summary>Online play: a short fingerprint of cards.json, so both players are known to have the same cards.</summary>
+    public static string DataFingerprint => _fingerprint ??= CosmicCrusade.Core.Net.NetProtocol.DataFingerprint(File.ReadAllText(CardsJson));
 }

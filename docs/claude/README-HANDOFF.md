@@ -1,16 +1,47 @@
-# Cosmic Crusade: Handoff (updated 7 Nov 2026, Archons + Spacecraft written, not yet compiled)
+# Cosmic Crusade: Handoff (updated 8 Nov 2026: player guides, licence, LAN Server, installer)
 
-Cosmic Crusade is Gavin's own physical card game. It's being built as a **Windows standalone app** (C#, .NET 8, WPF/MVVM, Visual Studio) where **one human plays an AI**, with a fixed rules engine and configurable card pools. Later goals: two humans over a shared folder or bridge, then a web server.
+Cosmic Crusade is Gavin's own physical card game. It's being built as a **Windows standalone app** (C#, .NET 8, WPF/MVVM, Visual Studio) where one human plays an AI **or another human online**, with a fixed rules engine and configurable card pools.
 
 The in-game AI is plain C# that runs locally: no network, API or LLM, so it's free and works offline.
 
 ## Status
-- Design: rules spec v1.1 (`design/rules-spec.md`, 56 rulings + Archons A1–A12 / P1–P15 in `design/archons.md` + Spacecraft S1–S28 in `design/spacecraft.md`), **237 cards** encoded (`design/card-catalogue-notes.md`).
+- **8 Nov 2026: docs, licence, LAN Server in the installer** (not yet built):
+  - **Player guides** in `docs/players/`: HOW-TO-PLAY, RULEBOOK (player-facing rules incl. all modules), GLOSSARY, PLAYING-ONLINE, LAN-GUIDE, HOST-YOUR-OWN-SERVER. They ship in `{app}\docs`, are linked from the main menu ("New to Cosmic Crusade?", via `AppPaths.PlayerDoc`), and get a Start menu shortcut.
+  - `docs/multiplayer/SETUP-GUIDE.md` is now the developer testing guide.
+  - **Licence:** `LICENSE` is MIT for the software. A separate part says the game concepts, rules, theme, races, card names and text are © 2026 Gavin Nicholls, all rights reserved. Credits: card art generated with Google Gemini, engine developed with Claude. There's also `THIRD-PARTY-NOTICES.md`. Both are copied to the output, and the installer shows `LICENSE` as an information page.
+  - **LAN Server:** the relay is published as a single self-contained `CosmicCrusade-LanServer.exe` into the app folder, with a Start menu shortcut. It now prints this PC's LAN addresses and takes `--port`.
+  - **Default server:** `data/online.json` `defaultServer` pre-fills the Server box when the player hasn't set one (`AppSettings.DefaultServer`).
+  - The stale "Milestone 3.1" text on the setup screen is replaced by the guide links.
+- **8 Nov 2026: installer written** (not yet run: no Windows or Inno Setup in Claude's sandbox). Same setup as Throng:
+  - `Directory.Build.props` `<Version>` (1.0.0, also shown in the window title);
+  - `publish.bat` → `build\publish.ps1`: tests, self-contained win-x64 publish to `artifacts\app`, checks the exe, data and every art image, then Inno Setup → `artifacts\CosmicCrusade-Setup-<version>.exe` + SHA-256;
+  - `installer\CosmicCrusade.iss`: per user, `%LocalAppData%\Programs\Cosmic Crusade`, Start menu + desktop shortcuts, AppId `5A56303A-43B9-4EFB-928C-D34F05229610`, which must never change;
+  - VS publish profile `Release-win-x64.pubxml`, and `clean.bat`.
+  - Steps: `docs/release/INSTALLER.md`. Gavin leaves `data\art` empty in zips; the publish script refuses to build without art unless given `-AllowMissingArt`.
+- Multiplayer: Gavin built it and ran the tests. `NetTests.Dropped_connections…` failed only because the game was too short for 3 drops (fixed: drop every 7 messages, first to 5).
+- **8 Nov 2026: online multiplayer written, not compiled yet.** Code drop: `CosmicCrusade-Multiplayer-code.zip` (full solution, built on the Spacecraft drop; the `data/` folder is unchanged). Design: `design/multiplayer.md`. Player and setup guide: `docs/multiplayer/SETUP-GUIDE.md`. Also in this drop: **ruling #57** (nothing in the Leader slot goes into Standby), clearer Standby logs plus regression tests for **Salvage Tug** (Gavin reported it not working), and choice labels showing player names instead of P0/P1.
+  - Next step: Gavin builds, runs the tests (`NetTests`, new `SpacecraftTests`), then follows the guide: Part A (two windows + local relay), then Part C (Cloudflare deploy).
+- Design: rules spec v1.1 (`design/rules-spec.md`, 57 rulings + Archons A1–A12 / P1–P15 in `design/archons.md` + Spacecraft S1–S28 in `design/spacecraft.md`), **237 cards** encoded (`design/card-catalogue-notes.md`).
 - **M1 → M3.3, effects passes 1–3 and M4a (Monte Carlo AI) built and confirmed working by Gavin** (7 Nov 2026: "it works perfectly").
 - **Archons module + app icon, then the Spacecraft module, written but NOT compiled yet** (no .NET SDK in Claude's sandbox).
   - Code drop: `CosmicCrusade-Spacecraft-code.zip` (full solution: Archons + icon + Spacecraft, built on M4a). It supersedes `CosmicCrusade-Archons-code.zip` and the earlier loader patch.
   - Data drop: `CosmicCrusade-Data-Spacecraft.zip` (the whole `data/` folder; replace the repo's `data/` with it): everything from the Archons data drop, plus cards.json with 237 entries (48 Spacecraft: 30 spacecraft, 12 Orders, 5 Warzones 6W03–6W07, Fighter token 0ST1), `pools/standard.json` `spacecraft` + `spacecraftWarzones` sections, `game-modes.json` `spacecraft` option (off), `card-layout.json` `header.classDisplay`, placeholder art `art/0SL1..6W07.jpg` (generated: starfield, faction-coloured silhouette, code + name).
   - Next step: Gavin builds, runs the tests (`ArchonTests`, `SpacecraftTests`, updated sweep tests), and plays a game with *Archons* and *Spacecraft* ticked.
+
+## Online multiplayer (8 Nov 2026)
+Full design: `design/multiplayer.md`. Summary:
+- **Lockstep:** both apps run the engine from the host's options and seed; only decisions travel, as indices into `Legal` / `Options`. `LocalSeat` wraps the human and sends; `RemoteSeat` receives and checks a `StateHash` (desync → both games stop). Host = player 0, guest = player 1.
+- **Relay:** pairs host and guest by a 5-letter room code and forwards text. Free online version: `server/cloudflare` (Worker + SQLite Durable Object, `npx wrangler deploy`). Local/LAN version: `src/CosmicCrusade.Relay` (ASP.NET Core, ws://localhost:5080).
+- **Reliability:** 4 s heartbeat both ways (opponent silent for 15 s → "connection lost, waiting"), automatic reconnect into the same seat (secret key), numbered decision log plus `resume` re-sends missed moves, stuck detection (both waiting with nothing in flight → desync).
+- **Lobby:** guest `hello` (version, name, cards.json fingerprint) → host `start` (options, names) or `reject`. **Bump `NetProtocol.GameVersion` when the rules change.**
+- **App:** `Board/Perspective.cs` (Me/Opp; ~80 UI sites converted from hard-coded player 0, all "AI" strings now use the opponent's name); `Views/GameView.Online.cs` (chat, status line, waiting overlay, opponent left / desync handling); setup screen PLAYER + PLAY ONLINE panel (name, server, HOST / JOIN, code); `AppSettings` (`%AppData%\CosmicCrusade\settings.json`).
+- **Not yet:** resume after an app restart, a rematch button, spectators, turn timer, hidden-information (server-authoritative) mode.
+
+### Multiplayer things to check on first build/run
+- Compile errors (written blind). Likely spots: `GameView` partials (the new `Me`/`Opp` static helpers vs any local names, pattern variables added to the round-result and game-over code in `GameView.Events.cs` and to `UpdateBoardReadout`), `SetupView.xaml` (new right-column panel), `NetConnection` (channels, `Interlocked.Exchange` on the transport), the relay's primary-constructor classes.
+- `NetTests` uses a single-thread pump: if a lockstep test hangs it fails after 120 s with a cancellation.
+- Guest view: your own side at the bottom, totals and banners from your point of view, the chevrons and tug bar pointing the right way.
+- Chat focus: Space must not pass while typing; Esc or clicking the table returns the keyboard.
 
 ## Spacecraft module (7 Nov 2026)
 Full design, rulings, assumed readings and implementation notes: `design/spacecraft.md`. Summary:
@@ -49,6 +80,7 @@ Gavin's sketch: two C's back to front, like ⟨ ⟩. Built as two chevrons of fi
 - Next AI steps when wanted: full ISMCTS; search for priority windows and key choices; value the Archon draw by simulation; HeuristicAi clean-ups (raw-JSON text checks, `FillerOrderChance`). Known limits: determinization doesn't track cards seen going into the opponent's hand; Warzone deck order isn't re-shuffled; `StackItem` ids are global.
 
 ## Roadmap (Gavin, 7 Nov 2026)
+0. ~~Online multiplayer~~ (written, above).
 1. ~~Archons~~ (written, above).
 2. **Card banners:** clean up; a solid colour is fine (Gavin doesn't mind solid vs the crack texture). The Archon strip currently uses the crack texture.
 3. **More card effects and sounds:** card-specific animations/sounds that aren't in yet (spacecraft have only boarding / Fighter visuals so far).
@@ -71,8 +103,12 @@ Each new module needs design + rulings before code, the same way the base game, 
   - `Effects/`: EffectSupport, EffectContext, EffectRunner.
   - `Engine/`: GameEngine (+ `.Effects.cs`, `.Triggers.cs`, `.Scripts.cs`, `.Spacecraft.cs`), GameActions/LegalActions, GameEvents, Choices, IPlayerController, StackItem.
   - `Ai/`: HeuristicAi (+ RandomAi), AiChoices, AiVision, Determinizer, MonteCarloAi.
-- `tests/CosmicCrusade.Core.Tests`: xUnit incl. soak, determinism, `RulesTests`, `OrderReactAssembleTests`, `EffectTests`, `StaticTests`, `TriggerTests`, `M32cTests`, `M33Tests`, `EffectsPassTests`, `M4Tests`, `ArchonTests`, `SpacecraftTests`.
-- `src/CosmicCrusade.App`: `Assets/` (icon), `Views/` (GameView + partials `.Events`, `.Inspect`, `.Stack`, `.Choices`, `.Effects`, `.Fx`, `.Fx2`, `.Fx3`, `.Fx3Ambient`, `.Archons`, `.Spacecraft`; SetupView), `Controls/`, `Board/`, `Rendering/`, `ViewModels/`.
+  - `Net/`: NetProtocol (messages, options DTO, codes, fingerprint), NetTransport (WebSocket), NetConnection (heartbeat, reconnect, resend log), LockstepSeats (LocalSeat, RemoteSeat, StateHash), NetLobby.
+- Release: `publish.bat`, `build/publish.ps1`, `installer/CosmicCrusade.iss`, `src/CosmicCrusade.App/Properties/PublishProfiles/Release-win-x64.pubxml`, `clean.bat`.
+- `src/CosmicCrusade.Relay`: local relay (ASP.NET Core minimal API, port 5080).
+- `server/cloudflare`: online relay (Cloudflare Worker), with a Node test of its room logic.
+- `tests/CosmicCrusade.Core.Tests`: xUnit incl. soak, determinism, `RulesTests`, `OrderReactAssembleTests`, `EffectTests`, `StaticTests`, `TriggerTests`, `M32cTests`, `M33Tests`, `EffectsPassTests`, `M4Tests`, `ArchonTests`, `SpacecraftTests`, `NetTests` (+ `NetTestSupport`: in-memory relay, single-thread pump).
+- `src/CosmicCrusade.App`: `Assets/` (icon), `Views/` (GameView + partials `.Events`, `.Inspect`, `.Stack`, `.Choices`, `.Effects`, `.Fx`, `.Fx2`, `.Fx3`, `.Fx3Ambient`, `.Archons`, `.Spacecraft`, `.Online`; SetupView), `Controls/`, `Board/` (incl. `Perspective`), `Rendering/`, `ViewModels/`, `AppSettings`.
 
 ## Testing
 - Scenario tests use `OrderReactAssembleTests.Run(state, p0, p1, throughCleanUp: false)` with `ScriptedController`: `.Turn(...)`, `.React(name)`, `Chooser`. The default answer to every choice is the first option / "Yes". Forced choices are never asked.
@@ -99,7 +135,8 @@ Each new module needs design + rulings before code, the same way the base game, 
 - Board effects go on `BoardCanvas` (1600×1000, clipped, inside `BoardRoot`); screen effects on `FxCanvas` (`ProjectToFx` / `ProjectRect`). Board cards are placed with `PlaceOnBoard` → `BoardLayout.CardCenter` (crew offset).
 - Card-specific effects key off the event's source card name (`PrintedDefinition.Name` for Archons).
 - Units score for, and are controlled by, the side they sit on.
+- The UI never assumes "you are player 0": use `Me` / `Opp` / `OppName` (`Board/Perspective.cs`). The engine must stay deterministic (seeded RNG only, no iteration over hash order that can differ between processes): online play depends on it.
 - `PoolDefinition` and `GameOptions` ignore pool sections / game-mode keys they don't know, so new modules can land in the data before the code.
 
 ## Prompt to start the next chat
-> Here's my Cosmic Crusade code (zip) and data folder. Read claude/README-HANDOFF.md. Archons and Spacecraft are in: here are the build errors / test results / how they played: ...
+> Here's my Cosmic Crusade code (zip) and data folder. Read claude/README-HANDOFF.md. Multiplayer is in: here are the build errors / test results / how an online game went: ...
