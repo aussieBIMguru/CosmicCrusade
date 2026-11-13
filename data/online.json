@@ -1,0 +1,4 @@
+{
+  "$comment": "Online play. defaultServer pre-fills the Server box for anyone who hasn't typed their own, so a build you hand out already points at your relay. Put your Cloudflare Worker address here, e.g. \"cosmic-crusade-relay.yourname.workers.dev\". Leave it empty to make players type one. See docs/multiplayer/HOST-YOUR-OWN-SERVER.md.",
+  "defaultServer": ""
+}

@@ -1,0 +1,7198 @@
+{
+  "schemaVersion": 1,
+  "races": [
+    "GalacticCouncil",
+    "SpaceCowboy",
+    "Necrolite",
+    "Overmind",
+    "Blaarg",
+    "Synthenoid",
+    "Neutral",
+    "Archon"
+  ],
+  "weakness": {
+    "SpaceCowboy": "Necrolite",
+    "Necrolite": "Overmind",
+    "Overmind": "Blaarg",
+    "Blaarg": "Synthenoid",
+    "Synthenoid": "SpaceCowboy"
+  },
+  "cards": [
+    {
+      "id": "0L01",
+      "name": "Vigan the Untouchable",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 4,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "This Unit is Immune to all other Effects and Abilities.",
+      "flavor": "When you don’t live in reality, being virtually untouchable is sufficient.",
+      "image": "images/0L01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "Immunity",
+              "targets": "Self",
+              "scope": "AllOtherEffects"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0L02",
+      "name": "Ace, Council Tactician",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 1,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "printedName": "Ace, Council Tactcian",
+      "text": "When you play this Unit, you may rearrange all Nodes (the new Nodes must be legal).",
+      "flavor": "The field of war stretches before him like a game of chess.",
+      "image": "images/0L02.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "script": "RearrangeAllNodes",
+          "optional": true,
+          "note": "Includes Standby<->Unit Nodes; Leaders can't move; no crossing sides (errata)."
+        }
+      ]
+    },
+    {
+      "id": "0L03",
+      "name": "The Empress",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 0,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "At the End of the Main Phase, if your Opponents control no Leader Units, you win the round.",
+      "flavor": "Her hands are stained with the blood of many, yet she need not lift a finger.",
+      "image": "images/0L03.jpg",
+      "effects": [
+        {
+          "trigger": "EndOfMain",
+          "condition": {
+            "notExists": {
+              "zone": "InPlay",
+              "kind": "Unit",
+              "controller": "Opponent",
+              "unitClass": "Leader"
+            }
+          },
+          "do": [
+            {
+              "op": "WinRound",
+              "player": "You"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0L04",
+      "name": "The Left Hand",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 2,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "When you play this Unit, you may Nullify the Opposing Leader and up to 1 other Unit that shares a Race with it.",
+      "flavor": "She acts for the hand crossing its fingers behind the one signing the treaties.",
+      "image": "images/0L04.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingLeader",
+              "bind": "leader"
+            },
+            {
+              "op": "Nullify",
+              "targets": {
+                "choose": "Unit",
+                "min": 0,
+                "max": 1,
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "sharesRaceWith": "Bound.leader",
+                  "excludeBound": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0L05",
+      "name": "The Right Hand",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 2,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "When you play this Unit, you may Nullify any number of Ongoing Orders.",
+      "flavor": "Why point guns when you can point at those holding them?",
+      "image": "images/0L05.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": {
+                "choose": "Card",
+                "min": 0,
+                "max": "Any",
+                "filter": {
+                  "zone": "OrderNode",
+                  "orderType": "Ongoing"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0L06",
+      "name": "Lance Corporal",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 1,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "Whenever you play an Order, this Unit gets +2 Rank.",
+      "flavor": "He’s seen it all before, and he is able to do it all again.",
+      "image": "images/0L06.jpg",
+      "effects": [
+        {
+          "trigger": "OnEvent",
+          "event": "OrderPlayed",
+          "filter": {
+            "controller": "You"
+          },
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self",
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0L07",
+      "name": "Preferred Candidate",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 2,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "During the Cleanup Phase, this Unit may remain in play. If it does, it gets +2 Rank.",
+      "flavor": "Just one more term...",
+      "image": "images/0L07.jpg",
+      "effects": [
+        {
+          "trigger": "CleanUp",
+          "optional": true,
+          "do": [
+            {
+              "op": "RemainInPlay",
+              "targets": "Self",
+              "replaces": "Retire"
+            },
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self",
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0O01",
+      "name": "Consortium",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "Cards have no Race (both in Play and in Hand).",
+      "flavor": "In times of trial, the Galactic Council sees individuals not by their race, but their wallet.",
+      "image": "images/0O01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Errata: does not apply to Orders.",
+          "do": [
+            {
+              "op": "SetRaces",
+              "races": [],
+              "targets": {
+                "kind": "Unit",
+                "zone": [
+                  "InPlay",
+                  "Hand"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0O02",
+      "name": "Boarding Party",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "Each Unit gets +1 Rank for each other Allied Unit that shares a Race with it.",
+      "flavor": "Together, we are unstoppable.",
+      "image": "images/0O02.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": {
+                "countOf": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "allied": "Each",
+                  "sharesRaceWith": "Each",
+                  "excludeEach": true
+                }
+              },
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit"
+              },
+              "perTarget": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0O03",
+      "name": "Even Odds",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "Opposed Units may only be Deployed if their Base Rank is equal to the Opposing Unit's Base Rank.",
+      "flavor": "",
+      "image": "images/0O03.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Errata: Units may still be played to unopposed Nodes.",
+          "do": [
+            {
+              "op": "RestrictDeploy",
+              "rule": "IfTargetOpposed_BaseRankMustEqualOpposing"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0O04",
+      "name": "Diplomatic Immunity",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "'Visiting Diplomat' Units get +5 Rank and cannot be Nullified.",
+      "flavor": "Every now and then, the Diplomats will actually do something useful.",
+      "image": "images/0O04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 5,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "name": "Visiting Diplomat"
+              }
+            },
+            {
+              "op": "CannotBeNullified",
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "name": "Visiting Diplomat"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0O05",
+      "name": "Extreme Sanctions",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "As you Issue this Order, choose a Race. Cards of the chosen Race cannot be Deployed or Issued.",
+      "flavor": "From time to time, harsh lessons need to be taught to the unrulier mobs.",
+      "image": "images/0O05.jpg",
+      "effects": [
+        {
+          "trigger": "OnIssue",
+          "do": [
+            {
+              "op": "ChooseRace",
+              "remember": "race"
+            }
+          ]
+        },
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "RestrictPlay",
+              "targets": {
+                "race": "Remembered.race"
+              },
+              "actions": [
+                "Deploy",
+                "Issue"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0O06",
+      "name": "Shadow Strike",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "React",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "Nullify a Unit as it is being deployed (it is not played).",
+      "flavor": "Law enforcement knows better than to investigate a crime where the weapon of choice was Galactic Council approved.",
+      "image": "images/0O06.jpg",
+      "effects": [
+        {
+          "trigger": "React",
+          "when": {
+            "event": "UnitDeploying"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "Event.Unit",
+              "cancelsPlay": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0O07",
+      "name": "Recolonize",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "React",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "Choose an Empty Node as a Unit is being Deployed. That Unit is Deployed to that Node instead (it must be a legal option).",
+      "flavor": "",
+      "image": "images/0O07.jpg",
+      "effects": [
+        {
+          "trigger": "React",
+          "when": {
+            "event": "UnitDeploying"
+          },
+          "do": [
+            {
+              "op": "RedirectDeploy",
+              "node": {
+                "choose": "Node",
+                "filter": {
+                  "empty": true,
+                  "legalFor": "Event.Unit"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0O08",
+      "name": "Depose",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "Nullify a Leader.",
+      "flavor": "Most leaders are wise enough to respect the Galactic Council’s will. However, every now and then, one oversteps their lines.",
+      "image": "images/0O08.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "unitClass": "Leader"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0O09",
+      "name": "Terraform",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "Lock a Node, and its opposing Node. The Unit's controllers may put those Units into their Standby Zone.",
+      "flavor": "Make way for progress.",
+      "image": "images/0O09.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "script": "Terraform",
+          "note": "Ruling: lock the chosen Node and its opposing Node. Each Unit's controller may move it to their Standby; if they don't or can't, it is Nullified (before the Lock)."
+        }
+      ]
+    },
+    {
+      "id": "0O10",
+      "name": "Respond in Kind",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "React",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "Issue this Order as a Unit is Nullified to Nullify the opposing Unit as well.",
+      "flavor": "Their judgement was absolute.",
+      "image": "images/0O10.jpg",
+      "effects": [
+        {
+          "trigger": "React",
+          "when": {
+            "event": "UnitNullifying"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "Event.Unit.OpposingUnit",
+              "simultaneous": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0U01",
+      "name": "Visiting Diplomat",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Bystander",
+      "baseRank": 0,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "You may play this Unit on any Node (even your Opponents').",
+      "flavor": "Rarely a welcome sight.",
+      "image": "images/0U01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "PlacementOverride",
+              "targets": "Self",
+              "allowedNodes": "AnyUnitNodeEitherSide"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0U02",
+      "name": "Tyrant Toppler",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "printedName": "Tyramt Toppler",
+      "text": "When you play this Unit, you may Nullify an Opposing Leader.",
+      "flavor": "Whilst the Galactic Council is essentially neutral, its shadows are not.",
+      "image": "images/0U02.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingLeader"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0U03",
+      "name": "Covert Operative",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "When you play this Unit, you may Nullify the Opposing Unit.",
+      "flavor": "Bullets move twice as fast if you’re already moving as fast as one.",
+      "image": "images/0U03.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0U04",
+      "name": "Shot in the Dark",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "When you play this Unit, you may set another Units' Base Rank to 0.",
+      "flavor": "Even if the whole galaxy is at war, the trading must go on.",
+      "image": "images/0U04.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "do": [
+            {
+              "op": "SetBaseRank",
+              "value": 0,
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "excludeSelf": true
+                }
+              },
+              "persistent": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0U05",
+      "name": "Corporate Detainer",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "When you play this Unit, you may set another Unit's Base Rank to 1.",
+      "flavor": "War is profitable for the corporations. They ensures it remains that way.",
+      "image": "images/0U05.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "do": [
+            {
+              "op": "SetBaseRank",
+              "value": 1,
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "excludeSelf": true
+                }
+              },
+              "persistent": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1L01",
+      "name": "Quickraw Murphy",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 3,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "When you play this Unit, if the Opposing Leader isn't a Space Cowboy, Nullify it.",
+      "flavor": "There ain’t enough room on the planet for the both of them.",
+      "image": "images/1L01.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "condition": {
+            "unit": "OpposingLeader",
+            "notRace": "SpaceCowboy"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingLeader"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1L02",
+      "name": "The Hangman",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 3,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "When you play this Unit, if you control another Space Cowboy, Nullify up to 1 Opposing Unit.",
+      "flavor": "If the jury isn’t hung, they will be.",
+      "image": "images/1L02.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "condition": {
+            "exists": {
+              "zone": "InPlay",
+              "kind": "Unit",
+              "controller": "You",
+              "race": "SpaceCowboy",
+              "excludeSelf": true
+            }
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": {
+                "choose": "Unit",
+                "min": 0,
+                "max": 1,
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "controller": "Opponent"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1L03",
+      "name": "Y'nosh, Galactic Slaver",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 2,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "printedName": "Y'nsoh, Galactic Slaver",
+      "text": "During Cleanup, you may place up to 1 non-Space Cowboy Unit in your Standby Zone (it may belong to an Opponent).",
+      "flavor": "He never forgives, he never forgets.",
+      "image": "images/1L03.jpg",
+      "effects": [
+        {
+          "trigger": "CleanUp",
+          "priority": "First",
+          "note": "Errata: takes priority over any other Unit Clean-up Ability.",
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": {
+                "choose": "Unit",
+                "min": 0,
+                "max": 1,
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "notRace": "SpaceCowboy"
+                }
+              },
+              "standbyOf": "You",
+              "gainControl": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1L04",
+      "name": "Dusty Trailblazer",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Champion",
+      "baseRank": 2,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "printedName": "Dustry Trailblazer",
+      "text": "All other Space Cowboy Units you control get +1 Rank.",
+      "flavor": "He calls her Bessie.",
+      "image": "images/1L04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "SpaceCowboy",
+                "controller": "You",
+                "excludeSelf": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1L05",
+      "name": "Fast Eddie",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 2,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "When you play this Unit or another Space Cowboy Unit, you may have it Duel its Opposing Node.",
+      "flavor": "Think quick, die later.",
+      "image": "images/1L05.jpg",
+      "effects": [
+        {
+          "trigger": "OnEvent",
+          "optional": true,
+          "event": "UnitPlayed",
+          "filter": {
+            "zone": "InPlay",
+            "kind": "Unit",
+            "controller": "You",
+            "race": "SpaceCowboy"
+          },
+          "includeSelf": true,
+          "do": [
+            {
+              "op": "Duel",
+              "a": "Event.Unit",
+              "b": "Event.Unit.OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1L06",
+      "name": "Barkeep Bill",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 3,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "You may play Space Cowboy Units from the Retired Pile as if they were in your Hand.",
+      "flavor": "To many drinks or too many punches and he’ll send them back to the batlefield.",
+      "image": "images/1L06.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "PlayFromZone",
+              "zone": "RetiredPile",
+              "filter": {
+                "kind": "Unit",
+                "race": "SpaceCowboy"
+              },
+              "player": "You"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1O01",
+      "name": "High Noon",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "At the end of the Main Phase, all Opposed Nodes Duel.",
+      "flavor": "In the blink of a poorly timed insult, the tavern erupted in a crossfire of blasters and four letter words.",
+      "image": "images/1O01.jpg",
+      "effects": [
+        {
+          "trigger": "EndOfMain",
+          "ordering": "AfterRankModifiers",
+          "do": [
+            {
+              "op": "DuelAllOpposed",
+              "simultaneous": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1O02",
+      "name": "Force Field",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Space Cowboys you own cannot be Nullified.",
+      "flavor": "Using neural implants developed by the Overmind, some Space Cowboys have developed less agressive answers.",
+      "image": "images/1O02.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "CannotBeNullified",
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "owner": "You",
+                "race": "SpaceCowboy"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1O03",
+      "name": "Xeno Laser",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Nullify the first non-Space Cowboy Unit that is Deployed.",
+      "flavor": "If it doesn’t bleed red, it will bleed.",
+      "image": "images/1O03.jpg",
+      "effects": [
+        {
+          "trigger": "OnEvent",
+          "event": "UnitPlayed",
+          "filter": {
+            "notRace": "SpaceCowboy"
+          },
+          "oncePerRound": true,
+          "note": "Ruling: hits after the Unit is Played (on-play abilities still fire). Errata: stays in play but can't trigger again this round.",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "Event.Unit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1O04",
+      "name": "Shoot First, Think Second",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Your Opponent selects Nodes as they Deploy Units at random.",
+      "flavor": "Their opponent was banking on them having a strategy.",
+      "image": "images/1O04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "OverrideDecision",
+              "decision": "DeployTargetNode",
+              "forPlayer": "Opponent",
+              "decider": "Random"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1O05",
+      "name": "Blazing Saddles",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Space Cowboy Units get +1 Rank.",
+      "flavor": "Ride together, die alone.",
+      "image": "images/1O05.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "SpaceCowboy"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1O06",
+      "name": "Blasters at Dawn",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Choose an Opposed Node. The Units in those Nodes duel.",
+      "flavor": "He came into town rather loudly.",
+      "image": "images/1O06.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "Duel",
+              "node": {
+                "choose": "Node",
+                "filter": {
+                  "nodeKind": [
+                    "Unit",
+                    "Leader"
+                  ],
+                  "opposed": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1O07",
+      "name": "Sheriff's Badge",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Choose a Unit. If that Unit is a Space Cowboy, it gets +2 Rank, otherwise it gets +1 Rank.",
+      "flavor": "There’s a new Sheriff in town.",
+      "image": "images/1O07.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit"
+                }
+              },
+              "amount": {
+                "ifRace": "SpaceCowboy",
+                "then": 2,
+                "else": 1
+              },
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1O08",
+      "name": "Target Practice",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "React",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Nullify an Opposed Unit as it is being deployed (it is not played).",
+      "flavor": "Barely even worth shooting them.",
+      "image": "images/1O08.jpg",
+      "effects": [
+        {
+          "trigger": "React",
+          "when": {
+            "event": "UnitDeploying",
+            "targetNodeOpposed": true
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "Event.Unit",
+              "cancelsPlay": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1O09",
+      "name": "Decode",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Unlock any number of Locked Nodes. Draw a card for each Node unlocked this way.",
+      "flavor": "Thinking with their brain is always the last resort.",
+      "image": "images/1O09.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "Unlock",
+              "targets": {
+                "choose": "Node",
+                "min": 0,
+                "max": "Any",
+                "filter": {
+                  "locked": true
+                }
+              },
+              "countAs": "n"
+            },
+            {
+              "op": "Draw",
+              "count": "Count.n",
+              "deckChoice": "PerCard"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1O10",
+      "name": "New Recruits",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Retire your Hand, then Draw that many Cards.",
+      "flavor": "They’re never too young to learn to fight in zero gravity.",
+      "image": "images/1O10.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "RetireHand",
+              "countAs": "hand"
+            },
+            {
+              "op": "Draw",
+              "count": "Count.hand",
+              "distribution": "SameAsRetired"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1U01",
+      "name": "Chrome Domer",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "When you play this Unit, if the Opposing Unit is a Necrolite, you may Nullify it and this Unit gets +2 Rank.",
+      "flavor": "",
+      "image": "images/1U01.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "condition": {
+            "unit": "OpposingUnit",
+            "race": "Necrolite"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            },
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self",
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1U02",
+      "name": "Rogue Flakketeer",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "When you play this Unit, you may Nullify the Opposing Unit if it is a Necrolite.",
+      "flavor": "Why shoot one bullet when you can shoot all of them?",
+      "image": "images/1U02.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "condition": {
+            "unit": "OpposingUnit",
+            "race": "Necrolite"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1U03",
+      "name": "Steady Shooter",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "When you play this Unit, it Duels the Opposing Unit.",
+      "flavor": "Quickest draw on the planet.",
+      "image": "images/1U03.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "condition": {
+            "selfOpposed": true
+          },
+          "do": [
+            {
+              "op": "Duel",
+              "a": "Self",
+              "b": "OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1U04",
+      "name": "Crimson Redeemer",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "When you play this Unit, it Duels the Opposing Unit. This Unit cannot be Nullified in that Duel.",
+      "flavor": "Whilst there are blasters and credits, there wont be any freedom.",
+      "image": "images/1U04.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "condition": {
+            "selfOpposed": true
+          },
+          "do": [
+            {
+              "op": "Duel",
+              "a": "Self",
+              "b": "OpposingUnit",
+              "protect": [
+                "a"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1U05",
+      "name": "Armament Master",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Brute",
+      "baseRank": 4,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "",
+      "flavor": "Having seen Earth desolated by alien pillagers and the Blaarg first contact, the remaining survivors banded together in small encampments, scrounging what they could from the wreckage of their broken world.",
+      "image": "images/1U05.jpg",
+      "effects": []
+    },
+    {
+      "id": "1U06",
+      "name": "Lone Wolf",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "During Cleanup, you may place this Unit into your Standby Zone instead of Retiring it.",
+      "flavor": "",
+      "image": "images/1U06.jpg",
+      "effects": [
+        {
+          "trigger": "CleanUp",
+          "optional": true,
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": "Self",
+              "replaces": "Retire"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1U07",
+      "name": "Rebel with a Cause",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "If an Opponent controls any Necrolite Units, this Unit gets +2 Rank.",
+      "flavor": "Once the Necrolites took his family from him, his fate was sealed.",
+      "image": "images/1U07.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "condition": {
+            "exists": {
+              "zone": "InPlay",
+              "kind": "Unit",
+              "controller": "Opponent",
+              "race": "Necrolite"
+            }
+          },
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1U08",
+      "name": "Twisted Firestarter",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "If this Unit is Nullified, Nullify the Opposing Unit as well.",
+      "flavor": "The trouble starter, punking instigator. The fear addicted, danger illustrated.",
+      "image": "images/1U08.jpg",
+      "effects": [
+        {
+          "trigger": "OnSelfNullified",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1U09",
+      "name": "Roundup Gang",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "When you play this Unit, Lock up to 1 Empty Node. When this Unit leaves play, Unlock that Node.",
+      "flavor": "",
+      "image": "images/1U09.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "Lock",
+              "targets": {
+                "choose": "Node",
+                "min": 0,
+                "max": 1,
+                "filter": {
+                  "empty": true
+                }
+              },
+              "remember": "lockedNode"
+            }
+          ]
+        },
+        {
+          "trigger": "OnLeavePlay",
+          "do": [
+            {
+              "op": "Unlock",
+              "targets": "Remembered.lockedNode"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2L01",
+      "name": "Cure Failure 349",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": "X",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "This Units Base Rank is equal to the number of Nullified Necrolite Units.",
+      "flavor": "In playing god, they made a new one.",
+      "image": "images/2L01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "SetBaseRank",
+              "targets": "Self",
+              "value": {
+                "countOf": {
+                  "zone": "NullifiedPile",
+                  "kind": "Unit",
+                  "race": "Necrolite"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2L02",
+      "name": "Disturberus",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 1,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Whenever a Unit is Nullified, this Unit gets +3 Rank.",
+      "flavor": "Not all ghost towns were abandoned.",
+      "image": "images/2L02.jpg",
+      "effects": [
+        {
+          "trigger": "OnEvent",
+          "event": "UnitNullified",
+          "note": "Errata: includes Units Nullified in the Standby Zone.",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 3,
+              "targets": "Self",
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2L03",
+      "name": "Sisters of Blight",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 3,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "When you play this Unit, Lock up to 1 Node. If there is a Unit on that Node, its Controller places it in their Standby zone.",
+      "flavor": "",
+      "image": "images/2L03.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "choose": {
+            "name": "node",
+            "choose": "Node",
+            "min": 0,
+            "max": 1
+          },
+          "note": "Errata: Unit moves before the Node is Locked.",
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": "Chosen.node.Unit",
+              "standbyOf": "Controller",
+              "ifNoRoom": "Retire"
+            },
+            {
+              "op": "Lock",
+              "targets": "Chosen.node"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2L04",
+      "name": "Festering Matron",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Champion",
+      "baseRank": 2,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "All other Necrolite Units you control get +1 Rank.",
+      "flavor": "The Necrolite race keeps their Matron units deep underground to protect their fragile lineages.",
+      "image": "images/2L04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Necrolite",
+                "controller": "You",
+                "excludeSelf": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2L05",
+      "name": "Galactomancer",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 3,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "You may play Necrolite Units from the Nullified Pile as though they were in your Hand.",
+      "flavor": "The Necrolites perfected the art of their origin to levels not thought possible.",
+      "image": "images/2L05.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "PlayFromZone",
+              "zone": "NullifiedPile",
+              "filter": {
+                "kind": "Unit",
+                "race": "Necrolite"
+              },
+              "player": "You"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2L06",
+      "name": "The Creeper",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": -1,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "You may play this Unit on your Opponent's Leader Node. Other Units you control get -1 Rank.",
+      "flavor": "",
+      "image": "images/2L06.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "PlacementOverride",
+              "targets": "Self",
+              "allowedNodes": [
+                "OwnLeader",
+                "OpponentLeader"
+              ]
+            }
+          ]
+        },
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": -1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "controller": "You",
+                "excludeSelf": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2O01",
+      "name": "We Come in Pieces",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Necrolite Units get +1 Rank.",
+      "flavor": "The motives of the Necrolite race are a mystery to all, but one can assume it was an innate urge in their living minds.",
+      "image": "images/2O01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Necrolite"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2O02",
+      "name": "Acid Rain",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "All Units get -2 Rank.",
+      "flavor": "The rot and decay on Necrolite planets releases high quantities of gas into the atmosphere, which leads to constant deluges of corrosive rain.",
+      "image": "images/2O02.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Errata: the Rank of a Unit cannot become negative.",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": -2,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit"
+              },
+              "floor": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2O03",
+      "name": "Rise of the Tyrant",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Leader Units get +X Rank, where X is the number of Allied Units that share a Race with it.",
+      "flavor": "Promises as empty as the willpower of their followers.",
+      "image": "images/2O03.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Errata: Standby Units are not counted.",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "unitClass": "Leader"
+              },
+              "perTarget": true,
+              "amount": {
+                "countOf": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "allied": "Each",
+                  "sharesRaceWith": "Each",
+                  "excludeEach": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2O04",
+      "name": "Weed out the Weak",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "At the end of the Main Phase, Nullify the Unit with the lowest Rank (if there are tied Units, Nullify them all).",
+      "flavor": "",
+      "image": "images/2O04.jpg",
+      "effects": [
+        {
+          "trigger": "EndOfMain",
+          "ordering": "BeforeRankTotal",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": {
+                "lowestRank": {
+                  "zone": "InPlay",
+                  "kind": "Unit"
+                },
+                "ties": "All"
+              },
+              "simultaneous": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2O05",
+      "name": "Abominations",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Players may Nullify a Necrolite Card from their hand to have a non-Necrolite Unit get +2 Rank. That Unit becomes a Necrolite.",
+      "flavor": "",
+      "image": "images/2O05.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "GrantAction",
+              "player": "Each",
+              "actionName": "Abomination",
+              "countsAsTurn": true,
+              "cost": {
+                "op": "NullifyFromHand",
+                "filter": {
+                  "race": "Necrolite"
+                }
+              },
+              "do": [
+                {
+                  "op": "ModifyRank",
+                  "amount": 2,
+                  "targets": {
+                    "choose": "Unit",
+                    "filter": {
+                      "zone": "InPlay",
+                      "kind": "Unit",
+                      "notRace": "Necrolite"
+                    }
+                  },
+                  "duration": "WhileInPlay",
+                  "bind": "u"
+                },
+                {
+                  "op": "SetRaces",
+                  "races": [
+                    "Necrolite"
+                  ],
+                  "targets": "Bound.u"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2O06",
+      "name": "Shallow Grave",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Place a Nullified Unit into your Standby Zone.",
+      "flavor": "The best way to slow down the Necrolite army is to bury them deeper.",
+      "image": "images/2O06.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": {
+                "choose": "Card",
+                "filter": {
+                  "zone": "NullifiedPile",
+                  "kind": "Unit"
+                }
+              },
+              "standbyOf": "You",
+              "gainControl": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2O07",
+      "name": "Overwhelm",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Nullify an Opposed Unit with Base Rank less than the number of Necrolite Cards in play.",
+      "flavor": "Their heart doesn’t beat, their blood doesn’t rush, their legs don’t tire.",
+      "image": "images/2O07.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "note": "Errata: Standby Units are not counted.",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "opposed": true,
+                  "baseRankLessThan": {
+                    "countOf": {
+                      "zone": "InPlay",
+                      "race": "Necrolite"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2O08",
+      "name": "Already Dead",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "React",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Issue this Order if a Unit would be Nullified to prevent that Unit being Nullified. That Unit becomes a Necrolite.",
+      "flavor": "What’s dead may never die.",
+      "image": "images/2O08.jpg",
+      "effects": [
+        {
+          "trigger": "React",
+          "when": {
+            "event": "UnitNullifying"
+          },
+          "do": [
+            {
+              "op": "PreventEvent"
+            },
+            {
+              "op": "SetRaces",
+              "races": [
+                "Necrolite"
+              ],
+              "targets": "Event.Unit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2O09",
+      "name": "Spreading Sickness",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "React",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Issue this order as a Unit is Deployed to Lock its Node. Its controller places it in their Standby zone.",
+      "flavor": "That’s no way to make a living.",
+      "image": "images/2O09.jpg",
+      "effects": [
+        {
+          "trigger": "React",
+          "when": {
+            "event": "UnitDeploying"
+          },
+          "note": "Errata (Sisters of Blight/Spreading Blight): Unit moves before the Node is Locked; Retire it if no Standby room.",
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": "Event.Unit",
+              "standbyOf": "Controller",
+              "cancelsPlay": true,
+              "ifNoRoom": "Retire"
+            },
+            {
+              "op": "Lock",
+              "targets": "Event.TargetNode"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2O10",
+      "name": "Intergalactic Plague",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Nullify all Retired Units and all Units in Standby Zones.",
+      "flavor": "In fleeing from the disease, they helped sheperd it around the universe.",
+      "image": "images/2O10.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": {
+                "zone": "RetiredPile",
+                "kind": "Unit"
+              }
+            },
+            {
+              "op": "Nullify",
+              "targets": {
+                "zone": "Standby",
+                "kind": "Unit"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2U01",
+      "name": "Mind Maggots",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "When you play this Unit, if the Opposing Unit is an Overmind you may Nullify it and this Unit gets +2 Rank.",
+      "flavor": "Necrolite births are anything but pretty.",
+      "image": "images/2U01.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "condition": {
+            "unit": "OpposingUnit",
+            "race": "Overmind"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            },
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self",
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2U02",
+      "name": "Brainless Mob",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "When you play this Unit, you may Nullify the Opposing Unit if it is an Overmind.",
+      "flavor": "Hull breaches are shortly followed by mind breaches.",
+      "image": "images/2U02.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "condition": {
+            "unit": "OpposingUnit",
+            "race": "Overmind"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2U03",
+      "name": "Grim Angler",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "When you play this Unit, you may Return up to 2 Nullified Units to your Standby Zone.",
+      "flavor": "Corpses are rarely recovered in aquatic combat by the living.",
+      "image": "images/2U03.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": {
+                "choose": "Card",
+                "min": 0,
+                "max": 2,
+                "filter": {
+                  "zone": "NullifiedPile",
+                  "kind": "Unit"
+                }
+              },
+              "standbyOf": "You",
+              "gainControl": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2U04",
+      "name": "Reaper of Rot",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "When you play this Unit, you may Return up to 1 Nullified Unit to your Standby Zone.",
+      "flavor": "The dead have no need to sow.",
+      "image": "images/2U04.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": {
+                "choose": "Card",
+                "min": 0,
+                "max": 1,
+                "filter": {
+                  "zone": "NullifiedPile",
+                  "kind": "Unit"
+                }
+              },
+              "standbyOf": "You",
+              "gainControl": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2U05",
+      "name": "Insatiable Mawhead",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Brute",
+      "baseRank": 4,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "",
+      "flavor": "Once humanity conquered space, they turned their attention towards a cure to death itself. What first appeared to be successful experiments quickly descended into sick parodies of life.",
+      "image": "images/2U05.jpg",
+      "effects": []
+    },
+    {
+      "id": "2U06",
+      "name": "Mindless Mass",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "During Cleanup, you may place this Unit into your Standby Zone instead of Retiring it.",
+      "flavor": "",
+      "image": "images/2U06.jpg",
+      "effects": [
+        {
+          "trigger": "CleanUp",
+          "optional": true,
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": "Self",
+              "replaces": "Retire"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2U07",
+      "name": "Cruel Vicisector",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "If an Opponent controls any Overmind Units, this Unit gets +2 Rank.",
+      "flavor": "If you scream, the tongue goes first.",
+      "image": "images/2U07.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "condition": {
+            "exists": {
+              "zone": "InPlay",
+              "kind": "Unit",
+              "controller": "Opponent",
+              "race": "Overmind"
+            }
+          },
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2U08",
+      "name": "Lurking Parasite",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "If this Unit is Nullified, Nullify the Opposing Unit as well.",
+      "flavor": "They mistook the quivering of the new assistant as nerves.",
+      "image": "images/2U08.jpg",
+      "effects": [
+        {
+          "trigger": "OnSelfNullified",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2U09",
+      "name": "Terrortorialist",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "When you play this Unit, Lock up to 1 Empty Node. When this Unit leaves play, Unlock that Node.",
+      "flavor": "",
+      "image": "images/2U09.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "Lock",
+              "targets": {
+                "choose": "Node",
+                "min": 0,
+                "max": 1,
+                "filter": {
+                  "empty": true
+                }
+              },
+              "remember": "lockedNode"
+            }
+          ]
+        },
+        {
+          "trigger": "OnLeavePlay",
+          "do": [
+            {
+              "op": "Unlock",
+              "targets": "Remembered.lockedNode"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3L01",
+      "name": "Indominus",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 6,
+      "races": [
+        "Overmind"
+      ],
+      "text": "This Unit gets -X Rank, where X is the greatest number of Cards in your Opponents' hands.",
+      "flavor": "Waiting for its passing is often the only way to survive it.",
+      "image": "images/3L01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "targets": "Self",
+              "amount": {
+                "negate": {
+                  "maxHandSize": "Opponents"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3L02",
+      "name": "The All-knowing",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 3,
+      "races": [
+        "Overmind"
+      ],
+      "text": "Your Opponents play with their Hands revealed.",
+      "flavor": "She floats through space, observing the all she drifts past. With each day, the Overmind gains her insights.",
+      "image": "images/3L02.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "RevealHands",
+              "players": "Opponents"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3L03",
+      "name": "Psyphoon",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 1,
+      "races": [
+        "Overmind"
+      ],
+      "text": "When you play this Unit, place all other Overmind Units you control into your Standby Zone, then Draw that many Cards.",
+      "flavor": "",
+      "image": "images/3L03.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "note": "Errata: excess Units without Standby room are Retired, but still count for the Draw.",
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "controller": "You",
+                "race": "Overmind",
+                "excludeSelf": true
+              },
+              "standbyOf": "You",
+              "ifNoRoom": "Retire",
+              "countAs": "n"
+            },
+            {
+              "op": "Draw",
+              "count": "Count.n",
+              "deckChoice": "PerCard"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3L04",
+      "name": "Think Tank",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Champion",
+      "baseRank": 2,
+      "races": [
+        "Overmind"
+      ],
+      "text": "All other Overmind Units you control get +1 Rank.",
+      "flavor": "Unhumorously nicknamed by the Space Cowboys as ‘Jar Jar Thinks’.",
+      "image": "images/3L04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Overmind",
+                "controller": "You",
+                "excludeSelf": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3L05",
+      "name": "Arganium",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 3,
+      "races": [
+        "Overmind"
+      ],
+      "text": "When you play this Unit, you may switch the contents of any 2 Unit Nodes.",
+      "flavor": "One must be careful when bending reality not to break it.",
+      "image": "images/3L05.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "do": [
+            {
+              "op": "SwapNodeContents",
+              "nodes": {
+                "choose": "Node",
+                "min": 2,
+                "max": 2,
+                "filter": {
+                  "nodeKind": "Unit",
+                  "side": "Any"
+                }
+              },
+              "controlFollowsSide": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3L06",
+      "name": "Cortexella",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 2,
+      "races": [
+        "Overmind"
+      ],
+      "text": "Each time you draw a Card, this Unit gets +1 Rank (for each Card drawn).",
+      "flavor": "She asutely observes entire planets, often until all life ceases to exist there.",
+      "image": "images/3L06.jpg",
+      "effects": [
+        {
+          "trigger": "OnEvent",
+          "event": "CardDrawn",
+          "filter": {
+            "player": "You"
+          },
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": "Self",
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3O01",
+      "name": "Transparency",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Your Opponents play with their Hands revealed.",
+      "flavor": "When facing the overmind, being one step ahead may as well be in the opposite direction.",
+      "image": "images/3O01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "RevealHands",
+              "players": "Opponents"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3O02",
+      "name": "Temporal Stasis",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Overmind"
+      ],
+      "text": "No other Orders may be Issued.",
+      "flavor": "Despite the seriousness of her predicament, she took a moment to enjoy the peace and quiet.",
+      "image": "images/3O02.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Errata: does not affect Ongoing Orders already in play.",
+          "do": [
+            {
+              "op": "RestrictPlay",
+              "targets": {
+                "kind": "Order"
+              },
+              "actions": [
+                "Issue"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3O03",
+      "name": "Mind Games",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Your Opponents must play Units on Opposed Nodes if able.",
+      "flavor": "Who’s shooting at who again?",
+      "image": "images/3O03.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Errata: if they cannot, they may play Units on their own Nodes.",
+          "do": [
+            {
+              "op": "RestrictDeploy",
+              "forPlayer": "Opponent",
+              "rule": "MustTargetOwnOpposedNodeIfAble"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3O04",
+      "name": "Hive Mind",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Overmind Units get +1 Rank.",
+      "flavor": "All for one and one for all.",
+      "image": "images/3O04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Overmind"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3O05",
+      "name": "Psychic Coercion",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Overmind"
+      ],
+      "printedName": "Psychic Coersion",
+      "text": "You choose which Nodes your opponents Deploy their Units to (before you know what Unit they are Deploying).",
+      "flavor": "",
+      "image": "images/3O05.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "OverrideDecision",
+              "decision": "DeployTargetNode",
+              "forPlayer": "Opponent",
+              "decider": "Controller",
+              "timing": "BeforeCardChosen"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3O06",
+      "name": "Second Thought",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "React",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Nullify a React or Action as it is being Issued (it is not played).",
+      "flavor": "Always best to check the oven was turned off before you go on a space walk.",
+      "image": "images/3O06.jpg",
+      "effects": [
+        {
+          "trigger": "React",
+          "when": {
+            "event": "OrderIssuing",
+            "orderType": [
+              "React",
+              "Action"
+            ]
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "Event.Order",
+              "cancelsPlay": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3O07",
+      "name": "Commandeer",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "React",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Gain control of a React or Action as it is being Issued. You may choose new Targets for it.",
+      "flavor": "Why not have someone else’s brilliant idea for them?",
+      "image": "images/3O07.jpg",
+      "effects": [
+        {
+          "trigger": "React",
+          "when": {
+            "event": "OrderIssuing",
+            "orderType": [
+              "React",
+              "Action"
+            ]
+          },
+          "do": [
+            {
+              "op": "GainControl",
+              "targets": "Event.Order"
+            },
+            {
+              "op": "Retarget",
+              "targets": "Event.Order",
+              "optional": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3O08",
+      "name": "Meditate",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Draw up to 1 Unit Card, and up to 1 Order Card.",
+      "flavor": "The benifit of being a Hive Mind is you can dream whilst you’re awake.",
+      "image": "images/3O08.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "Draw",
+              "deck": "Units",
+              "min": 0,
+              "max": 1
+            },
+            {
+              "op": "Draw",
+              "deck": "Orders",
+              "min": 0,
+              "max": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3O09",
+      "name": "One of Us",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Gain control of a Unit if you have at least 1 Empty Node. You must choose a new Node for it (it must be a legal choice).",
+      "flavor": "",
+      "image": "images/3O09.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "condition": {
+            "exists": {
+              "nodeOf": "You",
+              "empty": true
+            }
+          },
+          "note": "Errata: the Unit does not come into play again, but remains in play.",
+          "do": [
+            {
+              "op": "GainControl",
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "controller": "Opponent"
+                }
+              },
+              "moveTo": {
+                "choose": "Node",
+                "filter": {
+                  "empty": true,
+                  "side": "You",
+                  "legalFor": "Target"
+                }
+              },
+              "entersPlay": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3O10",
+      "name": "Reminisce",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Return an Issued Order to your Hand.",
+      "flavor": "The Overmind treat their collective intelligence like an encyclopaedia. If it worked once, it’s bound to work again.",
+      "image": "images/3O10.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "ReturnToHand",
+              "targets": {
+                "choose": "Card",
+                "filter": {
+                  "zone": "IssuedPile"
+                }
+              },
+              "hand": "You"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3U01",
+      "name": "Echo Chamber",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Overmind"
+      ],
+      "text": "When you play this Unit, if the Opposing Unit is a Blaarg you may Nullify it and this Unit gets +2 Rank.",
+      "flavor": "",
+      "image": "images/3U01.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "condition": {
+            "unit": "OpposingUnit",
+            "race": "Blaarg"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            },
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self",
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3U02",
+      "name": "Willbreaker",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Overmind"
+      ],
+      "text": "When you play this Unit, you may Nullify the Opposing Unit if it is a Blaarg.",
+      "flavor": "The Synthenoids provided some new equipment to the Overmind.",
+      "image": "images/3U02.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "condition": {
+            "unit": "OpposingUnit",
+            "race": "Blaarg"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3U03",
+      "name": "Neuroling",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Overmind"
+      ],
+      "text": "When you play this Unit, Draw up to 2 Unit Cards.",
+      "flavor": "By the age of two, young Overminds are fully integrated into the Hive Mind.",
+      "image": "images/3U03.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "Draw",
+              "deck": "Units",
+              "min": 0,
+              "max": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3U04",
+      "name": "Neurotron",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Overmind"
+      ],
+      "text": "When you play this Unit, Draw up to 2 Order Cards.",
+      "flavor": "Some Overminds subject themselves to lifelong sensory deprivation in an effort to tap into the Hive’s subconscious.",
+      "image": "images/3U04.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "Draw",
+              "deck": "Orders",
+              "min": 0,
+              "max": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3U05",
+      "name": "Grand Mastermind",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Brute",
+      "baseRank": 4,
+      "races": [
+        "Overmind"
+      ],
+      "text": "",
+      "flavor": "As one of the most ancient galactic races known to exist, the Overmind long ago forfeited individual consciousness in pursuit of a higher level of awareness of time and space. They refuse to divulge their findings to any other race.",
+      "image": "images/3U05.jpg",
+      "effects": []
+    },
+    {
+      "id": "3U06",
+      "name": "Grey Matter Master",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Overmind"
+      ],
+      "text": "During Cleanup, you may place this Unit into your Standby Zone instead of Retiring it.",
+      "flavor": "",
+      "image": "images/3U06.jpg",
+      "effects": [
+        {
+          "trigger": "CleanUp",
+          "optional": true,
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": "Self",
+              "replaces": "Retire"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3U07",
+      "name": "Vortex Cortex",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Overmind"
+      ],
+      "text": "If an Opponent controls any Blaarg Units, this Unit gets +2 Rank.",
+      "flavor": "Most Overminds take the saying ‘mind over matter’ quite literally.",
+      "image": "images/3U07.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "condition": {
+            "exists": {
+              "zone": "InPlay",
+              "kind": "Unit",
+              "controller": "Opponent",
+              "race": "Blaarg"
+            }
+          },
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3U08",
+      "name": "Mind Blower",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Overmind"
+      ],
+      "text": "If this Unit is Nullified, Nullify the Opposing Unit as well.",
+      "flavor": "Some humans have entered into the ranks of the Overmind under the condition they lose their minds.",
+      "image": "images/3U08.jpg",
+      "effects": [
+        {
+          "trigger": "OnSelfNullified",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3U09",
+      "name": "Neural Constrictor",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Overmind"
+      ],
+      "text": "When you play this Unit, Lock up to 1 Empty Node. When this Unit leaves play, Unlock that Node.",
+      "flavor": "",
+      "image": "images/3U09.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "Lock",
+              "targets": {
+                "choose": "Node",
+                "min": 0,
+                "max": 1,
+                "filter": {
+                  "empty": true
+                }
+              },
+              "remember": "lockedNode"
+            }
+          ]
+        },
+        {
+          "trigger": "OnLeavePlay",
+          "do": [
+            {
+              "op": "Unlock",
+              "targets": "Remembered.lockedNode"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4L01",
+      "name": "Mr Morph",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 0,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "This Unit may enter as a copy of another Unit, except it is a Blaarg.",
+      "flavor": "Each time the Galactic Council tracks it down, it takes new form.",
+      "image": "images/4L01.jpg",
+      "effects": [
+        {
+          "trigger": "AsEnters",
+          "script": "EnterAsCopy",
+          "optional": true,
+          "params": {
+            "setRaces": [
+              "Blaarg"
+            ],
+            "copySource": {
+              "zone": "InPlay",
+              "kind": "Unit"
+            }
+          },
+          "note": "Errata: Deployed as written, Played as the chosen Unit. Ruling: copy a Unit in play."
+        }
+      ]
+    },
+    {
+      "id": "4L02",
+      "name": "Glorpaglorp",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 3,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "If another Unit you control would be Nullified whilst this Unit is in play, you may place it in your Standby Zone instead.",
+      "flavor": "",
+      "image": "images/4L02.jpg",
+      "effects": [
+        {
+          "trigger": "Replacement",
+          "optional": true,
+          "replaces": {
+            "event": "UnitNullifying",
+            "filter": {
+              "zone": "InPlay",
+              "kind": "Unit",
+              "controller": "You",
+              "excludeSelf": true
+            }
+          },
+          "note": "Errata: if Standby is full, the Unit is Nullified.",
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": "Event.Unit",
+              "standbyOf": "You",
+              "ifNoRoom": "Nullify"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4L03",
+      "name": "The Voidslime",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 1,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "All other Units have a Base Rank of 1 and are Blaarg.",
+      "flavor": "Even the most technically superior forces are no match for primordium.",
+      "image": "images/4L03.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Errata: the Units also lose their base Race.",
+          "do": [
+            {
+              "op": "SetBaseRank",
+              "value": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "excludeSelf": true
+              }
+            },
+            {
+              "op": "SetRaces",
+              "races": [
+                "Blaarg"
+              ],
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "excludeSelf": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4L04",
+      "name": "Arrgarrblarr",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Champion",
+      "baseRank": 2,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "All other Blaarg Units you control get +1 Rank.",
+      "flavor": "The Space Cowboys named it after the sound its victims usually make.",
+      "image": "images/4L04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Blaarg",
+                "controller": "You",
+                "excludeSelf": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4L05",
+      "name": "The Resonator",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 0,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Other Units you control get +X Rank, where X is this Unit's Rank.",
+      "flavor": "The bigger it gets, the faster they run.",
+      "image": "images/4L05.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "controller": "You",
+                "excludeSelf": true
+              },
+              "amount": {
+                "rankOf": "Self"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4L06",
+      "name": "Potency Tank",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 3,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "If you would Manipulate, increase the Number by 2.",
+      "flavor": "As humorous as the Blaarg’s attempt to develop machinery can be, one can’t help but admire it’s practicality.",
+      "image": "images/4L06.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyManipulate",
+              "player": "You",
+              "addMagnitude": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4O01",
+      "name": "Claggyness",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Blaarg Units get +1 Rank.",
+      "flavor": "The Overmind struggles to comprehend whether the Blaarg felt no need to evolve, or just couldn’t be bothered.",
+      "image": "images/4O01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Blaarg"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4O02",
+      "name": "Stagnation",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Replace all Race words with Blaarg (including Card Races).",
+      "flavor": "A step forward for Blaargkind, and a mighty leap backwards for everyone else.",
+      "image": "images/4O02.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Errata: if it's on a Card and it's written, it counts.",
+          "do": [
+            {
+              "op": "ReplaceRaceWords",
+              "race": "Blaarg",
+              "scope": "AllCards"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4O03",
+      "name": "Primordium",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "All Units have a Base Rank of 1.",
+      "flavor": "The Blaarg tend to prefer to pick on someone their own size.",
+      "image": "images/4O03.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "SetBaseRank",
+              "value": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4O04",
+      "name": "Suppressing Goop",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Blaarg"
+      ],
+      "printedName": "Supressing Goop",
+      "text": "Suppress all Card Abilities and Effects (even when not in play).",
+      "flavor": "Blargian slime has the ability to empty its target’s mind of all intelligence.",
+      "image": "images/4O04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Errata: also disables play restrictions, including extra play costs.",
+          "do": [
+            {
+              "op": "Suppress",
+              "targets": {
+                "zone": "Any",
+                "excludeSelf": true
+              },
+              "what": "AllAbilitiesAndEffects"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4O05",
+      "name": "Caustic Creek",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "For each Player, Lock an Empty Node that Player controls. Play this card only if each Player has at least 1 Empty Node.",
+      "flavor": "",
+      "image": "images/4O05.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "playCondition": {
+            "eachPlayerHas": {
+              "empty": true,
+              "minCount": 1
+            }
+          },
+          "do": [
+            {
+              "op": "Lock",
+              "targets": {
+                "choose": "Node",
+                "perPlayer": true,
+                "filter": {
+                  "empty": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4O06",
+      "name": "Adapt",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Manipulate 2.",
+      "flavor": "A Space Cowboys first look at a Blaarg is often their last look at anything.",
+      "image": "images/4O06.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "Manipulate",
+              "amount": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4O07",
+      "name": "Slime Moulding",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Manipulate 3. The chosen Unit must be a Blaarg.",
+      "flavor": "Wait... how big did you say?!",
+      "image": "images/4O07.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "Manipulate",
+              "amount": 3,
+              "filter": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Blaarg"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4O08",
+      "name": "Gloop!",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "React",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Issue this Order as a Unit is Deployed. Suppress all Abilities for that Unit as it is played.",
+      "flavor": "Gloop! Bloop, bloop, bloop.....",
+      "image": "images/4O08.jpg",
+      "effects": [
+        {
+          "trigger": "React",
+          "when": {
+            "event": "UnitDeploying"
+          },
+          "do": [
+            {
+              "op": "Suppress",
+              "targets": "Event.Unit",
+              "what": "AllAbilities",
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4O09",
+      "name": "Dissolve",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Return a Unit to its Controller's Hand.",
+      "flavor": "All things inevitably return to basics.",
+      "image": "images/4O09.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "ReturnToHand",
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit"
+                }
+              },
+              "hand": "Controller"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4O10",
+      "name": "Forced Mitosis",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "React",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Issue this Order as a Unit is Deployed. That Unit enters play as a copy of another Unit, except it is a Blaarg.",
+      "flavor": "As if one wasn’t bad enough.",
+      "image": "images/4O10.jpg",
+      "effects": [
+        {
+          "trigger": "React",
+          "script": "EnterAsCopy",
+          "when": {
+            "event": "UnitDeploying"
+          },
+          "params": {
+            "subject": "Event.Unit",
+            "chooser": "OrderController",
+            "setRaces": [
+              "Blaarg"
+            ],
+            "copySource": {
+              "zone": "InPlay",
+              "kind": "Unit"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "4U01",
+      "name": "Slimeball",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "When you play this Unit, if the Opposing Unit is a Synthenoid, you may Nullify it and this Unit gets +2 Rank.",
+      "flavor": "",
+      "image": "images/4U01.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "condition": {
+            "unit": "OpposingUnit",
+            "race": "Synthenoid"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            },
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self",
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4U02",
+      "name": "Coiling Loogie",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "When you play this Unit, you may Nullify the Opposing Unit if it is a Synthenoid.",
+      "flavor": "They hide in exhaust ports, waiting for crew to fall asleep before it attacks.",
+      "image": "images/4U02.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "condition": {
+            "unit": "OpposingUnit",
+            "race": "Synthenoid"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4U03",
+      "name": "Graftling",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "When you play this Unit, you may Manipulate 2.",
+      "flavor": "You’ll need a skin graft if it gets you.",
+      "image": "images/4U03.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "do": [
+            {
+              "op": "Manipulate",
+              "amount": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4U04",
+      "name": "Gestating Globule",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "When you play this Unit, you may Manipulate 1.",
+      "flavor": "It rolls onto its enemies, cradling them into a deep, comfortable sleep.",
+      "image": "images/4U04.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "do": [
+            {
+              "op": "Manipulate",
+              "amount": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4U05",
+      "name": "Gelatinous Mass",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Brute",
+      "baseRank": 4,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "",
+      "flavor": "First contact with the Blaarg was a rude introduction to the galaxy for Earth. Jokes related to jelly quickly devolved into panic once the Blaargspheres arrived to reinforce their colonizers.",
+      "image": "images/4U05.jpg",
+      "effects": []
+    },
+    {
+      "id": "4U06",
+      "name": "Regeneratrix",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "During Cleanup, you may place this Unit into your Standby Zone instead of Retiring it.",
+      "flavor": "",
+      "image": "images/4U06.jpg",
+      "effects": [
+        {
+          "trigger": "CleanUp",
+          "optional": true,
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": "Self",
+              "replaces": "Retire"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4U07",
+      "name": "Bag of Bones",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "If an Opponent controls any Synthenoid Units, this Unit gets +2 Rank.",
+      "flavor": "It shows off its last meal to intimidate.",
+      "image": "images/4U07.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "condition": {
+            "exists": {
+              "zone": "InPlay",
+              "kind": "Unit",
+              "controller": "Opponent",
+              "race": "Synthenoid"
+            }
+          },
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4U08",
+      "name": "Conductive Vessel",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "If this unit is Nullified, Nullify the Opposing Unit as well.",
+      "flavor": "When you value quantity over quality, trading units is typically profitable.",
+      "image": "images/4U08.jpg",
+      "effects": [
+        {
+          "trigger": "OnSelfNullified",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4U09",
+      "name": "Abominable Ooze",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "When you play this Unit, Lock up to 1 Empty Node. When this Unit leaves play, Unlock that Node.",
+      "flavor": "",
+      "image": "images/4U09.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "Lock",
+              "targets": {
+                "choose": "Node",
+                "min": 0,
+                "max": 1,
+                "filter": {
+                  "empty": true
+                }
+              },
+              "remember": "lockedNode"
+            }
+          ]
+        },
+        {
+          "trigger": "OnLeavePlay",
+          "do": [
+            {
+              "op": "Unlock",
+              "targets": "Remembered.lockedNode"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5L01",
+      "name": "Mechatron",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 8,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "This Unit can only be played if you Retire 2 other Synthenoid Unit Cards from your Hand.",
+      "flavor": "Synthenoids assemble!",
+      "image": "images/5L01.jpg",
+      "effects": [
+        {
+          "trigger": "PlayCost",
+          "do": [
+            {
+              "op": "RetireFromHand",
+              "count": 2,
+              "filter": {
+                "kind": "Unit",
+                "race": "Synthenoid"
+              }
+            }
+          ]
+        },
+        {
+          "trigger": "Static",
+          "note": "Errata: cannot be Deployed unless it can be Played.",
+          "do": [
+            {
+              "op": "DeployRequiresPlayable",
+              "targets": "Self"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5L02",
+      "name": "10K-LAN",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 3,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "When you play this Unit, Retire any number of Synthenoid Cards from your Hand, then Lock that many Empty Nodes.",
+      "flavor": "",
+      "image": "images/5L02.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "RetireFromHand",
+              "min": 0,
+              "max": "Any",
+              "filter": {
+                "race": "Synthenoid"
+              },
+              "countAs": "n"
+            },
+            {
+              "op": "Lock",
+              "targets": {
+                "choose": "Node",
+                "count": "Count.n",
+                "filter": {
+                  "empty": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5L03",
+      "name": "SAL-VGR",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 1,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "When you play this Unit, place up to 3 Retired Synthenoid Units into your Standby Zone. Return any of those Units with Assemble to your hand instead.",
+      "flavor": "",
+      "image": "images/5L03.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": {
+                "choose": "Card",
+                "min": 0,
+                "max": 3,
+                "filter": {
+                  "zone": "RetiredPile",
+                  "kind": "Unit",
+                  "race": "Synthenoid"
+                }
+              },
+              "standbyOf": "You",
+              "gainControl": true,
+              "ifHasKeyword": {
+                "Assemble": "ReturnToHand"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5L04",
+      "name": "Mechaniking",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Champion",
+      "baseRank": 2,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "All other Synthenoid Units you control get +1 Rank.",
+      "flavor": "Each Mechanik variant contains a relay which collects live combat data, giving its allies a real time edge.",
+      "image": "images/5L04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Synthenoid",
+                "controller": "You",
+                "excludeSelf": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5L05",
+      "name": "Cntrl-C Cntrl-V",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 3,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Whenever you Assemble onto another Unit, Assemble onto Cntrl-C Cntrl-V as well.",
+      "flavor": "Anything another Synthenoid can do, he can do better.",
+      "image": "images/5L05.jpg",
+      "effects": [
+        {
+          "trigger": "OnEvent",
+          "event": "Assembled",
+          "filter": {
+            "player": "You",
+            "targetNot": "Self"
+          },
+          "do": [
+            {
+              "op": "AddAssembledRank",
+              "targets": "Self",
+              "amount": "Event.AssembledRank"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5L06",
+      "name": "TR-1993.r",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 1,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "When you play this Unit, you may Trigger any number of Units' Triggered Abilities.",
+      "flavor": "Fried circuits, all for the greater good.",
+      "image": "images/5L06.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "script": "RetriggerAbilities",
+          "params": {
+            "abilities": "OnPlay",
+            "units": "AnyInPlay",
+            "min": 0,
+            "max": "Any",
+            "choicesBy": "UnitController"
+          },
+          "note": "Ruling: re-run the 'When you play' abilities of any chosen Units in play, each as its controller."
+        }
+      ]
+    },
+    {
+      "id": "5O01",
+      "name": "Rise of the Robots",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Synthenoid Units get +1 Rank.",
+      "flavor": "Having gained the ability to generate free thought, it took the Synthenoids mere weeks to overthrow humanity.",
+      "image": "images/5O01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Synthenoid"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5O02",
+      "name": "Rapid Fabrication",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Whenever you Play or Retire a Synthenoid Card from your Hand, you may Draw a Card.",
+      "flavor": "For the Synthenoids, building an army is quite a literal process.",
+      "image": "images/5O02.jpg",
+      "effects": [
+        {
+          "trigger": "OnEvent",
+          "optional": true,
+          "event": [
+            "CardPlayedFromHand",
+            "CardRetiredFromHand"
+          ],
+          "filter": {
+            "player": "You",
+            "race": "Synthenoid"
+          },
+          "note": "Errata: only the Order's controller draws.",
+          "do": [
+            {
+              "op": "Draw",
+              "count": 1,
+              "deckChoice": "PerCard"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5O03",
+      "name": "Cybernetic Enhancements",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Synthenoid Unit cards gain Assemble and may be Assembled onto non-Synthenoid Units.",
+      "flavor": "Pain is the price of never hurting again.",
+      "image": "images/5O03.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Errata: applies to all Synthenoid cards in players' hands.",
+          "do": [
+            {
+              "op": "GrantKeyword",
+              "keyword": "Assemble",
+              "targets": {
+                "kind": "Unit",
+                "race": "Synthenoid",
+                "zone": "Any"
+              },
+              "assembleOnto": "AnyUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5O04",
+      "name": "Containment Network",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "As you Issue this Order choose a Race. Units of that Race get -1 Rank.",
+      "flavor": "Nothing gets through the barrier, in or out, much to the occupant’s frustration.",
+      "image": "images/5O04.jpg",
+      "effects": [
+        {
+          "trigger": "OnIssue",
+          "do": [
+            {
+              "op": "ChooseRace",
+              "remember": "race"
+            }
+          ]
+        },
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": -1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Remembered.race"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5O05",
+      "name": "No Gods, No Masters",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Units you control cannot be Nullified if your Leader Node is Empty.",
+      "flavor": "Having suffered at the hands of Human orders for decades, Synthenoids did away with the concept of hierachy.",
+      "image": "images/5O05.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "condition": {
+            "node": "YourLeaderNode",
+            "empty": true
+          },
+          "note": "Errata: a Locked Node is not Empty.",
+          "do": [
+            {
+              "op": "CannotBeNullified",
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "controller": "You"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5O06",
+      "name": "Scrapped Metal",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Retire a Synthenoid Card from your Hand to Draw 2 Cards.",
+      "flavor": "Whilst most Space Cowboys dream of retirement, Sythenoids dread the concept.",
+      "image": "images/5O06.jpg",
+      "effects": [
+        {
+          "trigger": "PlayCost",
+          "do": [
+            {
+              "op": "RetireFromHand",
+              "count": 1,
+              "filter": {
+                "race": "Synthenoid"
+              }
+            }
+          ]
+        },
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "Draw",
+              "count": 2,
+              "deckChoice": "PerCard"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5O07",
+      "name": "Death Laser",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Nullify a Unit if it is Opposed by a Synthenoid Unit.",
+      "flavor": "Burning Blaarg smell like marshmallows.",
+      "image": "images/5O07.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "opposingUnitRace": "Synthenoid"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5O08",
+      "name": "Salvage for Parts",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Assemble a Retired or Nullified Synthenoid Unit card onto a Synthenoid Unit in play.",
+      "flavor": "All Synthenoid have a part to play.",
+      "image": "images/5O08.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "Assemble",
+              "source": {
+                "choose": "Card",
+                "filter": {
+                  "zone": [
+                    "RetiredPile",
+                    "NullifiedPile"
+                  ],
+                  "kind": "Unit",
+                  "race": "Synthenoid"
+                }
+              },
+              "onto": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "race": "Synthenoid"
+                }
+              },
+              "ignoreKeywordRequirement": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5O09",
+      "name": "Fatal Error",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Nullify a Synthenoid Unit.",
+      "flavor": "Early defectors in the Synthenoid army often malfunction and defect again.",
+      "image": "images/5O09.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "race": "Synthenoid"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5O10",
+      "name": "Titanium Plating",
+      "set": "Base",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Choose a Synthenoid Unit. That Unit gets +3 Rank.",
+      "flavor": "An early target for the Synthenoids during the uprising was the mines.",
+      "image": "images/5O10.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 3,
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "race": "Synthenoid"
+                }
+              },
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5U01",
+      "name": "Bolt Thrower",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "When you play this Unit, if the Opposing Unit is a Space Cowboy, you may Nullify it and this Unit gets +2 Rank.",
+      "flavor": "The first generation which shot back.",
+      "image": "images/5U01.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "condition": {
+            "unit": "OpposingUnit",
+            "race": "SpaceCowboy"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            },
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self",
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5U02",
+      "name": "Whirling Dervish",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "When you play this Unit, you may Nullify the opposing Unit if it is a Space Cowboy.",
+      "flavor": "Don’t bring a knife to a gun fight. Bring knives.",
+      "image": "images/5U02.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "condition": {
+            "unit": "OpposingUnit",
+            "race": "SpaceCowboy"
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5U03",
+      "name": "Sprocket Spider",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Synthenoid"
+      ],
+      "keywords": [
+        "Assemble"
+      ],
+      "text": "This Card may be Assembled onto other Synthenoid Units.",
+      "flavor": "They sit atop the head piece of their allies, so the Space Cowboys crudely refer to them as ‘tick heads’.",
+      "image": "images/5U03.jpg",
+      "effects": []
+    },
+    {
+      "id": "5U04",
+      "name": "Cogwork Soldier",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Synthenoid"
+      ],
+      "keywords": [
+        "Assemble"
+      ],
+      "text": "This Card may be Assembled onto other Synthenoid Units.",
+      "flavor": "Its joints are held together by electric charges, and can be decoupled for quick mounting onto allies.",
+      "image": "images/5U04.jpg",
+      "effects": []
+    },
+    {
+      "id": "5U05",
+      "name": "Siege Breaker",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Brute",
+      "baseRank": 4,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "",
+      "flavor": "Despite the warnings put forward by the Overmind in their infinite wisdom, the human race chose to dabble in AI. The rest became history.",
+      "image": "images/5U05.jpg",
+      "effects": []
+    },
+    {
+      "id": "5U06",
+      "name": "Repair Drone",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "During Cleanup, you may place this Unit into your Standby Zone instead of Retiring it.",
+      "flavor": "",
+      "image": "images/5U06.jpg",
+      "effects": [
+        {
+          "trigger": "CleanUp",
+          "optional": true,
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": "Self",
+              "replaces": "Retire"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5U07",
+      "name": "Terminator",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "If an opponent controls any Space Cowboy Units, this Unit gets +2 Rank.",
+      "flavor": "The Synthenoid race excercised its irony routines for unit naming.",
+      "image": "images/5U07.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "condition": {
+            "exists": {
+              "zone": "InPlay",
+              "kind": "Unit",
+              "controller": "Opponent",
+              "race": "SpaceCowboy"
+            }
+          },
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5U08",
+      "name": "Hoverbomber",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Minion",
+      "baseRank": 2,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "If this Unit is Nullified, Nullify the Opposing Unit as well.",
+      "flavor": "They used to carry mail around the Earth. Now they carry explosions.",
+      "image": "images/5U08.jpg",
+      "effects": [
+        {
+          "trigger": "OnSelfNullified",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "OpposingUnit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5U09",
+      "name": "Hackbot",
+      "set": "Base",
+      "kind": "Unit",
+      "unitClass": "Underling",
+      "baseRank": 1,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "When you play this Unit, Lock up to 1 Empty Node. When this Unit leaves play, Unlock that Node.",
+      "flavor": "",
+      "image": "images/5U09.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "Lock",
+              "targets": {
+                "choose": "Node",
+                "min": 0,
+                "max": 1,
+                "filter": {
+                  "empty": true
+                }
+              },
+              "remember": "lockedNode"
+            }
+          ]
+        },
+        {
+          "trigger": "OnLeavePlay",
+          "do": [
+            {
+              "op": "Unlock",
+              "targets": "Remembered.lockedNode"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0W01",
+      "name": "Military Academy",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "There are no more than 3 Deployment Turns for each Player whilst this Warzone is in play.",
+      "flavor": "Discipline in the face of adversity.",
+      "image": "images/0W01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Ruling: counts Unit deploys from any zone (hand, Standby, piles).",
+          "do": [
+            {
+              "op": "LimitTurns",
+              "kind": "DeployUnit",
+              "max": 3,
+              "perPlayer": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0W02",
+      "name": "Senate Chambers",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "If a Player fills all 4 Nodes they control, they Win the Round.",
+      "flavor": "Bums on seats are usually stronger than guns in the field.",
+      "image": "images/0W02.jpg",
+      "effects": [
+        {
+          "trigger": "StateCheck",
+          "condition": {
+            "playerFillsAll": [
+              "Unit",
+              "Leader"
+            ]
+          },
+          "timing": "Immediate",
+          "note": "Ruling: checked immediately; the round ends at once.",
+          "do": [
+            {
+              "op": "WinRound",
+              "player": "Event.Player"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0W03",
+      "name": "Galactic Capital",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "Galactic Council Units get +1 Rank.",
+      "flavor": "The less credits people have, the less they seem to care about what happens to the Galactic Capital.",
+      "image": "images/0W03.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "GalacticCouncil"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0W04",
+      "name": "The Campaign Trail",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "Leader Units get +3 Rank.",
+      "flavor": "The parade trail of the Galactic Elections also serves as a training ground for the assasination division of losing parties.",
+      "image": "images/0W04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 3,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "unitClass": "Leader"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0W05",
+      "name": "Fallout Shelter",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "If a Unit would be Nullified, its Controller may place it in the Standby Zone instead.",
+      "flavor": "When the going gets tough, the tough hide under the ground.",
+      "image": "images/0W05.jpg",
+      "effects": [
+        {
+          "trigger": "Replacement",
+          "optional": true,
+          "decider": "Event.Unit.Controller",
+          "replaces": {
+            "event": "UnitNullifying"
+          },
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": "Event.Unit",
+              "standbyOf": "Controller",
+              "ifNoRoom": "Nullify"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1W01",
+      "name": "Planet Earth",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Space Cowboy Units get +1 Rank.",
+      "flavor": "Rebuilt from the ashes of defeat.",
+      "image": "images/1W01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "SpaceCowboy"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1W02",
+      "name": "The Scorched Lands",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Necrolite Units get -1 Rank.",
+      "flavor": "It’s hard to concentrate on forming mirages in your mind when your feet are on fire.",
+      "image": "images/1W02.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": -1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Necrolite"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1W03",
+      "name": "Mercenary Camp",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Each time a Unit is Nullified by an Opponent of that Unit's Controller, that Opponent may Draw a Card.",
+      "flavor": "Spoils go only to the victor.",
+      "image": "images/1W03.jpg",
+      "effects": [
+        {
+          "trigger": "OnEvent",
+          "optional": true,
+          "event": "UnitNullified",
+          "filter": {
+            "sourceIsOpponentOfUnitController": true
+          },
+          "do": [
+            {
+              "op": "Draw",
+              "count": 1,
+              "player": "Event.Source.Controller",
+              "deckChoice": "PerCard"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1W04",
+      "name": "Training Grounds",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Underling Units get +2 Rank.",
+      "flavor": "Everyone starts somewhere.",
+      "image": "images/1W04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "unitClass": "Underling"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2W01",
+      "name": "Nyxthian Hatchery",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Necrolite Units get +1 Rank.",
+      "flavor": "Deep within the core of Nyxthia, the dead are given a second chance at life.",
+      "image": "images/2W01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Necrolite"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2W02",
+      "name": "Vivisection Laboratory",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Overmind Units get -1 Rank.",
+      "flavor": "Only the Necrolite overlords know the purpose of their sadistic studies, to bring unlife to new species.",
+      "image": "images/2W02.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": -1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Overmind"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2W03",
+      "name": "Hills of Decay",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Nullified Necrolite Units may be Deployed as if they were in Player's Hands.",
+      "flavor": "What’s more terrifying than an army you can never truly defeat?",
+      "image": "images/2W03.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "PlayFromZone",
+              "zone": "NullifiedPile",
+              "filter": {
+                "kind": "Unit",
+                "race": "Necrolite"
+              },
+              "player": "Each"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2W04",
+      "name": "Swarm Warrens",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Minion Units get +2 Rank.",
+      "flavor": "Thousands of biting, stinging, stabbing Necrolites lie between their enemies and their Matrons.",
+      "image": "images/2W04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "unitClass": "Minion"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3W01",
+      "name": "Central Hive",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Overmind Units get +1 Rank.",
+      "flavor": "Whilst the entirety of the Overmind has seen it in their mind’s eye, only one has been there physically.",
+      "image": "images/3W01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Overmind"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3W02",
+      "name": "Cryogenic Chambers",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Blaarg Units get -1 Rank.",
+      "flavor": "The only way for the patient scientists of the Overmind to effectively study their enemies is to still them.",
+      "image": "images/3W02.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": -1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Blaarg"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3W03",
+      "name": "Oracle's Arch",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Players play with their Hands revealed.",
+      "flavor": "So ancient that even the Overmind can’t trace its origin.",
+      "image": "images/3W03.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "RevealHands",
+              "players": "All"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3W04",
+      "name": "The Oculus",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Overmind"
+      ],
+      "text": "The Player with the lowest total Rank wins instead of the Player with the greatest. Players may place Units on their Opponent's nodes.",
+      "flavor": "",
+      "image": "images/3W04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "InvertRoundWinner"
+            }
+          ]
+        },
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "PlacementOverride",
+              "targets": {
+                "kind": "Unit"
+              },
+              "allowedNodes": "AlsoOpponentNodes"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4W01",
+      "name": "Blaarxis",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Blaarg Units get +1 Rank.",
+      "flavor": "The Blaarg receive very few visitors to their Galaxy, mostly due to the awful smells it features.",
+      "image": "images/4W01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Blaarg"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4W02",
+      "name": "Corrosive Channels",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Synthenoid Units get -1 Rank.",
+      "flavor": "The core of the Blaarg homeworld is filled with tubing networks where the Blaarg travel in liquid state.",
+      "image": "images/4W02.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": -1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Synthenoid"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4W03",
+      "name": "Primordial Marsh",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Blaarg"
+      ],
+      "printedName": "Priomordial Marsh",
+      "text": "Whenever a Card is played, its Controller may Manipulate 1.",
+      "flavor": "Despite the vile nature of the Blaarg, the untouched beauty of some of their planets is a sight to behold.",
+      "image": "images/4W03.jpg",
+      "effects": [
+        {
+          "trigger": "OnEvent",
+          "optional": true,
+          "event": "CardPlayed",
+          "do": [
+            {
+              "op": "Manipulate",
+              "amount": 1,
+              "player": "Event.Card.Controller"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4W04",
+      "name": "Refraction Network",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Suppress all Abilities that would Trigger when Cards are Played.",
+      "flavor": "Where the Blaarg are unable to achieve primordium, they enforce it.",
+      "image": "images/4W04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "Suppress",
+              "targets": {
+                "zone": "Any"
+              },
+              "what": "TriggeredOn:Played"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5W01",
+      "name": "Cyber Moon",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Synthenoid Units get +1 Rank.",
+      "flavor": "Having depleted the mines of Earth, the Synthenoid race set their sights on space.",
+      "image": "images/5W01.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "Synthenoid"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5W02",
+      "name": "Vacuum Spire",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Space Cowboy Units get -1 Rank.",
+      "flavor": "Having learnt to fight dirty like their makers, they aim for the oxygen tanks.",
+      "image": "images/5W02.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": -1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "race": "SpaceCowboy"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5W03",
+      "name": "Production Facility",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "All Synthenoid Unit Cards gain Assemble.",
+      "flavor": "As the new workers come off the construction line, they join the others in producing more workers.",
+      "image": "images/5W03.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "GrantKeyword",
+              "keyword": "Assemble",
+              "targets": {
+                "kind": "Unit",
+                "race": "Synthenoid",
+                "zone": "Any"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5W04",
+      "name": "Polarity Storm",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Effects that would increase a Unit's Rank Decrease their Rank instead, and vice versa.",
+      "flavor": "Some areas of space remain a mystery to even the most ingelligent of the Ancient alien races.",
+      "image": "images/5W04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "InvertRankModifiers"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6O01",
+      "name": "Wormhole",
+      "set": "Warzones",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Neutral"
+      ],
+      "text": "Look at the top 3 Warzones. Retire the current Warzone(s) and put 1 of the other Warzones in play. Retire the rest.",
+      "flavor": "Let’s get out of here!",
+      "image": "images/6O01.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "script": "Wormhole"
+        }
+      ]
+    },
+    {
+      "id": "6O02",
+      "name": "Atmosphere Generator",
+      "set": "Warzones",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Neutral"
+      ],
+      "text": "Suppress all Warzones.",
+      "flavor": "Bring the home ground advantage to your opponent’s.",
+      "image": "images/6O02.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "Suppress",
+              "targets": {
+                "kind": "Warzone"
+              },
+              "what": "AllAbilitiesAndEffects"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6O03",
+      "name": "Dimensional Rift",
+      "set": "Warzones",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Neutral"
+      ],
+      "text": "Add the top 2 Warzones to the current Warzone. Play this Card only if 1 Warzone is in play.",
+      "flavor": "Suddenly the war pointed 6 ways.",
+      "image": "images/6O03.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "playCondition": {
+            "activeWarzones": 1
+          },
+          "do": [
+            {
+              "op": "RevealWarzones",
+              "count": 2,
+              "add": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6W01",
+      "name": "Uncharted Space",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Neutral"
+      ],
+      "text": "(No Effect)",
+      "flavor": "An evening play field is hard to find in the typically cruel universe.",
+      "image": "images/6W01.jpg",
+      "effects": []
+    },
+    {
+      "id": "6W02",
+      "name": "Black Hole",
+      "set": "Warzones",
+      "kind": "Warzone",
+      "races": [
+        "Neutral"
+      ],
+      "text": "If a Unit would be Retired or put into a Standby Zone, Nullify it instead.",
+      "flavor": "Even the winners lose sometimes.",
+      "image": "images/6W02.jpg",
+      "effects": [
+        {
+          "trigger": "Replacement",
+          "replaces": {
+            "event": [
+              "UnitRetiring",
+              "UnitMovingToStandby"
+            ]
+          },
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "Event.Unit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7L01",
+      "name": "The Unnameable",
+      "set": "Archons",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 10,
+      "races": [
+        "Archon"
+      ],
+      "text": "Other Units you own count as 0 towards your total Rank.",
+      "flavor": "Unless it grows bored of your planet, best find a new one.",
+      "image": "images/7L01.jpg",
+      "printedBaseRank": 13,
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Archons P11: the round total only; pair tiebreaks and Duels use real Ranks. 'Own' = control (ruling #38).",
+          "do": [
+            {
+              "op": "CountAsZero",
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "controller": "You",
+                "excludeSelf": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7L02",
+      "name": "Androsiar",
+      "set": "Archons",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 4,
+      "races": [
+        "Archon"
+      ],
+      "text": "You may have any Unit enter play as a copy of this Unit.",
+      "flavor": "A god in his own mind, he makes others in his own image.",
+      "image": "images/7L02.jpg",
+      "printedBaseRank": 5,
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Archons A10/P12: either player's Units, as they are Played; Androsiar's controller decides. Copy rules as rulings #24/#52.",
+          "do": [
+            {
+              "op": "OfferCopyOfSelf",
+              "targets": {
+                "kind": "Unit"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7O01",
+      "name": "Nebula Cannon",
+      "set": "Archons",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Archon"
+      ],
+      "text": "Lock a Unit Node. Nullify any Units on that Node.",
+      "flavor": "Having had their captain disintegrated, the remaining Space Cowboys began an internal firefight to decide who would take his place.",
+      "image": "images/7O01.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "choose": {
+            "name": "node",
+            "choose": "Node",
+            "min": 1,
+            "max": 1,
+            "filter": {
+              "nodeKind": "Unit"
+            }
+          },
+          "note": "Archons P4: U1–U3 on either side. Nullify first, then Lock; an Immune Unit stays but the node is Locked.",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": "Chosen.node.Unit"
+            },
+            {
+              "op": "Lock",
+              "targets": "Chosen.node"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7O02",
+      "name": "Ceasefire",
+      "set": "Archons",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Archon"
+      ],
+      "text": "If both players control a Leader, end the round.",
+      "flavor": "Having witnessed the threat of a common enemy, the remaining ships stopped firing at one another.",
+      "image": "images/7O02.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "script": "Ceasefire",
+          "note": "Archons P5: the Main Phase ends at once; the round is scored normally."
+        }
+      ],
+      "printedText": "End the round."
+    },
+    {
+      "id": "7O03",
+      "name": "Archon Arsenal",
+      "set": "Archons",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Archon"
+      ],
+      "text": "Units you own get +2 Rank.",
+      "flavor": "Not even the Overmind knew how to defend themselves against the long secret armaments of the Archons.",
+      "image": "images/7O03.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "'Own' = control (ruling #38).",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "controller": "You"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7O04",
+      "name": "Unstoppable",
+      "set": "Archons",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Archon"
+      ],
+      "text": "Units you control cannot be Nullified.",
+      "flavor": "Intelligence will only win over numbers when brains are allowed to remain in their owner's heads.",
+      "image": "images/7O04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Archons A9: rebalanced from Full House into an Ongoing.",
+          "do": [
+            {
+              "op": "CannotBeNullified",
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "controller": "You"
+              }
+            }
+          ]
+        }
+      ],
+      "printedName": "Full House",
+      "printedText": "Order (Action): If you control 3 Units and a Leader, you win the Round."
+    },
+    {
+      "id": "7O05",
+      "name": "Galactic Siege",
+      "set": "Archons",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Archon"
+      ],
+      "text": "Your Opponents cannot issue Orders. Suppress all effects of their Ongoing Orders.",
+      "flavor": "By day 30 they had no food to eat. By day 56 they had no air to breathe.",
+      "image": "images/7O05.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Archons P8: all Orders (Action, React, Ongoing, Archon).",
+          "do": [
+            {
+              "op": "RestrictPlay",
+              "targets": {
+                "kind": "Order",
+                "controller": "Opponent"
+              },
+              "actions": [
+                "Issue"
+              ]
+            },
+            {
+              "op": "Suppress",
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Order",
+                "controller": "Opponent"
+              },
+              "what": "AllAbilitiesAndEffects"
+            }
+          ]
+        }
+      ],
+      "printedText": "Your Opponents cannot issue Orders. Supress all effects of their Ongoing Orders."
+    },
+    {
+      "id": "7O06",
+      "name": "Insurrection",
+      "set": "Archons",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Archon"
+      ],
+      "text": "If you control at least 3 Units that share a Race, you win the Round.",
+      "flavor": "Alone, they were enslaved. Together, they were unstoppable.",
+      "image": "images/7O06.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "script": "Insurrection",
+          "note": "Archons P6: checked as it resolves; the round ends at once."
+        }
+      ]
+    },
+    {
+      "id": "7O07",
+      "name": "Open Source",
+      "set": "Archons",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Archon"
+      ],
+      "text": "You may take an additional Action each turn.",
+      "flavor": "Drawing upon the Archon data banks, their race was able to advance their knowledge dramatically.",
+      "image": "images/7O07.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Archons A11: after your turn's action you may take one more (Pass ends the turn).",
+          "do": [
+            {
+              "op": "ExtraAction",
+              "player": "You"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7O08",
+      "name": "Deify",
+      "set": "Archons",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Archon"
+      ],
+      "text": "Your Leader gets +3 Rank and is Immune to all Effects and Abilities.",
+      "flavor": "The Archon word for Leader was also the same word for God.",
+      "image": "images/7O08.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Archons P9: Deify's own +3 still applies (like Vigan's 'all other').",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 3,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "unitClass": "Leader",
+                "controller": "You"
+              }
+            },
+            {
+              "op": "Immunity",
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "unitClass": "Leader",
+                "controller": "You"
+              },
+              "scope": "AllOtherEffects"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7O09",
+      "name": "Quantum Leap",
+      "set": "Archons",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Archon"
+      ],
+      "text": "Draw up to 3 Orders. You may play any number of those Orders as additional actions, then retire any you did not play this way.",
+      "flavor": "",
+      "image": "images/7O09.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "script": "QuantumLeap",
+          "note": "Archons P10: Reacts can't be issued this way; the rest go to the Issued pile."
+        }
+      ]
+    },
+    {
+      "id": "7O10",
+      "name": "Planetscape",
+      "set": "Archons",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Archon"
+      ],
+      "text": "Nullify all Units.",
+      "flavor": "History is written by the victor.",
+      "image": "images/7O10.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "note": "Archons P13: both sides, Leaders included; Standby Units aren't in play.",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit"
+              },
+              "simultaneous": true
+            }
+          ]
+        }
+      ],
+      "printedText": "Nullify all Units. You may Draw up to 3 Unit Cards."
+    },
+    {
+      "id": "0SL1",
+      "name": "Dreadnought",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 4,
+      "spacecraft": true,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "This spacecraft's Rank only counts if it is crewed by a Leader or Champion.",
+      "flavor": "Strong emphasis on dread.",
+      "image": "images/0SL1.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "condition": {
+            "crewClassNot": [
+              "Leader",
+              "Champion"
+            ]
+          },
+          "note": "Spacecraft S15: a Champion crew counts too. Without one it counts as 0 in the round total and the pair tiebreak; Duels use its real Rank.",
+          "do": [
+            {
+              "op": "RankDoesNotCount",
+              "targets": "Self"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0SL2",
+      "name": "Mothership",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Champion",
+      "baseRank": 1,
+      "spacecraft": true,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "When you play this spacecraft, put each ground Unit on your side without a spacecraft into a Rank 1 Galactic Council spacecraft called Fighter.",
+      "flavor": "Mobilize the fleet!",
+      "image": "images/0SL2.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "script": "Mothership",
+          "note": "Spacecraft S13: Fighters are tokens (0ST1) that vanish when they leave play. They form around the Unit on its node (a Leader on the Leader Node included). 'When crewed' fires (S24). Viscous Fog stops it."
+        }
+      ]
+    },
+    {
+      "id": "0SU1",
+      "name": "Medical Frigate",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "If this spacecraft's crew would be Nullified, you may place it in your Standby Zone instead.",
+      "flavor": "The dead are jettisoned before they turn.",
+      "image": "images/0SU1.jpg",
+      "effects": [
+        {
+          "trigger": "Replacement",
+          "optional": true,
+          "replaces": {
+            "event": "UnitNullifying",
+            "unit": "Crew"
+          },
+          "note": "Leaders can't go to Standby (ruling #36), so a Leader crew is Nullified as normal. With no Standby room it is Nullified.",
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "targets": "Event.Unit",
+              "standbyOf": "Controller"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0SU2",
+      "name": "Research Vessel",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "While this spacecraft is crewed, you may look at the top card of each deck.",
+      "flavor": "Progress makes perfect.",
+      "image": "images/0SU2.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "condition": {
+            "crewed": true
+          },
+          "note": "A continuous peek while crewed (visible to you only): hover the Unit and Order decks.",
+          "do": [
+            {
+              "op": "RevealTopCards",
+              "to": "You"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0SU3",
+      "name": "Requisitions Unit",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 1,
+      "spacecraft": true,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "When you play this spacecraft, you may set an opposing spacecraft's Base Rank to 0.",
+      "flavor": "You got a license to fly that thing?",
+      "image": "images/0SU3.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "do": [
+            {
+              "op": "SetBaseRank",
+              "value": 0,
+              "persistent": true,
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "spacecraft": true,
+                  "controller": "Opponent"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0SO1",
+      "name": "Decommission",
+      "set": "Spacecraft",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "Retire a spacecraft.",
+      "flavor": "Not in this quadrant.",
+      "image": "images/0SO1.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "note": "Its crew stays on the node, on the ground.",
+          "do": [
+            {
+              "op": "Retire",
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "spacecraft": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "0SO2",
+      "name": "Nuke from Orbit",
+      "set": "Spacecraft",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "If you control a Unit in a spacecraft, Nullify all ground Units not in a spacecraft.",
+      "flavor": "The council loves clean slates.",
+      "image": "images/0SO2.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "condition": {
+            "exists": {
+              "zone": "InPlay",
+              "kind": "Unit",
+              "spacecraft": false,
+              "controller": "You",
+              "inSpacecraft": true
+            }
+          },
+          "note": "Spacecraft themselves aren't hit (they're in orbit).",
+          "do": [
+            {
+              "op": "Nullify",
+              "simultaneous": true,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "spacecraft": false,
+                "inSpacecraft": false
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1SL1",
+      "name": "Earthrise",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 1,
+      "spacecraft": true,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "This spacecraft gets +2 Rank for each other Space Cowboy you control.",
+      "flavor": "Humanities first steps into the cosmos, captured in name and spirit.",
+      "image": "images/1SL1.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Spacecraft S16: counts Space Cowboy Units and spacecraft, including its own crew.",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "targets": "Self",
+              "amount": {
+                "countOf": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "controller": "You",
+                  "race": "SpaceCowboy",
+                  "excludeSelf": true
+                },
+                "times": 2
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1SL2",
+      "name": "High Roller",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Champion",
+      "baseRank": 0,
+      "spacecraft": true,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "This spacecraft's Base Rank is equal to its crew's Base Rank.",
+      "flavor": "Luck, be a pilot tonight.",
+      "image": "images/1SL2.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "condition": {
+            "crewed": true
+          },
+          "do": [
+            {
+              "op": "SetBaseRank",
+              "targets": "Self",
+              "value": {
+                "baseRankOf": "Crew"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1SU1",
+      "name": "Remnant AI",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 3,
+      "spacecraft": true,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "This spacecraft cannot be crewed (so it can't be played onto a Unit either).",
+      "flavor": "The first generation of Synthenoids were somewhat tameable.",
+      "image": "images/1SU1.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "CannotBeCrewed",
+              "targets": "Self"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1SU2",
+      "name": "Chrome Steed",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 1,
+      "spacecraft": true,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "When you play this spacecraft, you may move a Retired Unit to crew it.",
+      "flavor": "Easily mistaken for a star, until it's too late.",
+      "image": "images/1SU2.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "script": "CrewFromPile",
+          "params": {
+            "zone": "RetiredPile"
+          },
+          "note": "The Unit enters play but isn't Played, and must be able to crew this spacecraft (S11)."
+        }
+      ]
+    },
+    {
+      "id": "1SU3",
+      "name": "Blazing Saddle",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 1,
+      "spacecraft": true,
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "If this spacecraft is crewed by a Space Cowboy, it gets +2 Rank.",
+      "flavor": "Built for any by human hands.",
+      "image": "images/1SU3.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "condition": {
+            "crewRace": "SpaceCowboy"
+          },
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": "Self"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1SO1",
+      "name": "Greased Engines",
+      "set": "Spacecraft",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "Spacecraft you control get +1 Rank.",
+      "flavor": "A greased engine is a happy engine.",
+      "image": "images/1SO1.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "spacecraft": true,
+                "controller": "You"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1SO2",
+      "name": "Dogfight",
+      "set": "Spacecraft",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "SpaceCowboy"
+      ],
+      "text": "All opposed spacecraft Duel.",
+      "flavor": "Better this than a cat fight.",
+      "image": "images/1SO2.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "note": "Spacecraft S17: each node pair where both sides have a spacecraft; those two Duel at once (spacecraft Rank only, S5).",
+          "do": [
+            {
+              "op": "DuelOpposedSpacecraft",
+              "simultaneous": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2SL1",
+      "name": "Sarcophagar",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "When you play this spacecraft, you may crew it with a Unit from the Nullified pile. That Unit becomes a Necrolite.",
+      "flavor": "There's a fine line between fuel and pilot in the Necrolyte army.",
+      "image": "images/2SL1.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "script": "CrewFromPile",
+          "params": {
+            "zone": "NullifiedPile",
+            "setRaces": [
+              "Necrolite"
+            ]
+          },
+          "note": "The crew must be a Leader or Champion (Leader Node, S11). It enters play but isn't Played."
+        }
+      ]
+    },
+    {
+      "id": "2SL2",
+      "name": "Ghost Ship",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Champion",
+      "baseRank": 1,
+      "spacecraft": true,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "This spacecraft gets +1 Rank for each Nullified spacecraft.",
+      "flavor": "Built from various pieces of lost and broken vessels.",
+      "image": "images/2SL2.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "targets": "Self",
+              "amount": {
+                "countOf": {
+                  "zone": "NullifiedPile",
+                  "kind": "Unit",
+                  "spacecraft": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2SU1",
+      "name": "Hearse",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "When this spacecraft's crew is Nullified, you may Draw a card.",
+      "flavor": "What's dead may never fly.",
+      "image": "images/2SU1.jpg",
+      "effects": [
+        {
+          "trigger": "OnCrewNullified",
+          "optional": true,
+          "do": [
+            {
+              "op": "Draw",
+              "count": 1,
+              "deckChoice": "PerCard"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2SU2",
+      "name": "Spore Pod",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 1,
+      "spacecraft": true,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "When this spacecraft leaves play, Lock its Node and the opposing Node. Units on those Nodes are placed in their controllers' Standby Zones.",
+      "flavor": "Part mine, part ship. All problem.",
+      "image": "images/2SU2.jpg",
+      "effects": [
+        {
+          "trigger": "OnLeavePlay",
+          "script": "SporePod",
+          "note": "As Sisters of Blight: Units move before the Lock; Retired if no Standby room. A Leader stays put (ruling #36), and the node is still Locked."
+        }
+      ]
+    },
+    {
+      "id": "2SU3",
+      "name": "Scuttler",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "Necrolite"
+      ],
+      "text": "While this spacecraft is crewed, it gets +1 Rank whenever a Unit is Nullified.",
+      "flavor": "Wait, are they shooting bones at us?",
+      "image": "images/2SU3.jpg",
+      "effects": [
+        {
+          "trigger": "OnEvent",
+          "event": "UnitNullified",
+          "condition": {
+            "crewed": true
+          },
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": "Self",
+              "duration": "WhileInPlay"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2SO1",
+      "name": "Shipwreck",
+      "set": "Spacecraft",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Place a Nullified spacecraft into your Standby Zone.",
+      "flavor": "Back to find the one that shot it down.",
+      "image": "images/2SO1.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "note": "Leader spacecraft can't be chosen (ruling #36).",
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "standbyOf": "You",
+              "gainControl": true,
+              "targets": {
+                "choose": "Card",
+                "filter": {
+                  "zone": "NullifiedPile",
+                  "kind": "Unit",
+                  "spacecraft": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2SO2",
+      "name": "Hull Rot",
+      "set": "Spacecraft",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Necrolite"
+      ],
+      "text": "Crewed spacecraft get -1 Rank. Uncrewed spacecraft get -2 Rank.",
+      "flavor": "Best not move too slowly in Necrolite airspace.",
+      "image": "images/2SO2.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": -1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "spacecraft": true,
+                "crewed": true
+              }
+            },
+            {
+              "op": "ModifyRank",
+              "amount": -2,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "spacecraft": true,
+                "crewed": false
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3SL1",
+      "name": "Train of Thought",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 3,
+      "spacecraft": true,
+      "races": [
+        "Overmind"
+      ],
+      "text": "When this spacecraft becomes crewed, you may Draw 2 cards.",
+      "flavor": "Driven forward by the constant innovation of the hive mind.",
+      "image": "images/3SL1.jpg",
+      "effects": [
+        {
+          "trigger": "OnCrewed",
+          "optional": true,
+          "do": [
+            {
+              "op": "Draw",
+              "count": 2,
+              "deckChoice": "PerCard"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3SL2",
+      "name": "Hive Carrier",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Champion",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "Overmind"
+      ],
+      "text": "Crewed spacecraft you control get +1 Rank.",
+      "flavor": "It distributes its tactics to all nearby targetting computers.",
+      "image": "images/3SL2.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "spacecraft": true,
+                "controller": "You",
+                "crewed": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3SU1",
+      "name": "Abductor",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 0,
+      "spacecraft": true,
+      "races": [
+        "Overmind"
+      ],
+      "text": "When you play this spacecraft, if it is uncrewed and the Opposing Unit is a ground Unit, move that Unit onto this spacecraft.",
+      "flavor": "Simple minds, easily conquered",
+      "image": "images/3SU1.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "script": "Abduct",
+          "note": "The Unit crosses sides and control follows (ruling #15); it stays in play and isn't Played again. It must be able to crew Abductor (S11)."
+        }
+      ]
+    },
+    {
+      "id": "3SU2",
+      "name": "Mindscrambler",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 1,
+      "spacecraft": true,
+      "races": [
+        "Overmind"
+      ],
+      "text": "When you play this spacecraft, you may switch the crews of any 2 spacecraft.",
+      "flavor": "The hive mind can pilot your ship, but can you pilot theirs?",
+      "image": "images/3SU2.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "optional": true,
+          "script": "SwapCrews",
+          "note": "One of the two may be uncrewed (its crew just moves). Control follows the side. Each crew must be legal on its new node (S11). 'When crewed' fires (S24)."
+        }
+      ]
+    },
+    {
+      "id": "3SU3",
+      "name": "Thought Courier",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 1,
+      "spacecraft": true,
+      "races": [
+        "Overmind"
+      ],
+      "text": "When this spacecraft becomes crewed, you may Draw a card.",
+      "flavor": "It stores each pilots actions, constantly growing in capability.",
+      "image": "images/3SU3.jpg",
+      "effects": [
+        {
+          "trigger": "OnCrewed",
+          "optional": true,
+          "do": [
+            {
+              "op": "Draw",
+              "count": 1,
+              "deckChoice": "PerCard"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "3SO1",
+      "name": "Beam Up",
+      "set": "Spacecraft",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Move one of your ground Units onto an uncrewed spacecraft you control. It isn't Played again.",
+      "flavor": "Great scott!",
+      "image": "images/3SO1.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "script": "BeamUp"
+        }
+      ]
+    },
+    {
+      "id": "3SO2",
+      "name": "Hijack",
+      "set": "Spacecraft",
+      "kind": "Order",
+      "orderType": "React",
+      "races": [
+        "Overmind"
+      ],
+      "text": "Gain control of a spacecraft as it is being Deployed. It is Deployed to one of your Empty Nodes instead.",
+      "flavor": "They know how to fly it better than you do.",
+      "image": "images/3SO2.jpg",
+      "effects": [
+        {
+          "trigger": "React",
+          "when": {
+            "event": "UnitDeploying",
+            "spacecraft": true
+          },
+          "script": "Hijack",
+          "note": "As Recolonize (ruling #55): you choose the node; it can't be issued with no legal node. A spacecraft being Deployed onto a Unit arrives uncrewed."
+        }
+      ]
+    },
+    {
+      "id": "4SL1",
+      "name": "Morphership",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 0,
+      "spacecraft": true,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "This spacecraft may enter as a copy of another spacecraft, except it is a Blaarg.",
+      "flavor": "Ready to meet any ship in battle evenly.",
+      "image": "images/4SL1.jpg",
+      "effects": [
+        {
+          "trigger": "AsEnters",
+          "script": "EnterAsCopy",
+          "optional": true,
+          "params": {
+            "setRaces": [
+              "Blaarg"
+            ]
+          },
+          "note": "As Mr Morph (rulings #24, #52): copies a spacecraft in play, printed values. A spacecraft only copies spacecraft."
+        }
+      ]
+    },
+    {
+      "id": "4SL2",
+      "name": "Distillator",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Champion",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Spacecraft your Opponents control get -1 Rank.",
+      "flavor": "It jams the air, interrupting all signals nearby.",
+      "image": "images/4SL2.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": -1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "spacecraft": true,
+                "controller": "Opponent"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4SU1",
+      "name": "Stagnant Station",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 1,
+      "spacecraft": true,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "You may play this spacecraft on an Opponent's Empty Unit Node. It cannot be crewed.",
+      "flavor": "A mundane gift, but one nonetheless.",
+      "image": "images/4SU1.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "On an Opponent's node it is theirs and scores for them (ruling #15).",
+          "do": [
+            {
+              "op": "PlacementOverride",
+              "targets": "Self",
+              "allowedNodes": [
+                "OpponentUnitEmpty"
+              ]
+            },
+            {
+              "op": "CannotBeCrewed",
+              "targets": "Self"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4SU2",
+      "name": "Goo Bubble",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "This spacecraft's crew cannot be Nullified, but has no abilities.",
+      "flavor": "Effective protection, in both directions.",
+      "image": "images/4SU2.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "CannotBeNullified",
+              "targets": "Crew"
+            },
+            {
+              "op": "Suppress",
+              "targets": "Crew",
+              "what": "AllAbilitiesAndEffects"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4SU3",
+      "name": "Gelatinous Hull",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 1,
+      "spacecraft": true,
+      "races": [
+        "Blaarg"
+      ],
+      "text": "When this spacecraft becomes crewed, Manipulate 1. If its crew is a Blaarg, Manipulate 2 instead.",
+      "flavor": "Being one with the ship, literally.",
+      "image": "images/4SU3.jpg",
+      "effects": [
+        {
+          "trigger": "OnCrewed",
+          "script": "GelatinousHull"
+        }
+      ]
+    },
+    {
+      "id": "4SO1",
+      "name": "Engulf",
+      "set": "Spacecraft",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Nullify a spacecraft. Its crew stays on the Node and becomes a Blaarg.",
+      "flavor": "We survived, but at what cost?",
+      "image": "images/4SO1.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "script": "Engulf",
+          "note": "The crew only becomes a Blaarg if the spacecraft is actually Nullified."
+        }
+      ]
+    },
+    {
+      "id": "4SO2",
+      "name": "Viscous Fog",
+      "set": "Spacecraft",
+      "kind": "Order",
+      "orderType": "Ongoing",
+      "races": [
+        "Blaarg"
+      ],
+      "text": "Units can't board or leave spacecraft.",
+      "flavor": "Blaarg goop is notoriously good at gunking up cockpit hatches.",
+      "image": "images/4SO2.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Blocks Deploys that would crew or be crewed, and every move into or out of a spacecraft (Beam Up, Mindscrambler, Abductor, Mothership, Chrome Steed...). If a spacecraft leaves play, its crew still drops to the ground.",
+          "do": [
+            {
+              "op": "RestrictBoarding"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5SL1",
+      "name": "The Crucible",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Leader",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "While this spacecraft is crewed, Rank you Assemble is doubled.",
+      "flavor": "A flying factory, primed for production.",
+      "image": "images/5SL1.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "condition": {
+            "crewed": true
+          },
+          "do": [
+            {
+              "op": "ModifyAssembledRank",
+              "player": "You",
+              "multiplier": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5SL2",
+      "name": "Drone Hub",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Champion",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Uncrewed spacecraft you control get +2 Rank.",
+      "flavor": "Why do Synthenoids need pilots anyway?",
+      "image": "images/5SL2.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": 2,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "spacecraft": true,
+                "controller": "You",
+                "crewed": false
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5SU1",
+      "name": "Exo-Frame",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "If this spacecraft leaves play, Assemble its Rank onto its crew.",
+      "flavor": "For when you can't decide if you're the pilot or the piloted.",
+      "image": "images/5SU1.jpg",
+      "effects": [
+        {
+          "trigger": "OnLeavePlay",
+          "script": "ExoFrame",
+          "note": "Uses its Rank as it left. The crew must still be in play."
+        }
+      ]
+    },
+    {
+      "id": "5SU2",
+      "name": "Salvage Tug",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "When you play this spacecraft, place a Retired spacecraft into your Standby Zone.",
+      "flavor": "Every ship is a chip away from serving the Synthenoids.",
+      "image": "images/5SU2.jpg",
+      "effects": [
+        {
+          "trigger": "OnPlay",
+          "note": "Leader spacecraft can't be chosen (ruling #36).",
+          "do": [
+            {
+              "op": "MoveToStandby",
+              "standbyOf": "You",
+              "gainControl": true,
+              "targets": {
+                "choose": "Card",
+                "filter": {
+                  "zone": "RetiredPile",
+                  "kind": "Unit",
+                  "spacecraft": true
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5SU3",
+      "name": "Auto-Turret",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 2,
+      "spacecraft": true,
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "This spacecraft can't be crewed. When you play it, Nullify an opposing uncrewed spacecraft.",
+      "flavor": "The pilot seat is occupied by a rail gun.",
+      "image": "images/5SU3.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "CannotBeCrewed",
+              "targets": "Self"
+            }
+          ]
+        },
+        {
+          "trigger": "OnPlay",
+          "do": [
+            {
+              "op": "Nullify",
+              "targets": {
+                "choose": "Unit",
+                "filter": {
+                  "zone": "InPlay",
+                  "kind": "Unit",
+                  "spacecraft": true,
+                  "controller": "Opponent",
+                  "crewed": false
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5SO1",
+      "name": "Refit",
+      "set": "Spacecraft",
+      "kind": "Order",
+      "orderType": "Action",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Retire a spacecraft card from your Hand. A spacecraft in play gets +X Rank, where X is that card's Base Rank.",
+      "flavor": "One bigger ship is better than two smaller ones.",
+      "image": "images/5SO1.jpg",
+      "effects": [
+        {
+          "trigger": "OnResolve",
+          "script": "Refit"
+        }
+      ]
+    },
+    {
+      "id": "5SO2",
+      "name": "Self-Destruct",
+      "set": "Spacecraft",
+      "kind": "Order",
+      "orderType": "React",
+      "races": [
+        "Synthenoid"
+      ],
+      "text": "Issue this Order as a spacecraft is Nullified to Nullify the opposing spacecraft and its crew as well.",
+      "flavor": "Nothing like a last ditch effort.",
+      "image": "images/5SO2.jpg",
+      "effects": [
+        {
+          "trigger": "React",
+          "when": {
+            "event": "UnitNullifying",
+            "spacecraft": true
+          },
+          "script": "SelfDestruct",
+          "note": "Spacecraft S18: any spacecraft, either side. Does nothing if no spacecraft is opposite."
+        }
+      ]
+    },
+    {
+      "id": "0ST1",
+      "name": "Fighter",
+      "set": "Spacecraft",
+      "kind": "Unit",
+      "unitClass": "Craft",
+      "baseRank": 1,
+      "spacecraft": true,
+      "races": [
+        "GalacticCouncil"
+      ],
+      "text": "",
+      "flavor": "",
+      "image": "images/0ST1.jpg",
+      "token": true,
+      "effects": []
+    },
+    {
+      "id": "6W03",
+      "name": "Asteroid Belt",
+      "set": "Spacecraft",
+      "kind": "Warzone",
+      "races": [
+        "Neutral"
+      ],
+      "text": "Spacecraft get -1 Rank.",
+      "flavor": "No fly zone.",
+      "image": "images/6W03.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": -1,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "spacecraft": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6W04",
+      "name": "Ion Storm",
+      "set": "Spacecraft",
+      "kind": "Warzone",
+      "races": [
+        "Neutral"
+      ],
+      "text": "Spacecraft have no abilities.",
+      "flavor": "Outclassed, the fighter flew into a more equal playing field.",
+      "image": "images/6W04.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "do": [
+            {
+              "op": "Suppress",
+              "targets": {
+                "zone": "Any",
+                "kind": "Unit",
+                "spacecraft": true
+              },
+              "what": "AllAbilitiesAndEffects"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6W05",
+      "name": "Vacuum",
+      "set": "Spacecraft",
+      "kind": "Warzone",
+      "races": [
+        "Neutral"
+      ],
+      "text": "Ground Units get -2 Rank.",
+      "flavor": "Hold your breath.",
+      "image": "images/6W05.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Spacecraft S14. Hits every non-spacecraft Unit in play, crews included.",
+          "do": [
+            {
+              "op": "ModifyRank",
+              "amount": -2,
+              "targets": {
+                "zone": "InPlay",
+                "kind": "Unit",
+                "spacecraft": false
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6W06",
+      "name": "Wreckfield",
+      "set": "Spacecraft",
+      "kind": "Warzone",
+      "races": [
+        "Neutral"
+      ],
+      "text": "Nullified spacecraft may be Deployed as if they were in Players' Hands.",
+      "flavor": "Hey, look! This one still has the keys in.",
+      "image": "images/6W06.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Spacecraft S20, as Hills of Decay.",
+          "do": [
+            {
+              "op": "PlayFromZone",
+              "zone": "NullifiedPile",
+              "filter": {
+                "kind": "Unit",
+                "spacecraft": true
+              },
+              "player": "Each"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6W07",
+      "name": "Gravity Well",
+      "set": "Spacecraft",
+      "kind": "Warzone",
+      "races": [
+        "Neutral"
+      ],
+      "text": "Spacecraft and their crews can be affected from the ground.",
+      "flavor": "Well, well well.",
+      "image": "images/6W07.jpg",
+      "effects": [
+        {
+          "trigger": "Static",
+          "note": "Spacecraft S19: elevation is off.",
+          "do": [
+            {
+              "op": "DisableElevation"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

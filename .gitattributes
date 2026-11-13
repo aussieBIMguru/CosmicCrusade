@@ -1,0 +1,4 @@
+# Windows scripts and the Inno Setup script keep Windows line endings
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.iss text eol=crlf

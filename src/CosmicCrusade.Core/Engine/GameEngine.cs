@@ -1,0 +1,866 @@
+using CosmicCrusade.Core.Effects;
+using CosmicCrusade.Core.Model;
+using CosmicCrusade.Core.Rules;
+
+namespace CosmicCrusade.Core.Engine;
+
+/// <summary>
+/// Runs a game: Start-up → Main → End of Main → Clean-up, round after round (spec §5).
+/// Single-threaded and deterministic: all randomness comes from <see cref="GameState.Rng"/>.
+/// When awaited on the WPF dispatcher, every continuation stays on the UI thread.
+/// </summary>
+public sealed partial class GameEngine
+{
+    private readonly IPlayerController[] _controllers;
+    private readonly IGameEventSink _sink;
+    private readonly Stack<StackItem> _stack = new();
+    private bool _lastActionWasPass;
+    private int _actionsThisRound;
+
+    public GameEngine(GameState state, IPlayerController player0, IPlayerController player1, IGameEventSink? sink = null)
+    {
+        State = state;
+        _controllers = new[] { player0, player1 };
+        _sink = sink ?? NullEventSink.Instance;
+    }
+
+    public GameState State { get; }
+
+    /// <summary>Safety valve against runaway loops while effects are being added.</summary>
+    public int MaxTurnsPerRound { get; set; } = 500;
+    public int MaxRounds { get; set; } = 200;
+
+    public IReadOnlyCollection<StackItem> PendingStack => _stack;
+
+    /// <summary>Creates a state with decks built and shuffled.</summary>
+    public static GameState CreateGame(CardDatabase db, GameOptions options, string player0Name = "Player", string player1Name = "AI")
+    {
+        var state = new GameState(db, options, player0Name, player1Name);
+        DeckBuilder.Build(state);
+        return state;
+    }
+
+    public async Task<GameOutcome> RunAsync(CancellationToken ct = default)
+    {
+        await EmitAsync(new GameStartedEvent(State.Options.RoundsToWin), ct);
+
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            await StartUpAsync(ct);
+            await MainPhaseAsync(ct);
+            await EndOfMainAsync(ct);
+            await CleanUpAsync(ct);
+
+            var outcome = CheckGameEnd();
+            if (outcome is not null)
+            {
+                State.Phase = GamePhase.GameOver;
+                await EmitAsync(new GameEndedEvent(outcome), ct);
+                return outcome;
+            }
+        }
+    }
+
+    // ================================================================== Start-up (§5.1)
+
+    private async Task StartUpAsync(CancellationToken ct)
+    {
+        State.Round++;
+        State.Phase = GamePhase.StartUp;
+        _actionsThisRound = 0;
+        foreach (var ps in State.Players) ps.DeployTurnsThisRound = 0;
+        ResetRoundFlags();
+
+        if (State.Round == 1) State.FirstPlayer = State.Rng.Next(2);
+        else if (State.LastRoundWinner is int w) State.FirstPlayer = w;
+        // No winner last round: the previous first player goes first again (ruling #31).
+        State.ActivePlayer = State.FirstPlayer;
+
+        await EmitAsync(new RoundStartedEvent(State.Round, State.FirstPlayer), ct);
+
+        // 1. Mandatory draw up to 5 Units and 3 Orders (ruling #10), in turn order. Archons module: each player who
+        // hasn't yet may first take their Archon draw (first player first), drawing one card fewer this round.
+        foreach (int p in TurnOrder())
+        {
+            var skipped = await ArchonDrawAsync(p, ct);
+            await DrawUpAsync(p, ct, skipped);
+        }
+
+        // 2. TODO(M3): carried-over effects, StartUp triggers.
+
+        // 3. Warzones: reveal the top Warzone; it is Active immediately.
+        if (State.Options.Warzones && State.WarzoneDeck.Count > 0)
+        {
+            var wz = State.WarzoneDeck[^1];
+            State.MoveToPile(wz, PileKind.ActiveWarzone);
+            await EmitAsync(new WarzoneRevealedEvent(wz), ct);
+            // TODO(M3): apply the Warzone's effects (only placement overrides are live so far).
+        }
+    }
+
+    private IEnumerable<int> TurnOrder()
+    {
+        yield return State.FirstPlayer;
+        yield return GameState.Other(State.FirstPlayer);
+    }
+
+    private async Task DrawUpAsync(int player, CancellationToken ct, PileKind? skipOne = null)
+    {
+        var ps = State.Players[player];
+        int units = State.Options.HandUnitTarget - (skipOne == PileKind.UnitDeck ? 1 : 0);
+        int orders = State.Options.HandOrderTarget - (skipOne == PileKind.OrderDeck ? 1 : 0);
+        while (ps.HandUnitCount < units)
+            if (await DrawAsync(player, PileKind.UnitDeck, ct) is null) break;
+        while (ps.HandOrderCount < orders)
+            if (await DrawAsync(player, PileKind.OrderDeck, ct) is null) break;
+    }
+
+    /// <summary>
+    /// Archons module (A3–A5, A12): once per game a player may take their Archon draw at Start-up: choose which
+    /// card to give up (a Unit or an Order), see the top 3 Archons, keep 1 (revealed); the other 2 are shuffled back.
+    /// Returns the deck the player draws one fewer card from, or null.
+    /// </summary>
+    private async Task<PileKind?> ArchonDrawAsync(int player, CancellationToken ct)
+    {
+        var ps = State.Players[player];
+        if (!State.Options.Archons || ps.ArchonTaken || State.ArchonDeck.Count == 0) return null;
+
+        var take = await ChooseAsync(ChoiceRequest.YesNo(player, null,
+            "Take your Archon draw this round? Once per game: see 3 Archons, keep 1 (revealed) to play this round, and draw one card fewer.",
+            "ArchonDraw"), ct);
+        if (take.Count == 0 || take[0] != 0) return null;
+        ps.ArchonTaken = true;
+
+        var skipOptions = new[] { new ChoiceOption("Draw one fewer Unit", Value: 0), new ChoiceOption("Draw one fewer Order", Value: 1) };
+        var skip = await ChooseAsync(new ChoiceRequest(player, null, "Which card do you give up for your Archon?",
+            ChoiceKind.Options, skipOptions, 1, 1, "ArchonSkip"), ct);
+        var skipped = skip.Count > 0 && skip[0] == 1 ? PileKind.OrderDeck : PileKind.UnitDeck;
+
+        var deck = State.ArchonDeck;
+        var offered = deck.Skip(Math.Max(0, deck.Count - 3)).Reverse().ToList(); // top card first; only this player sees them
+        var pick = await ChooseAsync(new ChoiceRequest(player, null, "Choose your Archon (it is revealed, and must be played this round)",
+            ChoiceKind.Cards, offered.Select(c => new ChoiceOption(c.Name, c)).ToList(), 1, 1, "ArchonPick"), ct);
+        var chosen = offered[pick.Count > 0 ? pick[0] : 0];
+        State.MoveToArchonSlot(chosen, player);
+        State.Shuffle(deck);
+        await EmitAsync(new ArchonTakenEvent(player, chosen, skipped, offered.Count), ct);
+        return skipped;
+    }
+
+    /// <summary>Draws one card from a deck, applying the empty-deck rule. Null when nothing can be drawn.</summary>
+    public async Task<CardInstance?> DrawAsync(int player, PileKind deckKind, CancellationToken ct, CardInstance? source = null)
+    {
+        CardInstance card;
+        if (State.Options.DeckMode == DeckMode.RandomDraw)
+        {
+            var pool = deckKind == PileKind.UnitDeck ? State.RandomDrawUnits : State.RandomDrawOrders;
+            if (pool.Count == 0) return null;
+            card = State.CreateInstance(pool[State.Rng.Next(pool.Count)]);
+            State.MoveToHand(card, player);
+        }
+        else
+        {
+            var deck = State.GetPile(deckKind);
+            if (deck.Count == 0)
+            {
+                switch (State.Options.EmptyDeck)
+                {
+                    case EmptyDeckRule.Reshuffle:
+                        var refillFrom = deckKind == PileKind.UnitDeck ? PileKind.RetiredUnits : PileKind.IssuedOrders;
+                        var pile = State.GetPile(refillFrom);
+                        if (pile.Count == 0) return null;
+                        foreach (var c in pile.ToList()) State.MoveToPile(c, deckKind);
+                        State.Shuffle(deck);
+                        await EmitAsync(new DeckReshuffledEvent(deckKind, deck.Count), ct);
+                        break;
+                    case EmptyDeckRule.EndAfterRound:
+                        State.EndAfterThisRound = true;
+                        return null;
+                    default:
+                        return null;
+                }
+            }
+            card = deck[^1];
+            State.MoveToHand(card, player);
+        }
+
+        await EmitAsync(new CardDrawnEvent(player, card, deckKind, source), ct);
+        await RaiseAsync(new TriggerEvent("CardDrawn", player, card), ct);
+        return card;
+    }
+
+    // ================================================================== Main Phase (§5.2)
+
+    private Task MainPhaseAsync(CancellationToken ct)
+    {
+        State.Phase = GamePhase.Main;
+        return MainLoopAsync(State.FirstPlayer, passesInRow: 0, ct);
+    }
+
+    /// <summary>
+    /// M4 (AI search): plays out the rest of the current round on this engine's state, starting with
+    /// <paramref name="current"/>'s Main Phase turn, then scores it (End of Main). No Clean-up.
+    /// The state must be at a Main Phase turn with an empty stack (a clone made while a controller is choosing a turn).
+    /// </summary>
+    public async Task<RoundResult> PlayOutRoundAsync(int current, bool opponentJustPassed, CancellationToken ct = default)
+    {
+        if (State.Phase != GamePhase.Main || _stack.Count > 0)
+            throw new InvalidOperationException("PlayOutRoundAsync needs a Main Phase turn with an empty stack.");
+        await MainLoopAsync(current, opponentJustPassed ? 1 : 0, ct);
+        return await EndOfMainAsync(ct);
+    }
+
+    private async Task MainLoopAsync(int current, int passesInRow, CancellationToken ct)
+    {
+        int turns = 0;
+        _lastActionWasPass = passesInRow > 0;
+
+        while (passesInRow < 2 && turns++ < MaxTurnsPerRound)
+        {
+            ct.ThrowIfCancellationRequested();
+            State.ActivePlayer = current;
+            var legal = LegalActions.ForTurn(State, current);
+
+            GameAction action;
+            if (legal.Count == 1)
+            {
+                action = legal[0]; // Only Pass is possible: pass automatically.
+            }
+            else
+            {
+                await EmitAsync(new TurnStartedEvent(current), ct);
+                var context = new DecisionContext(State, current, legal, _lastActionWasPass);
+                action = await _controllers[current].ChooseActionAsync(context, ct);
+                if (!legal.Contains(action))
+                    throw new InvalidOperationException($"Controller for player {current} returned an illegal action: {action.Describe()}");
+            }
+
+            if (action is PassAction)
+            {
+                passesInRow++;
+                _lastActionWasPass = true;
+                await EmitAsync(new PassedEvent(current), ct);
+            }
+            else
+            {
+                passesInRow = 0;
+                _lastActionWasPass = false;
+                _actionsThisRound++;
+                await ExecuteAsync(action, ct);
+                await CheckStateAsync(ct);
+                if (_roundEndsNow || _mainEndsNow) break; // Senate Chambers / Insurrection; Ceasefire.
+                await ExtraActionsAsync(current, ct);
+                if (_roundEndsNow || _mainEndsNow) break;
+            }
+
+            current = GameState.Other(current);
+        }
+    }
+
+    /// <summary>
+    /// Open Source: "You may take an additional Action each turn." After a turn's action the player may take more,
+    /// one per active source. Passing here only ends the turn (it doesn't count as a Pass).
+    /// </summary>
+    private async Task ExtraActionsAsync(int player, CancellationToken ct)
+    {
+        int used = 0;
+        while (used < StaticLayer.ExtraActions(State, player))
+        {
+            var legal = LegalActions.ForTurn(State, player);
+            if (legal.Count <= 1) return;
+            used++;
+            await EmitAsync(new LogEvent($"  {State.Players[player].Name} may take an additional action."), ct);
+            await EmitAsync(new TurnStartedEvent(player), ct);
+            var context = new DecisionContext(State, player, legal, OpponentJustPassed: false, ExtraAction: true);
+            var action = await _controllers[player].ChooseActionAsync(context, ct);
+            if (!legal.Contains(action))
+                throw new InvalidOperationException($"Controller for player {player} returned an illegal action: {action.Describe()}");
+            if (action is PassAction)
+            {
+                await EmitAsync(new LogEvent($"  {State.Players[player].Name} ends the turn."), ct);
+                return;
+            }
+            _actionsThisRound++;
+            await ExecuteAsync(action, ct);
+            await CheckStateAsync(ct);
+            if (_roundEndsNow || _mainEndsNow) return;
+        }
+    }
+
+    private async Task ExecuteAsync(GameAction action, CancellationToken ct)
+    {
+        switch (action)
+        {
+            case DeployFromHandAction d:
+                State.Players[d.Player].DeployTurnsThisRound++;
+                await DeployAsync(d.Player, d.Card, d.Target, fromNode: null, ct);
+                break;
+
+            case AdvanceFromStandbyAction a:
+                State.Players[a.Player].DeployTurnsThisRound++;
+                await DeployAsync(a.Player, a.From.Card!, a.To, fromNode: a.From, ct);
+                break;
+
+            case IssueOrderAction o:
+            {
+                var item = await AnnounceOrderAsync(o.Player, o.Card, o.OrderNode, respondingTo: null, ct);
+                await RunPriorityAsync(item, o.Player, ct);
+                break;
+            }
+
+            case AssembleAction a:
+                await AssembleAsync(a, ct);
+                break;
+
+            case DeployFromPileAction p:
+                await DeployFromPileAsync(p, ct);
+                break;
+
+            case DeployAtRandomAction r:
+            {
+                var nodes = LegalActions.Deploys(State, r.Player).Hand.Where(d => d.Card == r.Card).Select(d => d.Target).ToList();
+                var node = await RandomDeployNodeAsync(r.Player, r.Card, nodes, ct);
+                State.Players[r.Player].DeployTurnsThisRound++;
+                await DeployAsync(r.Player, r.Card, node, fromNode: null, ct);
+                break;
+            }
+
+            case CoercedDeployAction c:
+            {
+                var options = LegalActions.Deploys(State, c.Player).Hand.Select(d => (d.Card, d.Target)).ToList();
+                var (card, node) = await CoercedDeployPickAsync(c.Player, options, ct);
+                State.Players[c.Player].DeployTurnsThisRound++;
+                await DeployAsync(c.Player, card, node, fromNode: null, ct);
+                break;
+            }
+
+            case GrantedAction g:
+                await RunGrantedActionAsync(g, ct);
+                break;
+
+            default:
+                throw new NotSupportedException(action.GetType().Name);
+        }
+    }
+
+    // ------------------------------------------------------------------ Deploy (§7.1)
+
+    /// <summary>Deploy pipeline (§7.1): announce → priority/stack → Played (or cancelled).</summary>
+    private async Task DeployAsync(int player, CardInstance card, Node target, Node? fromNode, CancellationToken ct,
+        PileKind? fromPile = null)
+    {
+        await PayCostAsync(player, card, ct);
+        // Spacecraft: a crewed spacecraft advancing from Standby leaves its crew waiting on the Standby node; the
+        // crew comes aboard again once the spacecraft is Played.
+        var riding = fromNode is { Kind: NodeKind.Standby } && ReferenceEquals(fromNode.Card, card) ? fromNode.Crew : null;
+        State.MoveToStack(card, player);
+        await EmitAsync(new UnitDeployAnnouncedEvent(player, card, target, fromNode, fromPile), ct);
+
+        var item = new StackItem(player, StackItemKind.DeployUnit, card, $"Deploy {card.Name} to {target.Label}",
+            (self, token) => ResolveDeployAsync(self, token))
+        {
+            TargetNode = target,
+            FromNode = fromNode,
+            FromPile = fromPile,
+            RidingCrew = riding,
+        };
+        await RunPriorityAsync(item, player, ct);
+    }
+
+    private async Task ResolveDeployAsync(StackItem item, CancellationToken ct)
+    {
+        var card = item.Card;
+        var target = item.TargetNode!;
+        if (item.Cancelled) return; // The counter-effect already moved the card; it is not Played.
+
+        // Spacecraft (S1): a Unit may land on its controller's uncrewed spacecraft, or a spacecraft under a lone Unit.
+        bool joins = !target.IsEmpty && target.Side == item.Controller && Spacecraft.CanJoin(State, card, target);
+        if (!target.IsEmpty && !joins)
+        {
+            // The node was filled or Locked while the deploy waited (possible once effects exist). Not Played.
+            State.MoveToPile(card, PileKind.RetiredUnits);
+            await EmitAsync(new DeployCancelledEvent(item.Controller, card, PileKind.RetiredUnits), ct);
+            return;
+        }
+
+        State.MoveToNode(card, target);
+        await EmitAsync(new UnitPlayedEvent(item.Controller, card, target), ct);
+
+        // M3.3: "Played as the chosen Unit" – Forced Mitosis' copy, or Mr Morph's own, before "When you play".
+        await ApplyEntryAsync(item, card, target, ct);
+
+        // Archons: Androsiar – "You may have any Unit enter play as a copy of this Unit."
+        await OfferCopyOfSourceAsync(card, ct);
+
+        // "When you play this Unit": the controller is the side it landed on (ruling #15).
+        if (StaticLayer.IsTriggerSuppressed(State, card, "OnPlay"))
+        {
+            if (EffectSupport.IsLive(card.Definition, "OnPlay") || card.AbilitiesSuppressed)
+                await EmitAsync(new LogEvent($"  {card.Name}'s abilities are Suppressed."), ct);
+        }
+        else
+            await FireTriggersAsync(card, "OnPlay", target.Side, target, card.Memory, null, ct);
+
+        // Spacecraft: the crew of a spacecraft advancing from Standby comes back aboard (it isn't Played).
+        if (item.RidingCrew is { } rider && item.FromNode is { } standby && standby.Holds(rider) && target.Holds(card)
+            && Spacecraft.IsShip(card) && target.Crew is null)
+        {
+            if (Spacecraft.CanCrew(State, rider, card, target)) await BoardAsync(rider, card, null, ct, checkLegal: false);
+            else await EmitAsync(new LogEvent($"  {rider.Name} can't come aboard {card.Name} and stays in Standby."), ct);
+        }
+        // "When this spacecraft becomes crewed" (S24): the Unit landed on it, or it was laid under a Unit.
+        else if (joins && target.Crew is not null) await CrewArrivedAsync(target, ct);
+
+        // "Whenever a Unit / Card is played" (Xeno Laser hits after on-play abilities: ruling #21).
+        await RaisePlayedAsync(item.Controller, card, fromHand: item.FromNode is null && item.FromPile is null, ct);
+    }
+
+    /// <summary>
+    /// Androsiar (Archons A10, P12): a Unit (either side's) being Played may enter as a copy of a Unit with this
+    /// ability; that Unit's controller decides. Copy rules as Mr Morph (printed values of what the source is now).
+    /// </summary>
+    private async Task OfferCopyOfSourceAsync(CardInstance card, CancellationToken ct)
+    {
+        foreach (var src in StaticLayer.CopyOfferSources(State, card))
+        {
+            int chooser = src.Location.Node!.Side;
+            var def = src.Definition;
+            // The entering Unit rides on "Yes" (the UI shows it there; the AI reads it).
+            var options = new[] { new ChoiceOption("Yes", card, Value: 1), new ChoiceOption("No", Value: 0) };
+            var pick = await ChooseAsync(new ChoiceRequest(chooser, src,
+                $"{src.Name}: have {card.Name} enter play as a copy of {def.Name} (Rank {def.BaseRank})?",
+                ChoiceKind.YesNo, options, 1, 1, "CopyOfSelf"), ct);
+            if (pick.Count == 0 || pick[0] != 0) continue;
+            card.BecomeCopy(def, def.Races);
+            await EmitAsync(new CardCopiedEvent(card, def, src), ct);
+            return;
+        }
+    }
+
+    /// <summary>Barkeep Bill & co.: pick the Unit from the pile, then its node, then Deploy it as usual.</summary>
+    private async Task DeployFromPileAsync(DeployFromPileAction a, CancellationToken ct)
+    {
+        var cards = StaticLayer.PlayableFromPile(State, a.Player, a.Pile)
+            .Where(c => LegalActions.DeployNodes(State, a.Player, c).Count > 0).ToList();
+        if (cards.Count == 0) return;
+
+        CardInstance card;
+        Node node;
+        var deployOverride = StaticLayer.DeployNodeOverride(State, a.Player);
+        if (deployOverride is { Random: false })
+        {
+            // Psychic Coercion: the node first, then a Unit from the pile that may go there.
+            var options = cards.SelectMany(c => LegalActions.DeployNodes(State, a.Player, c).Select(n => (c, n))).ToList();
+            (card, node) = await CoercedDeployPickAsync(a.Player, options, ct);
+        }
+        else
+        {
+            string pileName = a.Pile == PileKind.RetiredUnits ? "Retired" : "Nullified";
+            var cardPick = await ChooseAsync(new ChoiceRequest(a.Player, null, $"Choose a Unit to Deploy from the {pileName} pile",
+                ChoiceKind.Cards, cards.Select(c => new ChoiceOption($"{c.Name} (Rank {RankCalculator.BaseRank(c)})", c)).ToList(),
+                1, 1, "PlayFromPile"), ct);
+            card = cards[cardPick.Count > 0 ? cardPick[0] : 0];
+
+            var nodes = LegalActions.DeployNodes(State, a.Player, card);
+            if (deployOverride is { Random: true })
+                node = await RandomDeployNodeAsync(a.Player, card, nodes, ct);
+            else
+            {
+                var nodePick = await ChooseAsync(new ChoiceRequest(a.Player, card, $"Deploy {card.Name} to which node?",
+                    ChoiceKind.Nodes, nodes.Select(n => new ChoiceOption($"{(n.Side == a.Player ? "Your" : "Opponent's")} {n.Label}", Node: n)).ToList(),
+                    1, 1, "DeployNode"), ct);
+                node = nodes[nodePick.Count > 0 ? nodePick[0] : 0];
+            }
+        }
+
+        State.Players[a.Player].DeployTurnsThisRound++; // Military Academy counts deploys from any zone (ruling #23)
+        await DeployAsync(a.Player, card, node, fromNode: null, ct, fromPile: a.Pile);
+    }
+
+    // ------------------------------------------------------------------ M3.2c: who picks the node
+
+    /// <summary>Shoot First, Think Second: one of the legal nodes, at random (seeded).</summary>
+    private async Task<Node> RandomDeployNodeAsync(int player, CardInstance card, IReadOnlyList<Node> nodes, CancellationToken ct)
+    {
+        var node = nodes[State.Rng.Next(nodes.Count)];
+        var sourceCard = StaticLayer.DeployNodeOverride(State, player)?.Source;
+        string source = sourceCard?.Name ?? "Random";
+        await EmitAsync(new RandomDeployNodeChosenEvent(player, card, nodes, node, sourceCard), ct);
+        await EmitAsync(new LogEvent($"{source}: {card.Name} goes to {State.Players[node.Side].Name}'s {node.Label} at random."), ct);
+        return node;
+    }
+
+    /// <summary>
+    /// Psychic Coercion (spec §7.1): the deploying player has declared "I'm deploying a Unit". The coercer picks the
+    /// node first – only nodes at least one of the Units could legally go to, so a Deploy is always possible – then the
+    /// deploying player picks a Unit for that node.
+    /// </summary>
+    private async Task<(CardInstance Card, Node Node)> CoercedDeployPickAsync(int player, List<(CardInstance Card, Node Node)> options,
+        CancellationToken ct)
+    {
+        var coercion = StaticLayer.DeployNodeOverride(State, player)
+            ?? throw new InvalidOperationException("No deploy override applies.");
+        int chooser = coercion.Chooser;
+        var nodes = options.Select(o => o.Node).Distinct().ToList();
+        var nodePick = await ChooseAsync(new ChoiceRequest(chooser, coercion.Source,
+            $"{coercion.Source.Name}: choose the node {State.Players[player].Name} must Deploy a Unit to",
+            ChoiceKind.Nodes, nodes.Select(n => new ChoiceOption($"{(n.Side == chooser ? "Your" : "Opponent's")} {n.Label}", Node: n)).ToList(),
+            1, 1, "CoerceNode"), ct);
+        var node = nodes[nodePick.Count > 0 ? nodePick[0] : 0];
+
+        var cards = options.Where(o => o.Node == node).Select(o => o.Card).Distinct().ToList();
+        var cardPick = await ChooseAsync(new ChoiceRequest(player, coercion.Source,
+            $"{coercion.Source.Name}: choose a Unit to Deploy to {(node.Side == player ? "your" : "the opponent's")} {node.Label}",
+            ChoiceKind.Cards, cards.Select(c => new ChoiceOption($"{c.Name} (Rank {RankCalculator.BaseRank(c)})", c, node)).ToList(),
+            1, 1, "CoercedUnit"), ct);
+        return (cards[cardPick.Count > 0 ? cardPick[0] : 0], node);
+    }
+
+    // ------------------------------------------------------------------ M3.2c: granted actions
+
+    /// <summary>
+    /// Abominations: pay the cost (Nullify a Necrolite card from hand), then run the granted ops as the acting
+    /// player, with the granting card as the source. It resolves at once: no React answers a granted action.
+    /// </summary>
+    private async Task RunGrantedActionAsync(GrantedAction a, CancellationToken ct)
+    {
+        var info = StaticLayer.GrantedActions(State, a.Player).FirstOrDefault(g => g.Source == a.Source);
+        if (info is null) return;
+        await EmitAsync(new LogEvent($"{State.Players[a.Player].Name}: {a.Name} ({a.Source.Name})."), ct);
+
+        var candidates = LegalActions.GrantedCostCandidates(State, a.Player, info);
+        if (candidates.Count == 0) return;
+        var pick = await ChooseAsync(new ChoiceRequest(a.Player, a.Source, $"{a.Name}: choose a card to Nullify from your hand",
+            ChoiceKind.Cards, candidates.Select(c => new ChoiceOption(c.Name, c)).ToList(), 1, 1, "PayCost"), ct);
+        await NullifyFromHandAsync(candidates[pick.Count > 0 ? pick[0] : 0], a.Source, ct);
+
+        var ctx = new EffectContext(this, a.Source, a.Player, a.Source.Location.Node, "GrantAction");
+        await Runner.RunAsync(info.Op, ctx, ct);
+    }
+
+    /// <summary>PlayCost (Mechatron, Scrapped Metal): Retire the required cards from hand as the card is played.</summary>
+    private async Task PayCostAsync(int player, CardInstance card, CancellationToken ct)
+    {
+        if (PlayRules.CostOf(State, card) is not { } cost) return;
+        var candidates = PlayRules.CostCandidates(State, card, player);
+        var picks = await ChooseAsync(new ChoiceRequest(player, card,
+            $"{card.Name}: choose {cost.Count} card{(cost.Count == 1 ? "" : "s")} to Retire from your hand",
+            ChoiceKind.Cards, candidates.Select(c => new ChoiceOption(c.Name, c)).ToList(), cost.Count, cost.Count, "PayCost"), ct);
+        foreach (var i in picks) await RetireFromHandAsync(candidates[i], ct);
+    }
+
+    // ------------------------------------------------------------------ Orders (§3, §7.1)
+
+    /// <summary>Card leaves hand, goes on the stack. The caller pushes it (turn action) or it is a React response.</summary>
+    private async Task<StackItem> AnnounceOrderAsync(int player, CardInstance card, Node? orderNode, StackItem? respondingTo, CancellationToken ct)
+    {
+        await PayCostAsync(player, card, ct);
+        State.MoveToStack(card, player);
+        string desc = respondingTo is not null
+            ? $"{card.Name} → {respondingTo.Card.Name}"
+            : orderNode is not null ? $"Issue {card.Name} to {orderNode.Label}" : $"Issue {card.Name}";
+        var item = new StackItem(player, StackItemKind.IssueOrder, card, desc, (self, token) => ResolveOrderAsync(self, token))
+        {
+            OrderNode = orderNode,
+            RespondingTo = respondingTo,
+        };
+        await EmitAsync(new OrderIssueAnnouncedEvent(player, card, orderNode, item), ct);
+        return item;
+    }
+
+    private async Task ResolveOrderAsync(StackItem item, CancellationToken ct)
+    {
+        if (item.Cancelled) return; // Nullified on the stack: already in the Issued pile, not played.
+
+        var card = item.Card;
+        int player = item.Controller;
+
+        switch (card.Definition.OrderType)
+        {
+            case OrderType.Ongoing:
+            {
+                if (item.OrderNode is { IsEmpty: true } node)
+                {
+                    State.MoveToNode(card, node);
+                    bool suppressed = StaticLayer.IsSuppressed(State, card);
+                    // "As you Issue this Order, choose a Race" (Extreme Sanctions, Containment Network).
+                    if (!suppressed && EffectSupport.IsLive(card.Definition, "OnIssue"))
+                        await FireTriggersAsync(card, "OnIssue", player, node, card.Memory, null, ct);
+                    bool live = StaticLayer.HasLiveStatics(card.Definition);
+                    string detail = suppressed ? "on its Order Node, but Suppressed"
+                        : live ? "in effect"
+                        : "on its Order Node (its effect isn't implemented yet)";
+                    await EmitAsync(new OrderResolvedEvent(player, card, node, live && !suppressed, detail), ct);
+                    await RaisePlayedAsync(player, card, fromHand: true, ct);
+                }
+                else
+                {
+                    State.MoveToPile(card, PileKind.IssuedOrders);
+                    await EmitAsync(new OrderResolvedEvent(player, card, null, false, "fizzled: its Order Node is no longer Empty"), ct);
+                }
+                break;
+            }
+
+            case OrderType.React when StaticLayer.IsSuppressed(State, card):
+            case OrderType.Action when StaticLayer.IsSuppressed(State, card):
+            {
+                // Suppressing Goop: "Suppress all Card Abilities and Effects (even when not in play)".
+                State.MoveToPile(card, PileKind.IssuedOrders);
+                await EmitAsync(new OrderResolvedEvent(player, card, null, false, "Suppressed: it has no effect"), ct);
+                await RaisePlayedAsync(player, card, fromHand: true, ct);
+                break;
+            }
+
+            case OrderType.React:
+            {
+                bool live = EffectSupport.IsLive(card.Definition, "React");
+                if (live) await FireTriggersAsync(card, "React", player, null, new(), item.RespondingTo, ct);
+                State.MoveToPile(card, PileKind.IssuedOrders);
+                await EmitAsync(new OrderResolvedEvent(player, card, null, live,
+                    live ? "resolved" : "its effect isn't implemented yet"), ct);
+                await RaisePlayedAsync(player, card, fromHand: true, ct);
+                break;
+            }
+
+            default: // Action
+            {
+                bool live = EffectSupport.IsLive(card.Definition, "OnResolve");
+                if (live) await FireTriggersAsync(card, "OnResolve", player, null, new(), null, ct);
+                State.MoveToPile(card, PileKind.IssuedOrders);
+                await EmitAsync(new OrderResolvedEvent(player, card, null, live,
+                    live ? "resolved" : "its effect isn't implemented yet"), ct);
+                await RaisePlayedAsync(player, card, fromHand: true, ct);
+                break;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ Assemble (ruling #18)
+
+    private async Task AssembleAsync(AssembleAction a, CancellationToken ct)
+    {
+        State.MoveToStack(a.Card, a.Player);
+        var item = new StackItem(a.Player, StackItemKind.Assemble, a.Card, $"Assemble {a.Card.Name} onto {a.Target.Name}",
+            (self, token) => ResolveAssembleAsync(self, token))
+        {
+            AssembleTarget = a.Target,
+        };
+        await EmitAsync(new AssembleAnnouncedEvent(a.Player, a.Card, a.Target, item), ct);
+        await RunPriorityAsync(item, a.Player, ct);
+    }
+
+    private async Task ResolveAssembleAsync(StackItem item, CancellationToken ct)
+    {
+        if (item.Cancelled) return;
+        var card = item.Card;
+        var target = item.AssembleTarget!;
+        int amount = AssembleRules.AssembledRank(card) * StaticLayer.AssembleMultiplier(State, item.Controller); // The Crucible
+
+        // The target must still be an allied Unit in play.
+        var node = target.Location.Node;
+        bool ok = target.Location.Kind == LocationKind.Node && node is not null && node.IsScoring && node.Side == item.Controller;
+        if (ok) target.PersistentModifiers.Add(new RankModifier($"Assemble: {card.Name}", amount));
+
+        State.MoveToPile(card, PileKind.RetiredUnits);
+        await EmitAsync(new AssembledEvent(item.Controller, card, target, amount, ok), ct);
+        await RaiseAsync(new TriggerEvent("CardRetiredFromHand", item.Controller, card), ct);
+        if (ok) await RaiseAsync(new TriggerEvent("Assembled", item.Controller, card, AssembledRank: amount, AssembleTarget: target), ct);
+    }
+
+    // ------------------------------------------------------------------ Priority (§7.2)
+
+    private IReadOnlyList<StackItem> StackSnapshot() => _stack.ToList(); // Stack<T> enumerates top first.
+
+    private async Task PushAsync(StackItem item, CancellationToken ct)
+    {
+        // A Nullify window only appears on the stack once someone responds to it (so it doesn't reveal hands).
+        if (item.RespondingTo is { Kind: StackItemKind.UnitNullifying, Shown: false } window)
+        {
+            window.Shown = true;
+            await EmitAsync(new StackPushedEvent(window, StackSnapshot()), ct);
+        }
+        _stack.Push(item);
+        if (item.Kind != StackItemKind.UnitNullifying) await EmitAsync(new StackPushedEvent(item, StackSnapshot()), ct);
+    }
+
+    /// <summary>
+    /// MTG Arena-style priority (§7.2): after an action the other player gets priority. Responses stack LIFO;
+    /// the top resolves once both players pass in a row, then priority passes again. A player is only asked when
+    /// they hold a React whose condition is met (auto-allow); the human seat can also auto-pass everything.
+    /// A cancelled item on top leaves the stack at once (there is nothing left to respond to).
+    /// </summary>
+    private async Task RunPriorityAsync(StackItem first, int actor, CancellationToken ct)
+    {
+        // Windows can open while another item resolves (a Nullify during an ability): resolve only down to here.
+        int baseDepth = _stack.Count;
+        await PushAsync(first, ct);
+        int priority = GameState.Other(actor);
+        int passesInRow = 0;
+        int guard = 0;
+
+        while (_stack.Count > baseDepth)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (++guard > 1000) throw new InvalidOperationException("Priority loop did not terminate.");
+
+            var top = _stack.Peek();
+            if (top.Cancelled)
+            {
+                await PopAndResolveAsync(ct);
+                passesInRow = 0;
+                priority = GameState.Other(top.Controller);
+                continue;
+            }
+
+            var snapshot = StackSnapshot();
+            var reacts = LegalActions.ForResponse(State, priority, snapshot);
+            GameAction? response = null;
+            if (reacts.Count > 0)
+            {
+                var legal = reacts.Append(new PassAction(priority)).ToList();
+                await EmitAsync(new PriorityEvent(priority, snapshot), ct);
+                response = await _controllers[priority].ChooseResponseAsync(
+                    new DecisionContext(State, priority, legal, false, snapshot, IsResponse: true), ct);
+                if (response is not null && !legal.Contains(response))
+                    throw new InvalidOperationException($"Controller for player {priority} returned an illegal response: {response.Describe()}");
+            }
+
+            if (response is ReactAction r)
+            {
+                var item = await AnnounceOrderAsync(r.Player, r.Card, null, r.RespondingTo, ct);
+                await PushAsync(item, ct);
+                passesInRow = 0;
+                priority = GameState.Other(r.Player);
+                continue;
+            }
+
+            passesInRow++;
+            if (passesInRow >= 2)
+            {
+                await PopAndResolveAsync(ct);
+                passesInRow = 0;
+                priority = GameState.Other(top.Controller);
+            }
+            else
+            {
+                priority = GameState.Other(priority);
+            }
+        }
+    }
+
+    private async Task PopAndResolveAsync(CancellationToken ct)
+    {
+        var top = _stack.Pop();
+        await top.Resolve(top, ct); // Each item handles its own Cancelled state.
+        if (top.Kind != StackItemKind.UnitNullifying || top.Shown)
+            await EmitAsync(new StackPoppedEvent(top, StackSnapshot()), ct);
+    }
+
+    // ================================================================== End of Main (§5.3)
+
+    private async Task<RoundResult> EndOfMainAsync(CancellationToken ct)
+    {
+        State.Phase = GamePhase.EndOfMain;
+        // End of Main triggers (The Empress, High Noon, Weed out the Weak), skipped when Senate Chambers already
+        // ended the round.
+        if (!_roundEndsNow) await FirePhaseTriggersAsync("EndOfMain", ct);
+        var result = Scoring.Score(State);
+        if (_forcedRoundWinner is int forced)
+            result = result with { Winner = forced, DecidedByTiebreak = false, WonBy = _forcedRoundReason };
+        if (result.Winner is int w) State.Players[w].RoundsWon++;
+        State.LastRoundWinner = result.Winner;
+        await EmitAsync(new RoundScoredEvent(result), ct);
+        return result;
+    }
+
+    // ================================================================== Clean-up (§5.4)
+
+    private async Task CleanUpAsync(CancellationToken ct)
+    {
+        State.Phase = GamePhase.CleanUp;
+        // 1. Clean-up triggers: Y'nosh first, then Preferred Candidate, Lone Wolf & co.
+        await FirePhaseTriggersAsync("CleanUp", ct);
+
+        // 2. Units on nodes are Retired, except those that remain in play (Preferred Candidate).
+        foreach (int p in TurnOrder())
+        {
+            foreach (var node in State.Players[p].ScoringNodes.ToList())
+            {
+                // Spacecraft (S9): the spacecraft and its crew each follow their own rules (crew first, so it isn't
+                // dropped to the ground and then Retired as a ground Unit – same result, clearer log).
+                foreach (var card in node.Occupants.Reverse().ToList())
+                {
+                    if (!node.Holds(card) || _remainInPlay.Contains(card)) continue;
+                    await RetireAsync(card, ct); // fires "When this Unit leaves play"
+                }
+            }
+        }
+
+        foreach (int p in TurnOrder())
+        {
+            foreach (var node in State.Players[p].OrderNodes)
+            {
+                if (node.Card is null) continue;
+                var card = node.Card;
+                State.MoveToPile(card, PileKind.IssuedOrders);
+                await EmitAsync(new CardMovedToPileEvent(card, node, card.Location.Pile ?? PileKind.IssuedOrders), ct); // Archons go home
+
+            }
+        }
+
+        foreach (var node in State.AllNodes) node.IsLocked = false;
+
+        // Archons (A8): an Archon not played this round is lost (the once-per-game draw stays used).
+        foreach (int p in TurnOrder())
+        {
+            if (State.Players[p].ArchonSlot is not { } archon) continue;
+            State.ReturnArchonToDeck(archon);
+            await EmitAsync(new ArchonLostEvent(p, archon), ct);
+        }
+
+        // 5. Warzones: Active Warzones go to the bottom of the Warzone deck in random order.
+        if (State.ActiveWarzones.Count > 0)
+        {
+            var active = State.ActiveWarzones.ToList();
+            State.Shuffle(active);
+            foreach (var wz in active)
+            {
+                State.MoveToPileBottom(wz, PileKind.WarzoneDeck);
+                await EmitAsync(new WarzoneReturnedEvent(wz), ct);
+            }
+        }
+
+        await EmitAsync(new RoundEndedEvent(State.Round, State.Players[0].RoundsWon, State.Players[1].RoundsWon), ct);
+    }
+
+    // ================================================================== Game end (§5.5)
+
+    private GameOutcome? CheckGameEnd()
+    {
+        int r0 = State.Players[0].RoundsWon;
+        int r1 = State.Players[1].RoundsWon;
+        int target = State.Options.RoundsToWin;
+
+        if (r0 >= target || r1 >= target)
+            return new GameOutcome(r0 >= target ? 0 : 1, r0, r1, State.Round, $"First to {target} rounds");
+
+        if (State.EndAfterThisRound)
+            return new GameOutcome(r0 == r1 ? null : (r0 > r1 ? 0 : 1), r0, r1, State.Round, "A deck ran out");
+
+        if (_actionsThisRound == 0 && !CanStillDrawUnits())
+            return new GameOutcome(r0 == r1 ? null : (r0 > r1 ? 0 : 1), r0, r1, State.Round, "No playable cards left");
+
+        if (State.Round >= MaxRounds)
+            return new GameOutcome(r0 == r1 ? null : (r0 > r1 ? 0 : 1), r0, r1, State.Round, "Round limit reached");
+
+        return null;
+    }
+
+    private bool CanStillDrawUnits() =>
+        State.Options.DeckMode == DeckMode.RandomDraw
+        || State.UnitDeck.Count > 0
+        || (State.Options.EmptyDeck == EmptyDeckRule.Reshuffle && State.RetiredUnits.Count > 0);
+
+    internal Task EmitAsync(GameEvent e, CancellationToken ct) => _sink.PublishAsync(e, ct);
+}

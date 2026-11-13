@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Allows building the WPF project from non-Windows machines (CI etc.). Harmless on Windows. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!-- One place for the version: the assemblies, the window title, build\publish.ps1, the installer and the setup
+         file name all read it. Bump it for each release (major.minor.patch). -->
+    <Version>1.1.0</Version>
+    <Product>Cosmic Crusade</Product>
+    <Authors>Gavin Nicholls</Authors>
+    <Company>Gavin Nicholls</Company>
+    <Copyright>Copyright (c) 2026 Gavin Nicholls</Copyright>
+  </PropertyGroup>
+</Project>

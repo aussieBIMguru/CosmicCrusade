@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "CosmicCrusade.Relay": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
