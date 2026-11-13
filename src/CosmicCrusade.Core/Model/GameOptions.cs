@@ -29,6 +29,12 @@ public sealed class GameOptions
     /// <summary>M4: how strong the AI seat plays (Easy = heuristic, Normal/Hard = Monte Carlo search).</summary>
     public CosmicCrusade.Core.Ai.AiDifficulty AiDifficulty { get; set; } = CosmicCrusade.Core.Ai.AiDifficulty.Normal;
 
+    /// <summary>
+    /// Turn clock: seconds each player has to decide on their turn (0 = no clock). App-only: the engine never reads it,
+    /// so it can't affect the rules or the shuffle. A timed-out turn simply submits a Pass (see HumanController).
+    /// </summary>
+    public int TurnSeconds { get; set; } = 120;
+
     public int HandUnitTarget { get; set; } = 5;
     public int HandOrderTarget { get; set; } = 3;
 

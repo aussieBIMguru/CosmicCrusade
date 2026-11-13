@@ -44,6 +44,13 @@
                                    ToolTip="Easy: rule-of-thumb play. Normal / Hard: the AI simulates its options before each turn (Hard thinks longer)." />
                         <ComboBox ItemsSource="{Binding AiDifficulties}" SelectedItem="{Binding AiDifficulty}" Margin="0,2,0,10" />
 
+                        <TextBlock Text="Turn clock (minutes per turn)" Style="{StaticResource Muted}"
+                                   ToolTip="How long you have to decide each turn (0 = no clock). With 15 seconds left a fuse burns along the middle of the board; when it runs out you pass. Online, the host's setting is used." />
+                        <DockPanel Margin="0,2,0,10">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding TurnClockDisplay}" Width="56" TextAlignment="Right" FontSize="16" />
+                            <Slider Minimum="0" Maximum="10" IsSnapToTickEnabled="True" TickFrequency="0.5" Value="{Binding TurnMinutes}" />
+                        </DockPanel>
+
                         <TextBlock Text="Deck mode" Style="{StaticResource Muted}" />
                         <ComboBox ItemsSource="{Binding DeckModes}" SelectedItem="{Binding DeckMode}" Margin="0,2,0,10" />
 

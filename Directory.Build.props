@@ -9,7 +9,7 @@
 
     <!-- One place for the version: the assemblies, the window title, build\publish.ps1, the installer and the setup
          file name all read it. Bump it for each release (major.minor.patch). -->
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Product>Cosmic Crusade</Product>
     <Authors>Gavin Nicholls</Authors>
     <Company>Gavin Nicholls</Company>

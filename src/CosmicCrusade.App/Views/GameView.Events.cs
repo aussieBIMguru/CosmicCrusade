@@ -28,6 +28,7 @@ public partial class GameView
     public async Task PublishAsync(GameEvent gameEvent, CancellationToken ct)
     {
         if (ct.IsCancellationRequested || _state is null) return;
+        ClockOnEvent(gameEvent); // turn clock: whose turn budget is running
 
         switch (gameEvent)
         {

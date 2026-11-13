@@ -65,6 +65,7 @@ public partial class GameView : UserControl, IGameEventSink
         _human.DecisionCompleted += OnHumanDecisionCompleted;
         _human.ChoiceRequested += OnHumanChoiceRequested;
         _human.ChoiceCompleted += OnHumanChoiceCompleted;
+        InitTurnClock(); // after the HUD handlers above (GameView.TurnClock.cs)
 
         Loaded += OnLoaded;
         Loaded += (_, _) => Sfx.SetMusic(MusicCheck.IsChecked == true);
@@ -81,7 +82,7 @@ public partial class GameView : UserControl, IGameEventSink
         OpponentHandCanvas.SizeChanged += (_, _) => LayoutOpponentHand(animate: false);
         PreviewKeyDown += OnKeyDown;
         ZoomHost.MouseRightButtonDown += ZoomHost_MouseRightButtonDown;
-        SizeChanged += (_, _) => { HideMagnifier(); CloseInspect(); };
+        SizeChanged += (_, _) => { HideMagnifier(); CloseInspect(); ClosePileViewer(); };
         // Clicking the table takes the keyboard back from the chat box (Space = pass, Enter = confirm).
         PlayArea.PreviewMouseDown += (_, _) => { if (ChatInput.IsKeyboardFocusWithin) Focus(); };
     }
@@ -185,6 +186,7 @@ public partial class GameView : UserControl, IGameEventSink
                 if (list.Count > 0) ShowZoom(list[^1]);
             };
             view.MouseLeftButtonDown += Pile_MouseLeftButtonDown;
+            if (CanBrowse(pile)) view.ToolTip = $"{BoardLayout.PileLabel(pile)}: click to see every card in it, right-click to enlarge the top card";
             view.MouseRightButtonDown += (_, e) =>
             {
                 // Right-click a face-up pile to enlarge its top card. Several Active Warzones: each right-click
@@ -217,6 +219,7 @@ public partial class GameView : UserControl, IGameEventSink
             bool isDeck = kind is PileKind.UnitDeck or PileKind.OrderDeck;
             view.Update(State.GetPile(kind), virtualDecks && isDeck ? (int?)int.MaxValue : null);
         }
+        RefreshPileViewer(); // an open pile viewer follows the game
     }
 
     // =================================================================== camera
@@ -880,7 +883,15 @@ public partial class GameView : UserControl, IGameEventSink
 
     private void Pile_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not PileView { IsTarget: true } pv) return;
+        if (sender is not PileView pv) return;
+        if (!pv.IsTarget)
+        {
+            // Not part of a move right now: open the pile to look through it (GameView.PileViewer.cs).
+            if (!CanBrowse(pv.Pile)) return;
+            e.Handled = true;
+            OpenPileViewer(pv.Pile);
+            return;
+        }
         e.Handled = true;
         if (_selectedIssue is null && _human.Current is { IsResponse: false } ctx
             && ctx.Legal.OfType<DeployFromPileAction>().FirstOrDefault(a => a.Pile == pv.Pile) is { } fromPile)
@@ -938,7 +949,9 @@ public partial class GameView : UserControl, IGameEventSink
         }
         else if (e.Key == Key.Escape)
         {
-            if (IsInspectOpen) CloseInspect(); // first Esc closes the enlarged card, the next clears the selection
+            // Esc closes the enlarged card first, then the pile viewer, then clears the selection.
+            if (IsInspectOpen) CloseInspect();
+            else if (IsPileViewerOpen) ClosePileViewer();
             else ClearSelection();
             e.Handled = true;
         }

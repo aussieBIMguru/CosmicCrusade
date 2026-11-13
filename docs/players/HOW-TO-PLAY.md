@@ -17,7 +17,7 @@ A quick start in the app. You don't need to know the rules first: the game only 
 
 | Area | What it's for |
 |---|---|
-| **Game setup** (left) | Rounds to win, AI difficulty (Easy / Normal / Hard), deck mode, what happens when a deck runs out, and a seed (leave blank for a random shuffle). |
+| **Game setup** (left) | Rounds to win, AI difficulty (Easy / Normal / Hard), the **turn clock** (minutes per turn, 2 by default; 0 = off), deck mode, what happens when a deck runs out, and a seed (leave blank for a random shuffle). |
 | Module check boxes | **Warzones**, **Archons**, **Spacecraft**, and **Leaders** (untick for No Leaders mode). Leave them off for your first games. |
 | **Card pool** (middle) | Every card and how many copies are in the decks. Click a card to preview it; edit **Copies** to change the decks. **RESET COUNTS** puts them back. |
 | **Player** (right) | **Your name**, shown on the score panel and to online opponents. |
@@ -64,6 +64,10 @@ When a card asks you to choose something (a target, a node, "yes or no"), a pane
 
 **The round ends when you both pass one after the other.** Passing isn't final: if your opponent plays something after you pass, you can act again.
 
+**Turn clock.** You have a set time to decide each turn (2 minutes unless you change it on the main menu); it's shown above the PASS button. It only runs while the game is waiting for you, and choosing targets for your card uses the same time. With **15 seconds** left, a fuse lights on the line across the middle of the board and burns towards the PASS button. If it burns out, you pass (or, in a React window, you let it happen; in a choice, the first option is picked). Online, the host's clock setting is used for both players.
+
+**Tapping the table.** Click any bare part of the board for a little ripple. It doesn't do anything; it's just fun to poke while you think.
+
 ---
 
 ## 4. Reacting
@@ -81,6 +85,7 @@ Some Orders are **Reacts**: you play them *in response* to something, even on yo
 
 - **Hover** any card to read it in the inspector.
 - **Right-click** any card to see it full size (click, right-click or Esc to close).
+- **Click a face-up pile** (Retired, Nullified, Issued, Active Warzone) to see every card in it, newest first. **LIST VIEW** / **CARD VIEW** switches between a compact list and the cards laid out in order. Hover to preview, right-click to enlarge, click outside or press Esc to close. (While a pile is glowing as part of your move, a click uses it instead; right-click still shows its top card.)
 - **Magnify hand cards on hover** enlarges the hand card under your mouse.
 - The **totals** and the bar at the top of the side panel show who would win if the round ended now.
 - Chevrons between opposed nodes show who's winning each pair, which matters if the totals tie.

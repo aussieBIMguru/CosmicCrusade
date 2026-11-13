@@ -1,12 +1,20 @@
 # Cosmic Crusade: Handover to the next chat
 
-**Updated:** 8 Nov 2026 (README split; `ai/` folder created). Latest work: player guides, licence, LAN Server, installer.
+**Updated:** 13 Nov 2026. Latest work: turn clock with a burning fuse, table taps. Before that: player guides, licence, LAN Server, installer.
 
 Cosmic Crusade is Gavin's own physical card game. It's being built as a **Windows standalone app** (C#, .NET 8, WPF/MVVM, Visual Studio) where one human plays an AI **or another human online**, with a fixed rules engine and configurable card pools.
 
 The in-game AI is plain C# that runs locally: no network, API or LLM, so it's free and works offline.
 
 ## Status
+- **13 Nov 2026: version 1.1.0** (`Directory.Build.props`): turn clock, table taps and pile viewer. Installer output: `artifacts\CosmicCrusade-Setup-1.1.0.exe`. Online, both players should be on 1.1.0 (1.0.0 still connects: `GameVersion` is unchanged, but a 1.0.0 host means no clock).
+- **13 Nov 2026: pile viewer** (written, not compiled yet). `Views/GameView.PileViewer.cs` + `PileViewerOverlay` in `GameView.xaml` (just below `InspectOverlay`, so right-click inspect opens over it). Left-click a face-up pile that isn't a move target (Retired, Nullified, Issued, Active Warzone; `CanBrowse`) → every card, newest first, numbered (1 = top, gold). CARD VIEW (a `WrapPanel` of `CardView`s, 118 px) or LIST VIEW (number, accent bar, name, races · class/Order type, printed Rank); the choice is remembered for the run (`_pileListMode`). Hover previews big on the right (280 px vector) and in the side-panel zoom; right-click enlarges. Closes on outside click, CLOSE, Esc (after an open inspect) or window resize. `UpdatePiles` refreshes it while open, so it follows the game. Read-only: it never touches the engine.
+- **13 Nov 2026: turn clock + table taps** (written, not compiled yet).
+  - `GameOptions.TurnSeconds` (default 120, 0 = off; app-only, the engine never reads it). Setup slider "Turn clock (minutes per turn)", 0–10 in half-minute steps, saved as `AppSettings.TurnMinutes`. Online it travels in `NetOptions.TurnSeconds` (nullable: a host from before the clock means no clock). No `GameVersion` bump: the rules didn't change.
+  - `Board/TurnClock.cs`: time runs only while that player is being asked (turn, React window, ability choice). On your own turn everything shares one budget (targets, counter-Reacts, Open Source extra actions); it refills at your next `TurnStartedEvent`. A `PassedEvent`, the round scoring or the other player's turn ends it. Off-turn questions get the full limit each. Paused while the table is blocked (reconnecting / opponent away / game over).
+  - `Views/GameView.TurnClock.cs`: drives both clocks (`ClockOnEvent` first thing in `PublishAsync`; `WatchOpponentClock` on the `RemoteSeat`), the side-panel readout (`TurnClockPanel` above the status line), and at ≤15 s a **fuse** on the control line burning left → right towards PASS (cord clipped as it burns, flickering ember, sparks, smoke, `FuseHiss`, ticks in the last 5 s). Out of time → `HumanController.AnswerOnTimeout()`: turn = Pass ("END TURN" on an extra action), React window = no response, choice = `DefaultPick()`; logged, gong. Online each app only enforces its own player; the opponent's fuse is cosmetic, and the timed-out decision goes over `LocalSeat` like any other.
+  - **Table taps:** a left click on the board that nothing handled, and not on a card or pile, gives a ripple (blue your half, red theirs), motes and `TableTap`. Local only. New sounds: `FuseHiss`, `TableTap`.
+  - Check on first build: the fuse sits on the control line between the front rows and reads well when tilted; `e.GetPosition(BoardCanvas)` through the 3D plane puts the ripple under the cursor; a timeout mid-target-choice closes the choice panel; online, the guest gets the host's clock.
 - **8 Nov 2026: repo tidy.**
   - The README is now short and player-facing, with a placeholder hero image at `docs/images/hero.png` (to be replaced by a screenshot; see `docs/images/README.md`).
   - Build and architecture notes moved to `docs/developing.md`.
@@ -19,7 +27,7 @@ The in-game AI is plain C# that runs locally: no network, API or LLM, so it's fr
   - **Default server:** `data/online.json` `defaultServer` pre-fills the Server box when the player hasn't set one (`AppSettings.DefaultServer`).
   - The stale "Milestone 3.1" text on the setup screen is replaced by the guide links.
 - **8 Nov 2026: installer written** (not yet run: no Windows or Inno Setup in Claude's sandbox). Same setup as Throng:
-  - `Directory.Build.props` `<Version>` (1.0.0, also shown in the window title);
+  - `Directory.Build.props` `<Version>` (1.1.0 since 13 Nov 2026, also shown in the window title);
   - `publish.bat` → `build\publish.ps1`: tests, self-contained win-x64 publish to `artifacts\app`, checks the exe, data and every art image, then Inno Setup → `artifacts\CosmicCrusade-Setup-<version>.exe` + SHA-256;
   - `installer\CosmicCrusade.iss`: per user, `%LocalAppData%\Programs\Cosmic Crusade`, Start menu + desktop shortcuts, AppId `5A56303A-43B9-4EFB-928C-D34F05229610`, which must never change;
   - VS publish profile `Release-win-x64.pubxml`, and `clean.bat`.
@@ -41,7 +49,7 @@ Full design: `design/multiplayer.md`. Summary:
 - **Reliability:** 4 s heartbeat both ways (opponent silent for 15 s → "connection lost, waiting"), automatic reconnect into the same seat (secret key), numbered decision log plus `resume` re-sends missed moves, stuck detection (both waiting with nothing in flight → desync).
 - **Lobby:** guest `hello` (version, name, cards.json fingerprint) → host `start` (options, names) or `reject`. **Bump `NetProtocol.GameVersion` when the rules change.**
 - **App:** `Board/Perspective.cs` (Me/Opp; ~80 UI sites converted from hard-coded player 0, all "AI" strings now use the opponent's name); `Views/GameView.Online.cs` (chat, status line, waiting overlay, opponent left / desync handling); setup screen PLAYER + PLAY ONLINE panel (name, server, HOST / JOIN, code); `AppSettings` (`%AppData%\CosmicCrusade\settings.json`).
-- **Not yet:** resume after an app restart, a rematch button, spectators, turn timer, hidden-information (server-authoritative) mode.
+- **Not yet:** resume after an app restart, a rematch button, spectators, hidden-information (server-authoritative) mode. (Turn clock: done 13 Nov 2026, see Status.)
 
 ### Multiplayer things to check on first build/run
 - Compile errors (written blind). Likely spots: `GameView` partials (the new `Me`/`Opp` static helpers vs any local names, pattern variables added to the round-result and game-over code in `GameView.Events.cs` and to `UpdateBoardReadout`), `SetupView.xaml` (new right-column panel), `NetConnection` (channels, `Interlocked.Exchange` on the transport), the relay's primary-constructor classes.
@@ -114,7 +122,7 @@ Each new module needs design + rulings before code, the same way the base game, 
 - `src/CosmicCrusade.Relay`: local relay (ASP.NET Core minimal API, port 5080).
 - `server/cloudflare`: online relay (Cloudflare Worker), with a Node test of its room logic.
 - `tests/CosmicCrusade.Core.Tests`: xUnit incl. soak, determinism, `RulesTests`, `OrderReactAssembleTests`, `EffectTests`, `StaticTests`, `TriggerTests`, `M32cTests`, `M33Tests`, `EffectsPassTests`, `M4Tests`, `ArchonTests`, `SpacecraftTests`, `NetTests` (+ `NetTestSupport`: in-memory relay, single-thread pump).
-- `src/CosmicCrusade.App`: `Assets/` (icon), `Views/` (GameView + partials `.Events`, `.Inspect`, `.Stack`, `.Choices`, `.Effects`, `.Fx`, `.Fx2`, `.Fx3`, `.Fx3Ambient`, `.Archons`, `.Spacecraft`, `.Online`; SetupView), `Controls/`, `Board/` (incl. `Perspective`), `Rendering/`, `ViewModels/`, `AppSettings`.
+- `src/CosmicCrusade.App`: `Assets/` (icon), `Views/` (GameView + partials `.Events`, `.Inspect`, `.Stack`, `.Choices`, `.Effects`, `.Fx`, `.Fx2`, `.Fx3`, `.Fx3Ambient`, `.Archons`, `.Spacecraft`, `.Online`, `.TurnClock`; SetupView), `Controls/`, `Board/` (incl. `Perspective`, `TurnClock`), `Rendering/`, `ViewModels/`, `AppSettings`.
 
 ## Testing
 - Scenario tests use `OrderReactAssembleTests.Run(state, p0, p1, throughCleanUp: false)` with `ScriptedController`: `.Turn(...)`, `.React(name)`, `Chooser`. The default answer to every choice is the first option / "Yes". Forced choices are never asked.

@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace CosmicCrusade.App;
 
 /// <summary>
-/// Remembered between runs: your player name and the online server address.
+/// Remembered between runs: your player name, the online server address and the turn clock.
 /// Stored in %AppData%\CosmicCrusade\settings.json.
 /// </summary>
 public sealed class AppSettings
@@ -16,6 +16,9 @@ public sealed class AppSettings
     /// or ws://localhost:5080 for the local test relay.
     /// </summary>
     public string ServerAddress { get; set; } = "";
+
+    /// <summary>Turn clock: minutes per turn (0 = no clock). Hosting online, your opponent gets yours.</summary>
+    public double TurnMinutes { get; set; } = 2;
 
     /// <summary>The name shown in games: your player name, or "You" if you haven't set one.</summary>
     public string DisplayName => string.IsNullOrWhiteSpace(PlayerName) ? "You" : PlayerName.Trim();

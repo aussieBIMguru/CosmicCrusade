@@ -116,6 +116,39 @@
                 </StackPanel>
             </Border>
 
+            <!-- Pile viewer: every card in a face-up pile, newest first (GameView.PileViewer.cs). Below the inspect
+                 overlay, so right-clicking a card in it still enlarges it. -->
+            <Grid x:Name="PileViewerOverlay" Visibility="Collapsed" Background="#C8020310" MouseDown="PileViewerOverlay_MouseDown">
+                <Border x:Name="PileViewerPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="18,14"
+                        CornerRadius="16" Background="#F00A0D24" BorderBrush="#AA4FD1FF" BorderThickness="2"
+                        RenderTransformOrigin="0.5,0.5" MouseDown="PileViewerPanel_MouseDown">
+                    <Border.RenderTransform>
+                        <ScaleTransform x:Name="PileViewerScale" ScaleX="1" ScaleY="1" />
+                    </Border.RenderTransform>
+                    <Border.Effect>
+                        <DropShadowEffect Color="#4FD1FF" BlurRadius="30" ShadowDepth="0" Opacity="0.5" />
+                    </Border.Effect>
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                            <Button DockPanel.Dock="Right" Content="CLOSE" Style="{StaticResource SmallButton}" Margin="8,0,0,0"
+                                    VerticalAlignment="Center" Click="PileViewerClose_Click" ToolTip="Close (Esc)" />
+                            <Button x:Name="PileViewerModeButton" DockPanel.Dock="Right" Style="{StaticResource SmallButton}"
+                                    VerticalAlignment="Center" Click="PileViewerMode_Click"
+                                    ToolTip="Switch between the cards laid out in order and a compact list" />
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock x:Name="PileViewerTitle" FontFamily="{StaticResource DisplayFont}" FontSize="34"
+                                           Foreground="{StaticResource GoldBrush}" />
+                                <TextBlock x:Name="PileViewerSubtitle" Style="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DockPanel>
+                        <Border x:Name="PileViewerPreview" DockPanel.Dock="Right" Margin="16,0,0,0" VerticalAlignment="Top" />
+                        <ScrollViewer x:Name="PileViewerScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ContentControl x:Name="PileViewerContent" Focusable="False" />
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+            </Grid>
+
             <!-- Right-click inspect: one big crisp card; any click or Esc closes it -->
             <Grid x:Name="InspectOverlay" Visibility="Collapsed" Background="#C8020310" Cursor="Hand"
                   MouseDown="InspectOverlay_MouseDown">
@@ -180,7 +213,7 @@
 
                 <!-- Zoomed card -->
                 <Border x:Name="ZoomHost" Grid.Row="0" Height="330" HorizontalAlignment="Center" Margin="0,0,0,8">
-                    <TextBlock x:Name="ZoomHint" Text="Hover a card to inspect it&#x0a;Right-click a card to enlarge it" TextAlignment="Center" Style="{StaticResource Muted}"
+                    <TextBlock x:Name="ZoomHint" Text="Hover a card to inspect it&#x0a;Right-click a card to enlarge it&#x0a;Click a face-up pile to see all its cards" TextAlignment="Center" Style="{StaticResource Muted}"
                                VerticalAlignment="Center" HorizontalAlignment="Center" />
                 </Border>
 
@@ -224,6 +257,14 @@
 
                 <!-- Turn status + pass -->
                 <StackPanel Grid.Row="2" Margin="0,8,0,0">
+                    <!-- Turn clock: shown while someone is deciding (GameView.TurnClock.cs). -->
+                    <StackPanel x:Name="TurnClockPanel" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,2"
+                                Visibility="Collapsed" IsHitTestVisible="False">
+                        <TextBlock x:Name="TurnClockLabel" Style="{StaticResource Muted}" FontSize="12" VerticalAlignment="Center"
+                                   Margin="0,0,8,0" Text="YOUR CLOCK" />
+                        <TextBlock x:Name="TurnClockText" FontFamily="{StaticResource DisplayFont}" FontSize="30" Foreground="White"
+                                   MinWidth="56" TextAlignment="Center" Text="2:00" />
+                    </StackPanel>
                     <TextBlock Text="{Binding Status}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
                     <TextBlock Text="{Binding Hint}" Style="{StaticResource Muted}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,2,0,6" />
                     <TextBlock Text="{Binding HandRevealNote}" Foreground="#C084FC" FontSize="12" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,4">

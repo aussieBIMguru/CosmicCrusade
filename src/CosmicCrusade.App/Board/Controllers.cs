@@ -51,6 +51,30 @@ public sealed class HumanController : IPlayerController
 
     public bool IsWaiting => _pending is not null;
 
+    /// <summary>
+    /// The turn clock ran out: answers whatever is being asked with the safe default. A turn passes ("END TURN" during an
+    /// Open Source extra action), a React window answers "no response", an ability choice takes its default pick.
+    /// Online this goes through <c>LocalSeat</c> like any other decision, so both games stay in step.
+    /// Returns what was answered, or null if nothing was being asked.
+    /// </summary>
+    public TimeoutAnswer? AnswerOnTimeout()
+    {
+        if (_pendingChoice is not null && CurrentChoice is { } req)
+        {
+            var pick = req.DefaultPick();
+            if (!req.IsValid(pick)) return null;
+            SubmitChoice(pick);
+            return TimeoutAnswer.Choice;
+        }
+        if (_pending is not null && Current is { } ctx && ctx.Legal.OfType<PassAction>().FirstOrDefault() is { } pass)
+        {
+            var kind = ctx.IsResponse ? TimeoutAnswer.NoResponse : ctx.ExtraAction ? TimeoutAnswer.EndTurn : TimeoutAnswer.Pass;
+            Submit(pass);
+            return kind;
+        }
+        return null;
+    }
+
     // ------------------------------------------------------------------ ability choices
 
     private TaskCompletionSource<IReadOnlyList<int>>? _pendingChoice;
@@ -92,6 +116,15 @@ public sealed class HumanController : IPlayerController
         DecisionCompleted?.Invoke();
         tcs.TrySetResult(action);
     }
+}
+
+/// <summary>What <see cref="HumanController.AnswerOnTimeout"/> did.</summary>
+public enum TimeoutAnswer
+{
+    Pass,
+    EndTurn,
+    NoResponse,
+    Choice,
 }
 
 /// <summary>Wraps an AI so its moves are paced for a human to follow.</summary>

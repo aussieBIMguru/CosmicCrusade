@@ -45,6 +45,7 @@ public partial class GameView
         var local = new LocalSeat(_human, net);
         var remote = new RemoteSeat(net);
         remote.WaitingChanged += SetAiThinking; // the holographic eye pulses while the opponent decides
+        WatchOpponentClock(remote);             // and their turn clock (and fuse) runs
 
         net.ChatReceived += OnChatReceived;
         net.OpponentPresenceChanged += OnOpponentPresenceChanged;

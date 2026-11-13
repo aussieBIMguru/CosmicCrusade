@@ -17,6 +17,8 @@ public enum SfxKind
     Riffle, Deal, Taunt, Cycle, Crack, SlowMo, LiftOff,
     // Archons
     ArchonInvoke, ArchonBell, ArchonBeam, ArchonQuake,
+    // Turn clock fuse + tapping the table
+    FuseHiss, TableTap,
 }
 
 /// <summary>
@@ -440,6 +442,16 @@ public static class Sfx
         // Victory: Units lift off.
         SfxKind.LiftOff => Lowpass(Render(1.4, (t, n) =>
             (n * 0.5 + Math.Sin(2 * Math.PI * (120 + 300 * t) * t) * 0.4) * Math.Sin(Math.PI * t / 1.4)), 0.3),
+
+        // Turn clock: a burning fuse, crackling (random pops in a soft hiss).
+        SfxKind.FuseHiss => Lowpass(Render(0.8, (t, n) =>
+            (n * 0.3 + (Math.Abs(n) > 0.94 ? Math.Sign(n) * 0.9 : 0)) * Math.Sin(Math.PI * t / 0.8)), 0.45),
+
+        // Tapping the table: a soft knock under a small glassy "tink".
+        SfxKind.TableTap => Render(0.22, (t, n) =>
+            Math.Sin(2 * Math.PI * 150 * t) * Math.Exp(-t * 40) * 0.5
+            + (Math.Sin(2 * Math.PI * 1180 * t) * 0.35 + Math.Sin(2 * Math.PI * 1770 * t) * 0.18) * Math.Exp(-t * 22)
+            + n * Math.Exp(-t * 140) * 0.15),
 
         _ => Array.Empty<float>(),
     };

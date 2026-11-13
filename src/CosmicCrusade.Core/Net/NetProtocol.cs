@@ -145,6 +145,9 @@ public sealed class NetOptions
     public int Seed { get; set; }
     public int HandUnitTarget { get; set; }
     public int HandOrderTarget { get; set; }
+
+    /// <summary>The host's turn clock (seconds, 0 = off). Null from a host built before the clock: no clock.</summary>
+    public int? TurnSeconds { get; set; }
     public Dictionary<string, int> CopyCounts { get; set; } = new();
     public List<string> LeaderRelatedCards { get; set; } = new();
 
@@ -160,6 +163,7 @@ public sealed class NetOptions
         Seed = o.Seed,
         HandUnitTarget = o.HandUnitTarget,
         HandOrderTarget = o.HandOrderTarget,
+        TurnSeconds = o.TurnSeconds,
         CopyCounts = o.CopyCounts.OrderBy(kv => kv.Key, StringComparer.Ordinal).ToDictionary(kv => kv.Key, kv => kv.Value),
         LeaderRelatedCards = o.LeaderRelatedCards.OrderBy(x => x, StringComparer.Ordinal).ToList(),
     };
@@ -178,6 +182,7 @@ public sealed class NetOptions
             Seed = Seed,
             HandUnitTarget = HandUnitTarget,
             HandOrderTarget = HandOrderTarget,
+            TurnSeconds = TurnSeconds ?? 0,
         };
         foreach (var kv in CopyCounts) o.CopyCounts[kv.Key] = kv.Value;
         foreach (var id in LeaderRelatedCards) o.LeaderRelatedCards.Add(id);

@@ -76,6 +76,9 @@ public sealed class SetupViewModel : ObservableObject
     private string _onlineStatus = "";
     private string _hostCode = "";
     private bool _onlineBusy;
+    private double _turnMinutes = Math.Clamp(AppSettings.Current.TurnMinutes, 0, MaxTurnMinutes);
+
+    public const double MaxTurnMinutes = 10;
 
     public SetupViewModel()
     {
@@ -119,6 +122,19 @@ public sealed class SetupViewModel : ObservableObject
     public IReadOnlyList<AiDifficulty> AiDifficulties { get; } = Enum.GetValues<AiDifficulty>();
 
     public AiDifficulty AiDifficulty { get => _aiDifficulty; set => Set(ref _aiDifficulty, value); }
+
+    /// <summary>Turn clock, minutes per turn in half-minute steps (0 = off). Saved between runs.</summary>
+    public double TurnMinutes
+    {
+        get => _turnMinutes;
+        set
+        {
+            if (Set(ref _turnMinutes, Math.Clamp(Math.Round(value * 2) / 2, 0, MaxTurnMinutes))) Raise(nameof(TurnClockDisplay));
+        }
+    }
+
+    /// <summary>"Off", "2 min", "1.5 min".</summary>
+    public string TurnClockDisplay => TurnMinutes <= 0 ? "Off" : $"{TurnMinutes:0.#} min";
 
     public int RoundsToWin { get => _roundsToWin; set => Set(ref _roundsToWin, Math.Clamp(value, 1, 9)); }
     public DeckMode DeckMode { get => _deckMode; set { if (Set(ref _deckMode, value)) UpdateTotals(); } }
@@ -179,6 +195,7 @@ public sealed class SetupViewModel : ObservableObject
         var s = AppSettings.Current;
         s.PlayerName = PlayerName.Trim();
         s.ServerAddress = ServerAddress.Trim();
+        s.TurnMinutes = TurnMinutes;
         s.Save();
     }
 
@@ -193,6 +210,7 @@ public sealed class SetupViewModel : ObservableObject
         o.AiDifficulty = AiDifficulty;
         o.Archons = Archons;
         o.Spacecraft = Spacecraft;
+        o.TurnSeconds = (int)Math.Round(TurnMinutes * 60);
         o.Seed = int.TryParse(Seed, out int s) ? s : Environment.TickCount;
         foreach (var row in Cards) o.CopyCounts[row.Id] = row.Copies;
         return o;
